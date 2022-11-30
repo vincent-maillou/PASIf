@@ -1,3 +1,6 @@
+# Regarding the dataset, used for debug now
+data/*
+
 # ---> C++
 # Prerequisites
 *.d
