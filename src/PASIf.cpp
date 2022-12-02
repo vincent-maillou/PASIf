@@ -24,6 +24,14 @@ PYBIND11_MODULE(PASIf, m) {
   py::class_<__GpuDriver>(m, "__GpuDriver")
     .def(py::init<std::vector<std::vector<reel>>, uint>(),
       py::arg("excitationSet_"),
-      py::arg("sampleRate_"));
+      py::arg("sampleRate_"))
+    .def("__setSystems", &__GpuDriver::__setSystems, 
+      py::arg("M_"),
+      py::arg("B_"),
+      py::arg("K_"),
+      py::arg("Gamma_"),
+      py::arg("Lambda_"),
+      py::arg("ForcePattern_"))
+    .def("__getAmplitudes", &__GpuDriver::__getAmplitudes);
 
 }

@@ -9,6 +9,7 @@
  * 
  */
 
+
 #include "helpers.cuh"
 
 
@@ -18,17 +19,21 @@ class __GpuDriver{
   __GpuDriver(std::vector< std::vector<reel> > excitationSet_, uint sampleRate_);
   ~__GpuDriver();
 
+
   int __setSystems(std::vector< matrix > & M_,
                    std::vector< matrix > & B_,
                    std::vector< matrix > & K_,
-                   std::vector< tensor >  & Gamma_,
+                   std::vector< tensor > & Gamma_,
                    std::vector< matrix > & Lambda_,
                    std::vector< std::vector<reel> > & ForcePattern_);
 
+  int __getAmplitudes();
 
 
  private:
   int loadExcitationsSet(std::vector<std::vector<reel>> ExcitationsSet_);
+  int setCUDA(uint nStreams_);
+
 
   // Host-wise data
   std::vector<reel> excitationSet;
@@ -36,19 +41,36 @@ class __GpuDriver{
   uint numberOfExcitations;
   uint lengthOfeachExcitation;
 
-  std::vector<reel> ForcePattern;
-
   uint numberOfDOFs;
+
 
   // Device-wise data
   reel *d_ExcitationsSet;
-  reel *d_ForcePattern;
 
   // System description
-  COOMatrix B;
-  COOMatrix K;
-  COOTensor Gamma;
-  COOMatrix Lambda;
+  COOMatrix *B;
+  COOMatrix *K;
+  COOTensor *Gamma;
+  COOMatrix *Lambda;
+  COOVector *ForcePattern;
 
 
+  // Computation parameters
+  uint nStreams;
+  cudaStream_t *streams;
+
+  uint IntraStrmParallelism;
+
+  int  deviceId;
+  int  numberOfSMs;
+  uint numberOfBlocks;
+  uint numberOfThreadsPerBlock;
+
+  cusparseHandle_t h_cuSPARSE;
 };
+
+
+
+
+
+
