@@ -11,6 +11,7 @@
 
 
 #include "helpers.cuh"
+#include "kernels.cuh"
 
 
 

@@ -1,3 +1,13 @@
+/**
+ * @file helpers.cuh
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-12-02
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 #pragma once
 
 #include <cuda_runtime.h>
@@ -140,6 +150,8 @@
     // device-side data
     reel *d_val;
     uint *d_indice;
+
+    cusparseSpVecDescr_t sparseVec;
   };
 
   std::ostream& operator<<(std::ostream& out, COOVector const& vector_);

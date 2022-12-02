@@ -337,6 +337,10 @@
     // Copy the data to the device
     CHECK_CUDA( cudaMemcpy(d_indice, indice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
     CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+
+    // Create the sparse vector descriptor
+    CHECK_CUSPARSE( cusparseCreateSpVec(&sparseVec, n, nzz, &d_indice, &d_val,
+                                        CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
   }
 
 

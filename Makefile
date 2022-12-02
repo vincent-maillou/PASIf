@@ -16,11 +16,15 @@ $(PBUILD)PASIf.so: $(PBUILD)PASIf.o $(PBUILD)__GpuDriver.o $(PBUILD)helpers.o
 $(PBUILD)PASIf.o: $(PSRC)PASIf.cpp $(PBUILD)helpers.o
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC -c $(python3-config --includes) $(PYBIND11) -o $@ $<
 
-$(PBUILD)__GpuDriver.o: $(PSRC)__GpuDriver.cu $(PSRC)__GpuDriver.cuh $(PBUILD)helpers.o
+$(PBUILD)__GpuDriver.o: $(PSRC)__GpuDriver.cu $(PSRC)__GpuDriver.cuh $(PBUILD)helpers.o $(PBUILD)kernels.o
+	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
+
+$(PBUILD)kernels.o: $(PSRC)kernels.cu $(PSRC)kernels.cuh $(PBUILD)helpers.o
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
 
 $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
+
 
 clean:
 	rm -f $(PBUILD)*.o $(PBUILD)*.so

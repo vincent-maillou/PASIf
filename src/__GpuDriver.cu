@@ -24,18 +24,16 @@
       nStreams(1),
       IntraStrmParallelism(2){
 
-    B = nullptr;
-    K = nullptr;
-    Gamma = nullptr;
+    B      = nullptr;
+    K      = nullptr;
+    Gamma  = nullptr;
     Lambda = nullptr;
-    ForcePattern = nullptr;
-
+    ForcePattern     = nullptr;
     d_ExcitationsSet = nullptr;
-    loadExcitationsSet(excitationSet_);
-
-    streams = nullptr;
+    streams    = nullptr;
     h_cuSPARSE = NULL;
 
+    loadExcitationsSet(excitationSet_);
     setCUDA(nStreams);
   }
 
