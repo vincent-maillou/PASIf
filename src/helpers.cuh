@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include "cublas_v2.h"
 #include "cusparse_v2.h" 
 
 #include <iostream>
@@ -41,6 +42,15 @@
       if (status != cudaSuccess) {                                               \
           printf("CUDA API failed at line %d with error: %s (%d)\n",             \
                 __LINE__, cudaGetErrorString(status), status);                   \
+      }                                                                          \
+  }
+
+  #define CHECK_CUBLAS(func)                                                     \
+  {                                                                              \
+      cublasStatus_t status = (func);                                            \
+      if (status != CUBLAS_STATUS_SUCCESS) {                                     \
+          printf("CUBLAS API failed at line %d with error: %s (%d)\n",           \
+                __LINE__, cublasGetStatusString(status), status);                \
       }                                                                          \
   }
 
@@ -81,7 +91,7 @@
     uint *d_row;
     uint *d_col;
 
-    cusparseSpMatDescr_t sparseMat;
+    cusparseSpMatDescr_t sparseMat_desc;
     void *d_buffer;
     size_t bufferSize;
 
@@ -151,7 +161,7 @@
     reel *d_val;
     uint *d_indice;
 
-    cusparseSpVecDescr_t sparseVec;
+    cusparseSpVecDescr_t sparseVec_desc;
   };
 
   std::ostream& operator<<(std::ostream& out, COOVector const& vector_);
@@ -168,6 +178,9 @@
 
   template <typename T>
   std::ostream& operator<<(std::ostream& out, std::vector<T> const& vec);
+
+  void printVector(std::vector<reel> & vec);
+  uint extendTheVector(std::vector<reel> & vec, uint nTimes);
 
 
 

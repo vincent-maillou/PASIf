@@ -118,7 +118,7 @@
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
 
       // Create the sparse matrix descriptor and allocate the needed buffer
-      CHECK_CUSPARSE( cusparseCreateCoo(&sparseMat, n, n, 
+      CHECK_CUSPARSE( cusparseCreateCoo(&sparseMat_desc, n, n, 
                                         nzz, d_row, d_col, d_val, 
                                         CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
       
@@ -126,7 +126,7 @@
       CHECK_CUDA( cudaMalloc((void**)&d_beta, sizeof(reel)) );
 
       CHECK_CUSPARSE( cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                              &d_alpha, sparseMat, vecX, &d_beta, vecY, CUDA_R_32F, 
+                                              &d_alpha, sparseMat_desc, vecX, &d_beta, vecY, CUDA_R_32F, 
                                               CUSPARSE_SPMV_ALG_DEFAULT, &bufferSize) )
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
@@ -288,33 +288,43 @@
 /****************************************************
  *              COO Vector
  ****************************************************/
+  /** COOVector::COOVector()
+    * @brief Construct a new COOVector::COOVector object
+    * 
+    * @param denseVector 
+    */  
+    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector) : n(0) {
+      d_val = nullptr;
+      d_indice = nullptr;
 
-  COOVector::COOVector(std::vector< std::vector<reel> > & denseVector) : n(0) {
-    d_val = nullptr;
-    d_indice = nullptr;
-
-    for(size_t i(0); i<denseVector.size(); ++i){
-      for(size_t j(0); j<denseVector[i].size(); ++j){
-        if(std::abs(denseVector[i][j]) > reel_eps){
-          indice.push_back(j+n);
-          val.push_back(denseVector[i][j]);
+      for(size_t i(0); i<denseVector.size(); ++i){
+        for(size_t j(0); j<denseVector[i].size(); ++j){
+          if(std::abs(denseVector[i][j]) > reel_eps){
+            indice.push_back(j+n);
+            val.push_back(denseVector[i][j]);
+          }
         }
+        n += denseVector[i].size();
+
       }
-      n += denseVector[i].size();
+      nzz = val.size();
 
     }
-    nzz = val.size();
 
-  }
 
-  COOVector::~COOVector(){
-    if(d_val != nullptr){
-      CHECK_CUDA( cudaFree(d_val) );
+  /** COOVector::COOVector()
+    * @brief Construct a new COOVector::COOVector object
+    * 
+    * @param denseVector 
+    */  
+    COOVector::~COOVector(){
+      if(d_val != nullptr){
+        CHECK_CUDA( cudaFree(d_val) );
+      }
+      if(d_indice != nullptr){
+        CHECK_CUDA( cudaFree(d_indice) );
+      }
     }
-    if(d_indice != nullptr){
-      CHECK_CUDA( cudaFree(d_indice) );
-    }
-  }
 
   uint COOVector::ExtendTheSystem(uint nTimes){
     for(uint i(0); i<nTimes; ++i){
@@ -339,7 +349,7 @@
     CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
 
     // Create the sparse vector descriptor
-    CHECK_CUSPARSE( cusparseCreateSpVec(&sparseVec, n, nzz, &d_indice, &d_val,
+    CHECK_CUSPARSE( cusparseCreateSpVec(&sparseVec_desc, n, nzz, &d_indice, &d_val,
                                         CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
   }
 
@@ -404,6 +414,10 @@
     return out;
   }
 
+  void printVector(std::vector<reel> & vec){
+    std::cout << vec << std::endl;
+  }
+
 
   template <typename T>
   std::ostream& operator<<(std::ostream& out, std::vector<T> const& vec){
@@ -413,6 +427,16 @@
     out << std::endl;
     return out;
   }      
+
+  uint extendTheVector(std::vector<reel> & vec, uint nTimes){
+    uint n(vec.size());
+    for(uint i(0); i<nTimes; ++i){
+      for(uint j(0); j<n; ++j){
+        vec.push_back(vec[j]);
+      }
+    }
+    return vec.size();
+  }
 
 
 

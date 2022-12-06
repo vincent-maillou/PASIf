@@ -31,7 +31,8 @@ PYBIND11_MODULE(PASIf, m) {
       py::arg("K_"),
       py::arg("Gamma_"),
       py::arg("Lambda_"),
-      py::arg("ForcePattern_"))
+      py::arg("ForcePattern_"),
+      py::arg("InitialConditions_"))
     .def("__getAmplitudes", &__GpuDriver::__getAmplitudes);
 
 }

@@ -76,6 +76,10 @@ ForcePattern2 = [1.0, 0.0]
 
 ForcePattern3 = [0.0, 3.0, 0.0]
 
+InitialCondition2 = [0.0, 2.0]
+
+InitialCondition3 = [0.0, 0.0, 3.0]
+
 
 vecM = [M2, M2, M3]
 vecB = [B2, B2, B3]
@@ -83,7 +87,22 @@ vecK = [K2, K2, K3]
 vecGamma = [Gamma2, Gamma2, Gamma3]
 vecLambda = [Lambda2, Lambda2, Lambda3]
 vecForcePattern = [ForcePattern2, ForcePattern2, ForcePattern3]
+vecInitialCondition = [InitialCondition2, InitialCondition2, InitialCondition3]
 
-gpudriver.__setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern)
+gpudriver.__setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
 gpudriver.__getAmplitudes()
+
+vecM = [M2, M3]
+vecB = [B2, B3]
+vecK = [K2, K3]
+vecGamma = [Gamma2, Gamma3]
+vecLambda = [Lambda2, Lambda3]
+vecForcePattern = [ForcePattern2, ForcePattern3]
+vecInitialCondition = [InitialCondition2, InitialCondition3]
+
+gpudriver.__setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
+gpudriver.__getAmplitudes()
+
+""" import time
+time.sleep(10) """
 

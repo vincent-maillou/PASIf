@@ -10,7 +10,7 @@ PSRC := src/
 
 all: $(PBUILD)PASIf.so
 
-$(PBUILD)PASIf.so: $(PBUILD)PASIf.o $(PBUILD)__GpuDriver.o $(PBUILD)helpers.o
+$(PBUILD)PASIf.so: $(PBUILD)PASIf.o $(PBUILD)__GpuDriver.o $(PBUILD)kernels.o $(PBUILD)helpers.o 
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -shared -o $@ $^
 
 $(PBUILD)PASIf.o: $(PSRC)PASIf.cpp $(PBUILD)helpers.o
