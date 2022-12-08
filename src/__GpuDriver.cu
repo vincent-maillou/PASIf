@@ -14,7 +14,7 @@
 
 
 /****************************************************
- *              Private functions                   *
+ *              Public functions                   *
  ****************************************************/
   /** __GpuDriver::__GpuDriver()
     * @brief Construct a new gpudriver::  gpudriver object
@@ -26,7 +26,7 @@
         sampleRate(sampleRate_),
         numberOfDOFs(0),
         nStreams(1),
-        IntraStrmParallelism(2),
+        IntraStrmParallelism(3),
         numberOfSimulationToPerform(0),
         alpha(1),
         beta1(1),
@@ -40,6 +40,7 @@
       d_ExcitationsSet = nullptr;
 
       // RK4
+      d_QinitCond = nullptr;
       d_Q1 = nullptr;
       d_Q2 = nullptr;
 
@@ -148,23 +149,29 @@
       }
 
 
+      // optimizeIntraStrmParallelisme();
+
+
+
       // Here we figure out the intra-stream excitations parallelism, from the
       // number of Excitations in the set and the intra-stream parallelism targeted
+      if(IntraStrmParallelism > numberOfExcitations){
+        IntraStrmParallelism = numberOfExcitations;
+      }
 
       numberOfSimulationToPerform = numberOfExcitations / IntraStrmParallelism;
-      if(numberOfExcitations % IntraStrmParallelism != 0){
+      exceedingSimulations = numberOfExcitations % IntraStrmParallelism;
+      if(exceedingSimulations != 0){
         numberOfSimulationToPerform++;
       }
 
-
-
       // Extend each system by the number of intra-stream parallelization wanted
-      std::array<uint, 6> dofChecking = {B->ExtendTheSystem(IntraStrmParallelism), 
-                                        K->ExtendTheSystem(IntraStrmParallelism), 
-                                        Gamma->ExtendTheSystem(IntraStrmParallelism), 
-                                        Lambda->ExtendTheSystem(IntraStrmParallelism), 
-                                        ForcePattern->ExtendTheSystem(IntraStrmParallelism),
-                                        extendTheVector(QinitCond, IntraStrmParallelism)};
+      std::array<uint, 6> dofChecking = {B->ExtendTheSystem(IntraStrmParallelism-1), 
+                                        K->ExtendTheSystem(IntraStrmParallelism-1), 
+                                        Gamma->ExtendTheSystem(IntraStrmParallelism-1), 
+                                        Lambda->ExtendTheSystem(IntraStrmParallelism-1), 
+                                        ForcePattern->ExtendTheSystem(IntraStrmParallelism-1),
+                                        extendTheVector(QinitCond, IntraStrmParallelism-1)};
 
       // Checking that each system is of the same size
       for(uint i = 0; i < dofChecking.size(); i++){
@@ -198,6 +205,12 @@
       std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
       std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
       std::cout << "QinitCond:" << std::endl; printVector(QinitCond);
+    }
+    if(true){
+      std::cout << "A system with " << numberOfDOFs << " DOFs has been assembled" << std::endl;
+      std::cout << "  This system is composed of " << IntraStrmParallelism << " parallelized simulations of " << numberOfDOFs/IntraStrmParallelism << " DOF each." << std::endl;
+      std::cout << "  The total number of excitation files is " << numberOfExcitations << std::endl;
+      std::cout << "  Hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
     }
     
 
@@ -244,22 +257,45 @@
 
 
     std::vector<reel> results;
-    results.reserve(numberOfDOFs*numberOfSimulationToPerform);
+    results.resize(numberOfDOFs*numberOfSimulationToPerform);
 
-    std::cout << "numberOfSimulationToPerform = " << numberOfSimulationToPerform << std::endl;
 
+    // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
       // Performe the rk4 steps
+      std::cout << "  " << k+1 << " / " << numberOfSimulationToPerform  << std::endl;
       for(uint t(0); t<lengthOfeachExcitation; t+=2){
-        /* rkStep(t); */
+        rkStep(k, t);
       }
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(results.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
 
-      // Reset the Q1 initials conditions
+      // Reset Q1 and Q2 to initials conditions
       CHECK_CUDA( cudaMemcpy(d_Q1, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
+      CHECK_CUDA( cudaMemset(d_Q2, 0, numberOfDOFs*sizeof(reel)) )
+
+      // Reset all of the other vectors to 0
+      CHECK_CUDA( cudaMemset(d_mi, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_ki, 0, numberOfDOFs*sizeof(reel)) )
+
+      CHECK_CUDA( cudaMemset(d_m1, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_m2, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_m3, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_m4, 0, numberOfDOFs*sizeof(reel)) )
+
+      CHECK_CUDA( cudaMemset(d_k1, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_k2, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_k3, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemset(d_k4, 0, numberOfDOFs*sizeof(reel)) )
+
+    }
+
+
+    // Cut the results vector to the correct size
+    if(exceedingSimulations != 0){
+      results.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
     }
 
 
@@ -296,16 +332,9 @@
       numberOfExcitations    = excitationSet_.size();
       lengthOfeachExcitation = excitationSet_[0].size();
       // Set the RK4 timesteps
-      h = lengthOfeachExcitation * sampleRate;
+      h = 1.0/sampleRate;
       h2 = h/2.0;
       h6 = h/6.0;
-      /* // Allocate and initialize the RK4 timesteps on the GPU
-      CHECK_CUDA( cudaMalloc((void**)&d_h, sizeof(reel)) )
-      CHECK_CUDA( cudaMalloc((void**)&d_h2, sizeof(reel)) )
-      CHECK_CUDA( cudaMalloc((void**)&d_h6, sizeof(reel)) )
-      CHECK_CUDA( cudaMemcpy(d_h, &h, sizeof(reel), cudaMemcpyHostToDevice) )
-      CHECK_CUDA( cudaMemcpy(d_h2, &h2, sizeof(reel), cudaMemcpyHostToDevice) )
-      CHECK_CUDA( cudaMemcpy(d_h6, &h6, sizeof(reel), cudaMemcpyHostToDevice) ) */
 
       // Parse the input excitationSet_ to a 1D array
       for(auto &excitation : excitationSet_){
@@ -378,7 +407,8 @@
    * 
    */
    void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, cusparseDnVecDescr_t k_desc,
-                                 cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc, uint t){
+                                 cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc,
+                                 uint k, uint t){
     // Get the pointers from the descriptors
     reel *pm; reel *pk; 
     reel *pq1; reel *pq2;
@@ -388,24 +418,36 @@
     CHECK_CUSPARSE( cusparseDnVecGetValues(q2_desc, (void**)&pq2) )
 
     // m = k
-    cublasScopy(h_cublas, numberOfDOFs, pm, 1, pq2, 1);
+    cublasScopy(h_cublas, numberOfDOFs, pq2, 1, pm, 1);
 
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k = B.d_ki
     cusparseSpMV(h_cuSPARSE, CUSPARSE_OPERATION_NON_TRANSPOSE, d_alpha, B->sparseMat_desc, q2_desc,
                  d_beta0, k_desc, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, B->d_buffer);
+    
     // k += K.d_mi
     cusparseSpMV(h_cuSPARSE, CUSPARSE_OPERATION_NON_TRANSPOSE, d_alpha, K->sparseMat_desc, q1_desc, 
                  d_beta1, k_desc, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, K->d_buffer);
+    
     // k += Gamma.d_mi²
-    customSpTV2<<<nBlocks, nThreadsPerBlock>>>(d_alpha, Gamma->d_val, Gamma->d_row, Gamma->d_col,
-                                               Gamma->d_slice, Gamma->nzz, pq1, d_beta1, pk);
+    customSpTV2<<<nBlocks, nThreadsPerBlock>>>(Gamma->d_val, Gamma->d_row, Gamma->d_col,
+                                               Gamma->d_slice, Gamma->nzz, pq1, pk);
+    
     // k += Lambda.d_mi³
-    customSpMV3<<<nBlocks, nThreadsPerBlock>>>(d_alpha, Lambda->d_val, Lambda->d_row, Lambda->d_col,
-                                               pq1, d_beta1, pk);
+    customSpMV3<<<nBlocks, nThreadsPerBlock>>>(Lambda->d_val, Lambda->d_row, Lambda->d_col,
+                                               Lambda->nzz, pq1, pk);
+    
     // k += ForcePattern.d_ExcitationsSet
-    customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock>>>(d_alpha, ForcePattern->d_val, ForcePattern->d_indice, d_ExcitationsSet,
-                                                          d_beta1, pk, numberOfDOFs, t, IntraStrmParallelism);
+    customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock>>>(ForcePattern->d_val,
+                                                          ForcePattern->d_indice,
+                                                          ForcePattern->nzz,
+                                                          d_ExcitationsSet,
+                                                          lengthOfeachExcitation,
+                                                          k,
+                                                          pk,
+                                                          numberOfDOFs,
+                                                          t,
+                                                          IntraStrmParallelism);
 
    }
 
@@ -414,24 +456,24 @@
    * @brief Performe a single Runge-Kutta step
    * 
    */
-   void __GpuDriver::rkStep(uint t){
+   void __GpuDriver::rkStep(uint k, uint t){
 
-    derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, t);
+    derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, k, t);
 
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m1, h2, numberOfDOFs);
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k1, h2, numberOfDOFs);
 
-    derivatives(d_m2_desc, d_k2_desc, d_mi_desc, d_ki_desc, t+1);
+    derivatives(d_m2_desc, d_k2_desc, d_mi_desc, d_ki_desc, k, t+1);
 
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m2, h2, numberOfDOFs);
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k2, h2, numberOfDOFs);
 
-    derivatives(d_m3_desc, d_k3_desc, d_mi_desc, d_ki_desc, t+1);
+    derivatives(d_m3_desc, d_k3_desc, d_mi_desc, d_ki_desc, k, t+1);
 
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m3, h, numberOfDOFs);
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k3, h, numberOfDOFs);
 
-    derivatives(d_m4_desc, d_k4_desc, d_mi_desc, d_ki_desc, t+2);
+    derivatives(d_m4_desc, d_k4_desc, d_mi_desc, d_ki_desc, k, t+2);
 
     // Compute next Q1 and Q2 vectors
     integrate<<<nBlocks, nThreadsPerBlock>>>(d_Q1, d_m1, d_m2, d_m3, d_m4, h6, numberOfDOFs);
@@ -526,6 +568,17 @@
       d_k4 = nullptr;
     }
    }
+
+
+
+/**
+ * @brief Optimize the parallelism of the kernel
+ * 
+ */
+  void optimizeIntraStrmParallelisme(){
+    ;
+  }
+
 
 
 

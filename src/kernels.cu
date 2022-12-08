@@ -15,16 +15,42 @@
 
 
 
+
+
 /** customSpMV3()
  * @brief Perform the coo sparse matrix - dense vector cube multiplication
  * 
  * @return __global__ 
  */
  __global__
- void customSpMV3(reel *d_alpha, reel* d_val, uint* d_row, uint* d_col, 
-                  reel* X, reel *d_beta, reel* Y){
-  //do something
-  ;
+ void customSpMV3(reel* d_val, uint* d_row, uint* d_col, uint nzz, reel* X, reel* Y){
+  
+  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
+
+  for(uint k = index; k < nzz; k += stride){
+    atomicAdd(&Y[d_row[k]], d_val[k] * X[d_col[k]] * X[d_col[k]] * X[d_col[k]]);
+  }
+
+
+  // Some ressources that could improve the performance of this kernel
+  // https://medium.com/analytics-vidhya/sparse-matrix-vector-multiplication-with-cuda-42d191878e8f
+  // https://moderngpu.github.io/segreduce.html
+  /* // From Nvidia COO Implementation
+  __device__ void
+  segmented_reduction( const int lane , const int * rows , float * vals ){
+    // segmented reduction in shared memory
+    if ( lane >= 1 && rows [ threadIdx.x ] == rows [ threadIdx.x - 1] )
+    vals [ threadIdx.x ] += vals [ threadIdx.x - 1];
+    if ( lane >= 2 && rows [ threadIdx.x ] == rows [ threadIdx.x - 2] )
+    vals [ threadIdx.x ] += vals [ threadIdx.x - 2];
+    if ( lane >= 4 && rows [ threadIdx.x ] == rows [ threadIdx.x - 4] )
+    vals [ threadIdx.x ] += vals [ threadIdx.x - 4];
+    if ( lane >= 8 && rows [ threadIdx.x ] == rows [ threadIdx.x - 8] )
+    vals [ threadIdx.x ] += vals [ threadIdx.x - 8];
+    if ( lane >= 16 && rows [ threadIdx.x ] == rows [ threadIdx.x - 16] )
+    vals [ threadIdx.x ] += vals [ threadIdx.x - 16];
+  } */
  }
 
 
@@ -34,14 +60,13 @@
  * 
  */
  __global__
- void customSpTV2(reel *d_alpha, reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
-                  reel* X, reel *d_beta, reel* Y){
-  
+ void customSpTV2(reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
+                  reel* X, reel* Y){
 
-  int index = threadIdx.x + blockIdx.x * blockDim.x;
-  int stride = blockDim.x * gridDim.x;  
+  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
 
-  for(int k = index; k < nzz; k += stride){
+  for(uint k = index; k < nzz; k += stride){
     atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
   }
  }
@@ -54,10 +79,29 @@
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* alpha, reel* d_val, uint* d_indice, reel* excitationsSet,
-                             reel* beta, reel* Y, uint n, uint t, uint intraSystParal){
-  //do something
-  ;
+ void customAxpbyMultiForces(reel* d_val, uint* d_indice, uint nzz, reel* excitationsSet,
+                             uint lengthOfeachExcitation, uint kSim, reel* Y, uint n, uint t,
+                             uint intraStrmParallelism){
+
+  uint dofStride = n/intraStrmParallelism;
+  uint selectedExcitation = kSim*intraStrmParallelism;
+
+  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
+
+  for(uint k = index; k<nzz; k += stride){
+
+    // Find the excitation corresponding to the force we want to apply to this part of the system
+    for(size_t i = 0; i < intraStrmParallelism; i++){
+      if(d_indice[k] >= i*dofStride && d_indice[k] < (i+1)*dofStride){
+
+      // Performe the custom axpby operation with the sparse pattern and the vector of excitations
+        Y[d_indice[k]] += d_val[k]*excitationsSet[(selectedExcitation+i)*lengthOfeachExcitation + t];
+        break;
+      }
+    }
+
+  }
  }
 
 
@@ -69,10 +113,10 @@
  __global__
  void updateSlope(reel* rki, reel* q, reel* rk, reel dt, uint n){
 
-  int index = threadIdx.x + blockIdx.x * blockDim.x;
-  int stride = blockDim.x * gridDim.x;  
+  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
 
-  for(int k = index; k < n; k += stride){
+  for(uint k = index; k < n; k += stride){
     rki[k] = q[k] + dt*rk[k];
   }
  }

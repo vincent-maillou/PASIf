@@ -20,8 +20,7 @@
  * @return __global__ 
  */
  __global__
- void customSpMV3(reel *d_alpha, reel* d_val, uint* d_row, uint* d_col, 
-                  reel* X, reel *d_beta, reel* Y);
+ void customSpMV3(reel* d_val, uint* d_row, uint* d_col, uint nzz, reel* X, reel* Y);
 
 
 
@@ -30,8 +29,8 @@
  * 
  */
  __global__
- void customSpTV2(reel *d_alpha, reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
-                  reel* X, reel *d_beta, reel* Y);
+ void customSpTV2(reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
+                  reel* X, reel* Y);
 
 
 
@@ -41,8 +40,9 @@
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* alpha, reel* d_val, uint* d_indice, reel* excitationsSet,
-                             reel* beta, reel* Y, uint n, uint t, uint intraSystParal);
+ void customAxpbyMultiForces(reel* d_val, uint* d_indice, uint nzz, reel* excitationsSet,
+                             uint lengthOfeachExcitation, uint kSim, reel* Y, uint n, uint t,
+                             uint intraStrmParallelism);
 
 
 

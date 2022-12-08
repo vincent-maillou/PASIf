@@ -90,19 +90,10 @@ vecForcePattern = [ForcePattern2, ForcePattern2, ForcePattern3]
 vecInitialCondition = [InitialCondition2, InitialCondition2, InitialCondition3]
 
 gpudriver.__setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
-gpudriver.__getAmplitudes()
+amplitudes = gpudriver.__getAmplitudes()
 
-vecM = [M2, M3]
-vecB = [B2, B3]
-vecK = [K2, K3]
-vecGamma = [Gamma2, Gamma3]
-vecLambda = [Lambda2, Lambda3]
-vecForcePattern = [ForcePattern2, ForcePattern3]
-vecInitialCondition = [InitialCondition2, InitialCondition3]
-
-gpudriver.__setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
-gpudriver.__getAmplitudes()
-
-""" import time
-time.sleep(10) """
-
+print("Size of amplitudes vector: ", len(amplitudes))
+# Loop until one of the amplitude is not null
+for i in range(len(amplitudes)):
+      if amplitudes[i] != 0.0:
+            print("Amplitude of excitation signal ", i, " is ", amplitudes[i])

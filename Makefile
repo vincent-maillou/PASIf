@@ -8,10 +8,13 @@ PYBIND11 := -I/home/vincent-maillou/anaconda3/include/python3.9 -I/home/vincent-
 PBUILD := build/
 PSRC := src/
 
-all: $(PBUILD)PASIf.so
+all: $(PBUILD)PASIf.so $(PBUILD)utest.out
 
 $(PBUILD)PASIf.so: $(PBUILD)PASIf.o $(PBUILD)__GpuDriver.o $(PBUILD)kernels.o $(PBUILD)helpers.o 
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -shared -o $@ $^
+
+$(PBUILD)utest.out: $(PSRC)utest.cu $(PBUILD)kernels.o $(PBUILD)helpers.o
+	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -o $@ $^
 
 $(PBUILD)PASIf.o: $(PSRC)PASIf.cpp $(PBUILD)helpers.o
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC -c $(python3-config --includes) $(PYBIND11) -o $@ $<

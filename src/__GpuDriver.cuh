@@ -34,12 +34,14 @@ class __GpuDriver{
   int  loadExcitationsSet(std::vector<std::vector<reel>> ExcitationsSet_);
   int  setCUDA(uint nStreams_);
   void derivatives(cusparseDnVecDescr_t m_desc, cusparseDnVecDescr_t k_desc,
-                   cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc, uint t);
-  void rkStep(uint t);
+                   cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc,
+                   uint k, uint t);
+  void rkStep(uint k, uint t);
   void checkAndDestroy();
+  void optimizeIntraStrmParallelisme();
 
 
-  // Host-wise data
+  //            Host-wise data
   std::vector<reel> excitationSet;
   uint sampleRate;
   uint numberOfExcitations;
@@ -48,7 +50,7 @@ class __GpuDriver{
   uint numberOfDOFs;
 
 
-  // Device-wise data
+  //            Device-wise data
   reel* d_ExcitationsSet;
 
   // System description
@@ -76,21 +78,22 @@ class __GpuDriver{
   reel* d_k3; cusparseDnVecDescr_t d_k3_desc;
   reel* d_k4; cusparseDnVecDescr_t d_k4_desc;
 
-  reel h;  //reel* d_h;
-  reel h2; //reel* d_h2;
-  reel h6; //reel* d_h6;
+  reel h; 
+  reel h2; 
+  reel h6;
 
   reel alpha; reel* d_alpha;
   reel beta1;  reel* d_beta1;
   reel beta0;  reel* d_beta0;
 
 
-  // Computation parameters
+  //        Computation parameters
   uint nStreams;
   cudaStream_t *streams;
 
   uint IntraStrmParallelism;
   uint numberOfSimulationToPerform;
+  uint exceedingSimulations;
 
   int  deviceId;
   int  numberOfSMs;
@@ -102,7 +105,23 @@ class __GpuDriver{
 };
 
 
+/**
+ * @brief Ideas of further optimization
+ * 
+ */
 
+/*
+
+1. cudaGraph capture of the kernels
+2. cudaGraph capture of the kernels + cudaGraph capture of the data transfers
+3. CUBLAS_COMPUTE_32F_FAST_TF32
+4. Interleaved excitations files
+
+
+
+
+
+*/
 
 
 

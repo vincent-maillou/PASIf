@@ -89,6 +89,10 @@
    * @param n 
    */
     uint COOMatrix::ExtendTheSystem(uint nTimes){
+      if(nTimes == 0){
+        return n;
+      }
+      
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
           row.push_back(row[j]+(i+1)*n);
@@ -134,6 +138,11 @@
   
     std::ostream& COOMatrix::print(std::ostream& out) const{
       // Print the sparse COO matrix in a readable format
+      if(nzz == 0){
+        out << "Empty matrix" << std::endl;
+        return out;
+      }
+
       size_t k(0);
       for(size_t i(0); i<n; ++i){
         for(size_t j(0); j<n; ++j){
@@ -223,6 +232,10 @@
    * @param nTimes 
    */
     uint COOTensor::ExtendTheSystem(uint nTimes){
+      if(nTimes == 0){
+        return n;
+      }
+
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
           row.push_back(row[j]+(i+1)*n);
@@ -256,6 +269,11 @@
     }
 
     std::ostream& COOTensor::print(std::ostream& out) const{
+      if(nzz == 0){
+        out << "Empty COO Tensor" << std::endl;
+        return out;
+      }
+
       size_t p(0);
       for(size_t m(0); m<n; ++m){
         size_t k(p);
@@ -327,6 +345,10 @@
     }
 
   uint COOVector::ExtendTheSystem(uint nTimes){
+    if(nTimes == 0){
+      return n;
+    }
+
     for(uint i(0); i<nTimes; ++i){
       for(uint j(0); j<nzz; ++j){
         indice.push_back(indice[j]+(i+1)*n);
@@ -355,6 +377,11 @@
 
 
   std::ostream& COOVector::print(std::ostream& out) const{
+    if(nzz == 0){
+      out << "Empty COO Vector" << std::endl;
+      return out;
+    }
+
     size_t p(0);
     for(size_t i(0); i<n; ++i){
       if(indice[p] == i){
@@ -366,6 +393,19 @@
       }
     }
     out << std::endl;
+
+    p = 0;
+    for(size_t i(0); i<n; ++i){
+      if(indice[p] == i){
+        out << indice[p] << " ";
+        ++p;
+      }
+      else{
+        out << "_ ";
+      }
+    }
+    out << std::endl;
+
     return out;
   }
 
