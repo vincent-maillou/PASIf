@@ -26,7 +26,7 @@
         sampleRate(sampleRate_),
         numberOfDOFs(0),
         nStreams(1),
-        IntraStrmParallelism(3),
+        IntraStrmParallelism(1),
         numberOfSimulationToPerform(0),
         alpha(1),
         beta1(1),
@@ -124,6 +124,9 @@
         }
       }
 
+      // Initialize the number of DOF at the original size of the system
+      numberOfDOFs = M_[0].size();
+
 
 
       // Check if the system matrix have already been loaded, 
@@ -149,42 +152,10 @@
       }
 
 
-      // optimizeIntraStrmParallelisme();
 
 
+      optimizeIntraStrmParallelisme();
 
-      // Here we figure out the intra-stream excitations parallelism, from the
-      // number of Excitations in the set and the intra-stream parallelism targeted
-      if(IntraStrmParallelism > numberOfExcitations){
-        IntraStrmParallelism = numberOfExcitations;
-      }
-
-      numberOfSimulationToPerform = numberOfExcitations / IntraStrmParallelism;
-      exceedingSimulations = numberOfExcitations % IntraStrmParallelism;
-      if(exceedingSimulations != 0){
-        numberOfSimulationToPerform++;
-      }
-
-      // Extend each system by the number of intra-stream parallelization wanted
-      std::array<uint, 6> dofChecking = {B->ExtendTheSystem(IntraStrmParallelism-1), 
-                                        K->ExtendTheSystem(IntraStrmParallelism-1), 
-                                        Gamma->ExtendTheSystem(IntraStrmParallelism-1), 
-                                        Lambda->ExtendTheSystem(IntraStrmParallelism-1), 
-                                        ForcePattern->ExtendTheSystem(IntraStrmParallelism-1),
-                                        extendTheVector(QinitCond, IntraStrmParallelism-1)};
-
-      // Checking that each system is of the same size
-      for(uint i = 0; i < dofChecking.size(); i++){
-        if(dofChecking[i] != dofChecking[0]){
-          std::cout << "Error : The number of DOFs is not the same for all the Matrix describing the system" << std::endl;
-          return -1;
-        }
-      }
-
-      // Modify if needed the number of DOFs
-      if(numberOfDOFs != dofChecking[0]){
-        numberOfDOFs = dofChecking[0];
-      }
 
       return 0;
     }
@@ -260,6 +231,8 @@
     results.resize(numberOfDOFs*numberOfSimulationToPerform);
 
 
+    auto begin = std::chrono::high_resolution_clock::now();
+
     // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
       // Performe the rk4 steps
@@ -291,6 +264,10 @@
       CHECK_CUDA( cudaMemset(d_k4, 0, numberOfDOFs*sizeof(reel)) )
 
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-begin;
+    std::cout << "Elapsed time: " << elapsed_seconds.count() << "s" << std::endl;
 
 
     // Cut the results vector to the correct size
@@ -575,8 +552,71 @@
  * @brief Optimize the parallelism of the kernel
  * 
  */
-  void optimizeIntraStrmParallelisme(){
-    ;
+  void __GpuDriver::optimizeIntraStrmParallelisme(){
+    
+    // 1. Get free storage on the GPU
+    size_t freeSpace, totalSpace;
+    CHECK_CUDA( cudaMemGetInfo(&freeSpace, &totalSpace) )
+
+    /* std::cout << "Free space on the GPU: " << freeSpace << " bytes" << std::endl;
+    std::cout << "Total space on the GPU: " << totalSpace << " bytes" << std::endl;
+    std::cout << "Used space " << totalSpace-freeSpace << " bytes" << std::endl; */
+
+    // 2. Compute the size required by 1 instance of the system
+
+    // .1 Size of the matrix of the system
+    size_t sizeOfSystem(0);
+    sizeOfSystem += B->memFootprint();
+    sizeOfSystem += K->memFootprint();
+    sizeOfSystem += Gamma->memFootprint();
+    sizeOfSystem += Lambda->memFootprint();
+    sizeOfSystem += ForcePattern->memFootprint();
+
+    // std::cout << "Size of 1 system: " << sizeOfSystem << " bytes" << std::endl;
+
+    // .2 Size of the rk4 and states vector needed for the computation
+    size_t sizeOfStates(0);
+    sizeOfStates += 13*sizeof(reel)*numberOfDOFs;
+
+    // std::cout << "Size of the states: " << sizeOfStates << " bytes" << std::endl;
+
+    size_t totalSize = sizeOfSystem + sizeOfStates;
+
+    // 3. Compute the max number of system that we can fit in the gpu memory
+
+    size_t maxNumberOfSystem = (0.8*freeSpace) / totalSize;
+
+    if(maxNumberOfSystem > numberOfExcitations){
+      maxNumberOfSystem = numberOfExcitations;
+    }
+
+    IntraStrmParallelism = maxNumberOfSystem;
+
+    numberOfSimulationToPerform = numberOfExcitations / IntraStrmParallelism;
+    exceedingSimulations = numberOfExcitations % IntraStrmParallelism;
+    if(exceedingSimulations != 0){
+      numberOfSimulationToPerform++;
+    }
+
+    // Extend each system by the number of intra-stream parallelization wanted
+    std::array<uint, 6> dofChecking = {B->ExtendTheSystem(IntraStrmParallelism-1), 
+                                      K->ExtendTheSystem(IntraStrmParallelism-1), 
+                                      Gamma->ExtendTheSystem(IntraStrmParallelism-1), 
+                                      Lambda->ExtendTheSystem(IntraStrmParallelism-1), 
+                                      ForcePattern->ExtendTheSystem(IntraStrmParallelism-1),
+                                      extendTheVector(QinitCond, IntraStrmParallelism-1)};
+
+    // Checking that each system is of the same size
+    for(uint i = 0; i < dofChecking.size(); i++){
+      if(dofChecking[i] != dofChecking[0]){
+        std::cout << "Error : The number of DOFs is not the same for all the Matrix describing the system" << std::endl;
+      }
+    }
+
+    // Modify if needed the number of DOFs
+    if(numberOfDOFs != dofChecking[0]){
+      numberOfDOFs = dofChecking[0];
+    }
   }
 
 

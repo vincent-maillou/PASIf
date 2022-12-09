@@ -76,6 +76,8 @@
 
     uint ExtendTheSystem(uint nTimes);
     void AllocateOnGPU(cusparseHandle_t & handle, cusparseDnVecDescr_t & vecX, cusparseDnVecDescr_t & vecY);
+    size_t memFootprint();
+    
     std::ostream& print(std::ostream& out) const;
 
 
@@ -116,6 +118,8 @@
 
     uint ExtendTheSystem(uint nTimes);
     void AllocateOnGPU();
+    size_t memFootprint();
+
     std::ostream& print(std::ostream& out) const;
 
 
@@ -149,6 +153,8 @@
 
     uint ExtendTheSystem(uint nTimes);
     void AllocateOnGPU();
+    size_t memFootprint();
+
     std::ostream& print(std::ostream& out) const;
 
     // host-side data

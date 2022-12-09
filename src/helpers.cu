@@ -135,6 +135,15 @@
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
     }
+
+    size_t COOMatrix::memFootprint(){
+      // Return the number of bytes needed to store this element on the GPU
+      size_t memFootprint;
+
+      memFootprint = bufferSize + 2*nzz*sizeof(uint) + nzz*sizeof(reel); 
+
+      return memFootprint;
+    }
   
     std::ostream& COOMatrix::print(std::ostream& out) const{
       // Print the sparse COO matrix in a readable format
@@ -268,6 +277,15 @@
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
     }
 
+    size_t COOTensor::memFootprint(){
+      // Return the number of bytes needed to store this element on the GPU
+      size_t memFootprint;
+
+      memFootprint = 3*nzz*sizeof(uint) + nzz*sizeof(reel); 
+
+      return memFootprint;
+    }
+
     std::ostream& COOTensor::print(std::ostream& out) const{
       if(nzz == 0){
         out << "Empty COO Tensor" << std::endl;
@@ -375,6 +393,14 @@
                                         CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
   }
 
+  size_t COOVector::memFootprint(){
+    // Return the number of bytes needed to store this element on the GPU
+    size_t memFootprint;
+
+    memFootprint = nzz*sizeof(uint) + nzz*sizeof(reel); 
+
+    return memFootprint;
+  }
 
   std::ostream& COOVector::print(std::ostream& out) const{
     if(nzz == 0){
@@ -382,6 +408,7 @@
       return out;
     }
 
+    out << "val: ";
     size_t p(0);
     for(size_t i(0); i<n; ++i){
       if(indice[p] == i){
@@ -394,6 +421,7 @@
     }
     out << std::endl;
 
+    out << "ind: ";
     p = 0;
     for(size_t i(0); i<n; ++i){
       if(indice[p] == i){

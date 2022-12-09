@@ -28,6 +28,5 @@ $(PBUILD)kernels.o: $(PSRC)kernels.cu $(PSRC)kernels.cuh $(PBUILD)helpers.o
 $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
 
-
 clean:
 	rm -f $(PBUILD)*.o $(PBUILD)*.so

@@ -1,5 +1,7 @@
 # Regarding the dataset, used for debug now
 data/*
+*nsys-rep
+*sqlite
 
 # ---> C++
 # Prerequisites

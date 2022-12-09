@@ -91,15 +91,7 @@
 
   for(uint k = index; k<nzz; k += stride){
 
-    // Find the excitation corresponding to the force we want to apply to this part of the system
-    for(size_t i = 0; i < intraStrmParallelism; i++){
-      if(d_indice[k] >= i*dofStride && d_indice[k] < (i+1)*dofStride){
-
-      // Performe the custom axpby operation with the sparse pattern and the vector of excitations
-        Y[d_indice[k]] += d_val[k]*excitationsSet[(selectedExcitation+i)*lengthOfeachExcitation + t];
-        break;
-      }
-    }
+    Y[d_indice[k]] += d_val[k]*excitationsSet[(selectedExcitation+d_indice[k]/dofStride)*lengthOfeachExcitation + t];
 
   }
  }
