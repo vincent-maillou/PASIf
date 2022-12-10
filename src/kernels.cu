@@ -90,7 +90,7 @@
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k<nzz; k += stride){
-
+    // Y[d_indice[k]] += 0.0;
     Y[d_indice[k]] += d_val[k]*excitationsSet[(selectedExcitation+d_indice[k]/dofStride)*lengthOfeachExcitation + t];
 
   }

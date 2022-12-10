@@ -2,6 +2,7 @@
 data/*
 *nsys-rep
 *sqlite
+test.ipynb
 
 # ---> C++
 # Prerequisites

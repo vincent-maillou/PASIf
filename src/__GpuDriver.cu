@@ -28,9 +28,9 @@
         nStreams(1),
         IntraStrmParallelism(1),
         numberOfSimulationToPerform(0),
-        alpha(1),
-        beta1(1),
-        beta0(0){
+        alpha(1.0),
+        beta1(1.0),
+        beta0(0.0){
       // System
       B      = nullptr;
       K      = nullptr;
@@ -137,7 +137,7 @@
 
       // Set the matrix defining the system
       std::vector< matrix > invertedScaledM = M_;
-      invertMatrix(invertedScaledM, 1.0);
+      invertMatrix(invertedScaledM, -1.0);
 
       B      = new COOMatrix(B_, invertedScaledM);
       K      = new COOMatrix(K_, invertedScaledM);
@@ -168,7 +168,7 @@
    */
    std::vector<reel> __GpuDriver::__getAmplitudes(){
       
-    if(true){
+    if(false){
       std::cout << "Checking the system assembly" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
@@ -183,12 +183,19 @@
       std::cout << "  The total number of excitation files is " << numberOfExcitations << std::endl;
       std::cout << "  Hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
     }
+    if(false){
+      std::cout << "The timestep of the simulations are" << std::endl;
+      std::cout << "h = " << h << std::endl;
+      std::cout << "h2 = " << h2 << std::endl;
+      std::cout << "h6 = " << h6 << std::endl;
+    }
     
 
     // Allocate the memory for the states and RK4 vectors coefficients,
     // and create the dense vector descriptors
     CHECK_CUDA( cudaMalloc((void**)&d_QinitCond, numberOfDOFs*sizeof(reel)) )
     CHECK_CUDA( cudaMalloc((void**)&d_Q1, numberOfDOFs*sizeof(reel)) )
+    CHECK_CUDA( cudaMemcpy(d_QinitCond, QinitCond.data(), numberOfDOFs*sizeof(reel), cudaMemcpyHostToDevice) )
     // Copy the device QinitCond initial conditions vector to Q1 device vector
     CHECK_CUDA( cudaMemcpy(d_Q1, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q1_desc, numberOfDOFs, d_Q1, CUDA_R_32F) )
@@ -231,6 +238,13 @@
     results.resize(numberOfDOFs*numberOfSimulationToPerform);
 
 
+    // For debug purpose
+    /* std::vector<reel> trajectory;
+    trajectory.resize(lengthOfeachExcitation/2);
+    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, lengthOfeachExcitation/2*sizeof(reel)) )
+ */
+
+
     auto begin = std::chrono::high_resolution_clock::now();
 
     // Perform the simulations
@@ -240,6 +254,12 @@
       for(uint t(0); t<lengthOfeachExcitation; t+=2){
         rkStep(k, t);
       }
+
+      /* rkStep(k, 0); */
+
+      // Copy trajectory back
+      // CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, lengthOfeachExcitation/2*sizeof(reel), cudaMemcpyDeviceToHost) )
+
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(results.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
@@ -262,7 +282,6 @@
       CHECK_CUDA( cudaMemset(d_k2, 0, numberOfDOFs*sizeof(reel)) )
       CHECK_CUDA( cudaMemset(d_k3, 0, numberOfDOFs*sizeof(reel)) )
       CHECK_CUDA( cudaMemset(d_k4, 0, numberOfDOFs*sizeof(reel)) )
-
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -277,6 +296,7 @@
 
 
     return results;
+    // return trajectory; // For debug purpose
    }
 
 
@@ -395,24 +415,55 @@
     CHECK_CUSPARSE( cusparseDnVecGetValues(q2_desc, (void**)&pq2) )
 
     // m = k
-    cublasScopy(h_cublas, numberOfDOFs, pq2, 1, pm, 1);
+    cublasScopy(h_cublas, 
+                numberOfDOFs, 
+                pq2, 
+                1, 
+                pm, 
+                1);
+
 
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k = B.d_ki
-    cusparseSpMV(h_cuSPARSE, CUSPARSE_OPERATION_NON_TRANSPOSE, d_alpha, B->sparseMat_desc, q2_desc,
-                 d_beta0, k_desc, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, B->d_buffer);
-    
+    cusparseSpMV(h_cuSPARSE, 
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+                 d_alpha, 
+                 B->sparseMat_desc, 
+                 q2_desc,
+                 d_beta0, 
+                 k_desc, 
+                 CUDA_R_32F, 
+                 CUSPARSE_SPMV_ALG_DEFAULT, 
+                 B->d_buffer);
+     
     // k += K.d_mi
-    cusparseSpMV(h_cuSPARSE, CUSPARSE_OPERATION_NON_TRANSPOSE, d_alpha, K->sparseMat_desc, q1_desc, 
-                 d_beta1, k_desc, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, K->d_buffer);
+    cusparseSpMV(h_cuSPARSE, 
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+                 d_alpha, 
+                 K->sparseMat_desc, 
+                 q1_desc, 
+                 d_beta1, 
+                 k_desc, 
+                 CUDA_R_32F, 
+                 CUSPARSE_SPMV_ALG_DEFAULT, 
+                 K->d_buffer);
     
     // k += Gamma.d_mi²
-    customSpTV2<<<nBlocks, nThreadsPerBlock>>>(Gamma->d_val, Gamma->d_row, Gamma->d_col,
-                                               Gamma->d_slice, Gamma->nzz, pq1, pk);
+    customSpTV2<<<nBlocks, nThreadsPerBlock>>>(Gamma->d_val,
+                                               Gamma->d_row, 
+                                               Gamma->d_col,
+                                               Gamma->d_slice, 
+                                               Gamma->nzz, 
+                                               pq1, 
+                                               pk);
     
     // k += Lambda.d_mi³
-    customSpMV3<<<nBlocks, nThreadsPerBlock>>>(Lambda->d_val, Lambda->d_row, Lambda->d_col,
-                                               Lambda->nzz, pq1, pk);
+    customSpMV3<<<nBlocks, nThreadsPerBlock>>>(Lambda->d_val,
+                                               Lambda->d_row,
+                                               Lambda->d_col,
+                                               Lambda->nzz,
+                                               pq1,
+                                               pk);
     
     // k += ForcePattern.d_ExcitationsSet
     customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock>>>(ForcePattern->d_val,
@@ -425,7 +476,7 @@
                                                           numberOfDOFs,
                                                           t,
                                                           IntraStrmParallelism);
-
+    
    }
 
   
@@ -435,6 +486,11 @@
    */
    void __GpuDriver::rkStep(uint k, uint t){
 
+    // "getTrajectory()" for debug purpose
+    // cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t/2], 1);
+
+
+    // Compute the derivatives
     derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, k, t);
 
       updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m1, h2, numberOfDOFs);

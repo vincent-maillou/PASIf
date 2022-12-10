@@ -87,6 +87,10 @@ class __GpuDriver{
   reel beta0;  reel* d_beta0;
 
 
+  // For debug purpose
+  reel* d_trajectory;
+
+
   //        Computation parameters
   uint nStreams;
   cudaStream_t *streams;
