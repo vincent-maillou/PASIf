@@ -168,7 +168,7 @@
    */
    std::vector<reel> __GpuDriver::__getAmplitudes(){
       
-    if(false){
+    if(true){
       std::cout << "Checking the system assembly" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
@@ -239,10 +239,10 @@
 
 
     // For debug purpose
-    /* std::vector<reel> trajectory;
-    trajectory.resize(lengthOfeachExcitation/2);
-    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, lengthOfeachExcitation/2*sizeof(reel)) )
- */
+    std::vector<reel> trajectory;
+    trajectory.resize(lengthOfeachExcitation);
+    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, lengthOfeachExcitation*sizeof(reel)) )
+
 
 
     auto begin = std::chrono::high_resolution_clock::now();
@@ -251,14 +251,14 @@
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
       // Performe the rk4 steps
       std::cout << "  " << k+1 << " / " << numberOfSimulationToPerform  << std::endl;
-      for(uint t(0); t<lengthOfeachExcitation; t+=2){
+      for(uint t(0); t<lengthOfeachExcitation; ++t){
         rkStep(k, t);
       }
 
       /* rkStep(k, 0); */
 
       // Copy trajectory back
-      // CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, lengthOfeachExcitation/2*sizeof(reel), cudaMemcpyDeviceToHost) )
+      CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, lengthOfeachExcitation*sizeof(reel), cudaMemcpyDeviceToHost) )
 
 
       // Copy the results of the performed simulation from the GPU to the CPU
@@ -487,7 +487,7 @@
    void __GpuDriver::rkStep(uint k, uint t){
 
     // "getTrajectory()" for debug purpose
-    // cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t/2], 1);
+    cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t], 1);
 
 
     // Compute the derivatives

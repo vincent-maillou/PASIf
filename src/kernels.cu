@@ -67,7 +67,7 @@
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
+    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] /* * X[d_col[k]] */);
   }
  }
 
