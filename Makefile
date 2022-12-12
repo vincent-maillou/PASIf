@@ -7,6 +7,7 @@ PYBIND11 := -I/home/vincent-maillou/anaconda3/include/python3.9 -I/home/vincent-
 
 PBUILD := build/
 PSRC := src/
+PREPORTS := reports/
 
 all: $(PBUILD)PASIf.so $(PBUILD)utest.out
 
@@ -28,5 +29,14 @@ $(PBUILD)kernels.o: $(PSRC)kernels.cu $(PSRC)kernels.cuh $(PBUILD)helpers.o
 $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
 
+profile: all
+	nsys profile python3 tad_dummy.py
+	mv *.nsys-tep reports/
+		
+
 clean:
 	rm -f $(PBUILD)*.o $(PBUILD)*.so
+
+cleanreports:
+	- rm -f $(PREPORTS)*.sqlite
+	- rm -f $(PREPORTS)*.nsys-rep

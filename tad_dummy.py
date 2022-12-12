@@ -14,7 +14,7 @@ sampleRate = 16000
 excitationSet = []
 
 # Generate the dummy excitation signals
-for i in range(1):
+for i in range(1200):
       excitation = np.zeros(excitationLength)
       for t in range(excitationLength):
             excitation[t] = 1.0
@@ -34,9 +34,13 @@ print("Number of excitation signals: ", len(excitationSet))
 
 
 import PASIf as pasif
-""" print( dir(pasif) ) """
+
+# Python chrono
+import time
+start = time.time()
 gpudriver = pasif.__GpuDriver(excitationSet, sampleRate)
-""" print( dir(gpudriver) ) """
+end = time.time()
+print("Time to load the files: ", end - start)
 
 # Define M, B, K, Gamma, Lambda and ForcePattern
 M1 = [[1.0]]
@@ -133,18 +137,25 @@ vecLambda3 = [Lambda3]
 vecForcePattern3 = [ForcePattern3]
 vecInitialCondition3 = [InitialCondition3]
 
-n = 1
+n = 200
+
+
+start = time.time()
 
 # gpudriver.__setSystems(n*vecM1, n*vecB1, n*vecK1, n*vecGamma1, n*vecLambda1, n*vecForcePattern1, n*vecInitialCondition1)
 gpudriver.__setSystems(n*vecM2, n*vecB2, n*vecK2, n*vecGamma2, n*vecLambda2, n*vecForcePattern2, n*vecInitialCondition2)
 # gpudriver.__setSystems(n*vecM3, n*vecB3, n*vecK3, n*vecGamma3, n*vecLambda3, n*vecForcePattern3, n*vecInitialCondition3)
 results = gpudriver.__getAmplitudes()
 
-print("debug python 1")
+end = time.time()
+print("Overall time: ", end - start)
 
-print("Size of results vector: ", len(results[0]))
+
+
+
+""" print("Size of results vector: ", len(results[0]))
 print("Results Q1: ", results[0])
-print("Results Q2: ", results[1])
+print("Results Q2: ", results[1]) """
 
 
 

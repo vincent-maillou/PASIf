@@ -277,7 +277,7 @@
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end-begin;
-    std::cout << "Elapsed time: " << elapsed_seconds.count() << "s" << std::endl;
+    std::cout << "CUDA solver execution time: " << elapsed_seconds.count() << "s" << std::endl;
 
 
     // Cut the results vector to the correct size
@@ -419,7 +419,6 @@
 
 
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
-    // CHECK_CUDA( cudaMemset(pk, 0, numberOfDOFs*sizeof(reel)) )
     // k = B.d_ki
     cusparseSpMV(h_cuSPARSE, 
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -482,12 +481,6 @@
    */
    void __GpuDriver::rkStep(uint k, 
                             uint t){
-
-    // "getTrajectory()" for debug purpose
-    /* cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t], 1);
-    cublasScopy(h_cublas, 1, &d_Q2 [1], 1, &d_trajectory[lengthOfeachExcitation+t], 1); */
-
-
 
     // Compute the derivatives
     derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, k, t);
