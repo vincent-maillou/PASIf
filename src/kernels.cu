@@ -23,9 +23,14 @@
  * @return __global__ 
  */
  __global__
- void customSpMV3(reel* d_val, uint* d_row, uint* d_col, uint nzz, reel* X, reel* Y){
+ void customSpMV3(reel* d_val, 
+                  uint* d_row, 
+                  uint* d_col, 
+                  uint nzz, 
+                  reel* X, 
+                  reel* Y){
   
-  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < nzz; k += stride){
@@ -60,15 +65,24 @@
  * 
  */
  __global__
- void customSpTV2(reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
-                  reel* X, reel* Y){
+ void customSpTV2(reel *d_val, 
+                  uint *d_row, 
+                  uint *d_col, 
+                  uint *d_slice, 
+                  uint nzz,
+                  reel* X, 
+                  reel* Y){
 
-  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] /* * X[d_col[k]] */);
+  for(uint k = index; k < 1; k += stride){
+    Y[1] += 1 * X[0] * X[0];
   }
+
+  /* for(uint k = index; k < nzz; k += stride){
+    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
+  } */
  }
 
 
@@ -79,14 +93,21 @@
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* d_val, uint* d_indice, uint nzz, reel* excitationsSet,
-                             uint lengthOfeachExcitation, uint kSim, reel* Y, uint n, uint t,
+ void customAxpbyMultiForces(reel* d_val, 
+                             uint* d_indice, 
+                             uint nzz, 
+                             reel* excitationsSet,
+                             uint lengthOfeachExcitation, 
+                             uint kSim, 
+                             reel* Y, 
+                             uint n, 
+                             uint t,
                              uint intraStrmParallelism){
 
   uint dofStride = n/intraStrmParallelism;
   uint selectedExcitation = kSim*intraStrmParallelism;
 
-  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k<nzz; k += stride){
@@ -103,9 +124,13 @@
  * 
  */
  __global__
- void updateSlope(reel* rki, reel* q, reel* rk, reel dt, uint n){
+ void updateSlope(reel* rki, 
+                  reel* q, 
+                  reel* rk, 
+                  reel dt, 
+                  uint n){
 
-  uint index = threadIdx.x + blockIdx.x * blockDim.x;
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < n; k += stride){
@@ -120,7 +145,13 @@
  * 
  */
  __global__
- void integrate(reel* q, reel* rk1, reel* rk2, reel* rk3, reel* rk4, reel h6, uint n){
+ void integrate(reel* q, 
+                reel* rk1, 
+                reel* rk2, 
+                reel* rk3, 
+                reel* rk4, 
+                reel h6, 
+                uint n){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  

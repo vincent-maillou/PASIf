@@ -48,29 +48,32 @@ M3 = [[1.0, 0.0, 0.0],
       [0.0, 1.5, 0.0],
       [0.0, 0.0, 0.0]]
 
+
 B1 = [[2.0]]
 
 B2 = [[2.0, 0.0],
-     [0.0, 0.0]]
+      [0.0,  0.0]]
 
 B3 = [[2.0, 0.0, 0.0],
       [0.0, 2.0, 0.0],
       [0.0, 0.0, 0.0]]
 
+
 K1 = [[12.0]]
 
 K2 = [[12.0, 0.0],
-      [0.0, 0.0]]
+      [0.0,  0.0]]
 
 K3 = [[12.0, 1.2, 0.0],
       [1.2, 12.0, 0.0],
       [0.0, 0.0, 0.0]]
 
+
 Gamma1 = [[[0.0]]]
 
 Gamma2 = [[[0.0, 0.0],
-          [0.0, 0.0]], [[1.0, 0.0],
-                        [0.0, 0.0]]]
+           [0.0, 0.0]], [[-1.0, 0.0],
+                         [0.0, 0.0]]]
 
 Gamma3 = [[[0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0],
@@ -84,17 +87,19 @@ Gamma3 = [[[0.0, 0.0, 0.0],
 Lambda1 = [[0.0]]
 
 Lambda2 = [[0.0, 0.0],
-          [0.0, 0.0]] 
+           [0.0, 0.0]] 
 
 Lambda3 = [[0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0]]
+
 
 ForcePattern1 = [1.0]
 
 ForcePattern2 = [1.0, 0.0]
 
 ForcePattern3 = [1.0, 1.0, 0.0]
+
 
 InitialCondition1 = [0.0]
 
@@ -135,12 +140,28 @@ gpudriver.__setSystems(n*vecM2, n*vecB2, n*vecK2, n*vecGamma2, n*vecLambda2, n*v
 # gpudriver.__setSystems(n*vecM3, n*vecB3, n*vecK3, n*vecGamma3, n*vecLambda3, n*vecForcePattern3, n*vecInitialCondition3)
 amplitudes = gpudriver.__getAmplitudes()
 
-print("Size of amplitudes vector: ", len(amplitudes))
-print("Amplitudes: ", amplitudes)
+""" print("Size of amplitudes vector: ", len(amplitudes))
+print("Amplitudes X1[0]: ", amplitudes[0])
+print("Amplitudes X1[1]: ", amplitudes[1])
+
+print("Amplitudes X2[0]: ", amplitudes[excitationLength])
+print("Amplitudes X2[1]: ", amplitudes[excitationLength+1]) """
 
 
 
 
+Q1 = amplitudes[0:excitationLength]
+Q2 = amplitudes[excitationLength:2*excitationLength]
+
+import matplotlib.pyplot as plt
+time = np.arange(0, excitationLength/sampleRate, 1/sampleRate)
+
+plt.subplot(2, 1, 1)
+plt.plot(time, Q1)
+plt.subplot(2, 1, 2)
+plt.plot(time, Q2)
+
+plt.show()
 
 
 """ # Generate the time vector with the sample rate

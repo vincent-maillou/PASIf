@@ -33,10 +33,14 @@ class __GpuDriver{
  private:
   int  loadExcitationsSet(std::vector<std::vector<reel>> ExcitationsSet_);
   int  setCUDA(uint nStreams_);
-  void derivatives(cusparseDnVecDescr_t m_desc, cusparseDnVecDescr_t k_desc,
-                   cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc,
-                   uint k, uint t);
-  void rkStep(uint k, uint t);
+  void derivatives(cusparseDnVecDescr_t m_desc, 
+                   cusparseDnVecDescr_t k_desc,
+                   cusparseDnVecDescr_t q1_desc, 
+                   cusparseDnVecDescr_t q2_desc,
+                   uint k, 
+                   uint t);
+  void rkStep(uint k, 
+              uint t);
   void checkAndDestroy();
   void optimizeIntraStrmParallelisme();
 
@@ -83,8 +87,8 @@ class __GpuDriver{
   reel h6;
 
   reel alpha; reel* d_alpha;
-  reel beta1;  reel* d_beta1;
-  reel beta0;  reel* d_beta0;
+  reel beta1; reel* d_beta1;
+  reel beta0; reel* d_beta0;
 
 
   // For debug purpose

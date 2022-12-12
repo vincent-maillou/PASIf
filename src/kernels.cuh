@@ -20,7 +20,12 @@
  * @return __global__ 
  */
  __global__
- void customSpMV3(reel* d_val, uint* d_row, uint* d_col, uint nzz, reel* X, reel* Y);
+ void customSpMV3(reel* d_val, 
+                  uint* d_row, 
+                  uint* d_col, 
+                  uint nzz, 
+                  reel* X, 
+                  reel* Y);
 
 
 
@@ -29,8 +34,13 @@
  * 
  */
  __global__
- void customSpTV2(reel *d_val, uint *d_row, uint *d_col, uint *d_slice, uint nzz,
-                  reel* X, reel* Y);
+ void customSpTV2(reel *d_val, 
+                  uint *d_row, 
+                  uint *d_col, 
+                  uint *d_slice, 
+                  uint nzz,
+                  reel* X, 
+                  reel* Y);
 
 
 
@@ -40,8 +50,15 @@
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* d_val, uint* d_indice, uint nzz, reel* excitationsSet,
-                             uint lengthOfeachExcitation, uint kSim, reel* Y, uint n, uint t,
+ void customAxpbyMultiForces(reel* d_val, 
+                             uint* d_indice, 
+                             uint nzz, 
+                             reel* excitationsSet,
+                             uint lengthOfeachExcitation, 
+                             uint kSim, 
+                             reel* Y, 
+                             uint n, 
+                             uint t,
                              uint intraStrmParallelism);
 
 
@@ -51,7 +68,11 @@
  * 
  */
  __global__
- void updateSlope(reel* rki, reel* q, reel* rk, reel dt, uint n);
+ void updateSlope(reel* rki, 
+                  reel* q, 
+                  reel* rk, 
+                  reel dt, 
+                  uint n);
 
 
 
@@ -60,4 +81,10 @@
  * 
  */
  __global__
- void integrate(reel* q, reel* rk1, reel* rk2, reel* rk3, reel* rk4, reel h6, uint n);
+ void integrate(reel* q, 
+                reel* rk1, 
+                reel* rk2, 
+                reel* rk3, 
+                reel* rk4, 
+                reel h6, 
+                uint n);

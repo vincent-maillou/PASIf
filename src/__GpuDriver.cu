@@ -103,12 +103,12 @@
     * @return int 
     */
     int __GpuDriver::__setSystems(std::vector< matrix > & M_,
-                    std::vector< matrix > & B_,
-                    std::vector< matrix > & K_,
-                    std::vector< tensor >  & Gamma_,
-                    std::vector< matrix > & Lambda_,
-                    std::vector< std::vector<reel> > & ForcePattern_,
-                    std::vector< std::vector<reel> > & InitialConditions_){
+                                  std::vector< matrix > & B_,
+                                  std::vector< matrix > & K_,
+                                  std::vector< tensor >  & Gamma_,
+                                  std::vector< matrix > & Lambda_,
+                                  std::vector< std::vector<reel> > & ForcePattern_,
+                                  std::vector< std::vector<reel> > & InitialConditions_){
 
       // Check the number of systems in all of the input vectors
       if(M_.size() != B_.size() || M_.size() != K_.size() || M_.size() != Gamma_.size() || M_.size() != Lambda_.size() || M_.size() != ForcePattern_.size() || M_.size() != InitialConditions_.size()){
@@ -240,9 +240,8 @@
 
     // For debug purpose
     std::vector<reel> trajectory;
-    trajectory.resize(lengthOfeachExcitation);
-    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, lengthOfeachExcitation*sizeof(reel)) )
-
+    trajectory.resize(2*lengthOfeachExcitation);
+    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, 2*lengthOfeachExcitation*sizeof(reel)) )
 
 
     auto begin = std::chrono::high_resolution_clock::now();
@@ -255,11 +254,11 @@
         rkStep(k, t);
       }
 
-      /* rkStep(k, 0); */
+      /* for(size_t t(0); t<2; ++t)
+        rkStep(k, t); */
 
       // Copy trajectory back
-      CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, lengthOfeachExcitation*sizeof(reel), cudaMemcpyDeviceToHost) )
-
+      CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, 2*lengthOfeachExcitation*sizeof(reel), cudaMemcpyDeviceToHost) )
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(results.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
@@ -295,8 +294,9 @@
     }
 
 
-    return results;
-    // return trajectory; // For debug purpose
+
+    // return results;
+    return trajectory; // For debug purpose
    }
 
 
@@ -403,9 +403,13 @@
    * @brief Compute the derivatives of the system
    * 
    */
-   void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, cusparseDnVecDescr_t k_desc,
-                                 cusparseDnVecDescr_t q1_desc, cusparseDnVecDescr_t q2_desc,
-                                 uint k, uint t){
+   void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
+                                 cusparseDnVecDescr_t k_desc,
+                                 cusparseDnVecDescr_t q1_desc, 
+                                 cusparseDnVecDescr_t q2_desc,
+                                 uint k, 
+                                 uint t){
+
     // Get the pointers from the descriptors
     reel *pm; reel *pk; 
     reel *pq1; reel *pq2;
@@ -424,6 +428,7 @@
 
 
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
+    // CHECK_CUDA( cudaMemset(pk, 0, numberOfDOFs*sizeof(reel)) )
     // k = B.d_ki
     cusparseSpMV(h_cuSPARSE, 
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -435,7 +440,7 @@
                  CUDA_R_32F, 
                  CUSPARSE_SPMV_ALG_DEFAULT, 
                  B->d_buffer);
-     
+    
     // k += K.d_mi
     cusparseSpMV(h_cuSPARSE, 
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -484,10 +489,13 @@
    * @brief Performe a single Runge-Kutta step
    * 
    */
-   void __GpuDriver::rkStep(uint k, uint t){
+   void __GpuDriver::rkStep(uint k, 
+                            uint t){
 
     // "getTrajectory()" for debug purpose
     cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t], 1);
+    cublasScopy(h_cublas, 1, &d_Q1 [1], 1, &d_trajectory[lengthOfeachExcitation+t], 1);
+
 
 
     // Compute the derivatives
