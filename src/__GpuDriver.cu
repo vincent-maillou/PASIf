@@ -164,11 +164,11 @@
   /** __GpuDriver::__getAmplitudes()
    * @brief 
    * 
-   * @return int 
+   * @return std::array<std::vector<reel>, 2>
    */
-   std::vector<reel> __GpuDriver::__getAmplitudes(){
+   std::array<std::vector<reel>, 2> __GpuDriver::__getAmplitudes(){
       
-    if(true){
+    if(false){
       std::cout << "Checking the system assembly" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
@@ -234,14 +234,10 @@
     ForcePattern->AllocateOnGPU();
 
 
-    std::vector<reel> results;
-    results.resize(numberOfDOFs*numberOfSimulationToPerform);
-
-
-    // For debug purpose
-    std::vector<reel> trajectory;
-    trajectory.resize(2*lengthOfeachExcitation);
-    CHECK_CUDA( cudaMalloc((void**)&d_trajectory, 2*lengthOfeachExcitation*sizeof(reel)) )
+    std::vector<reel> resultsQ1;
+    std::vector<reel> resultsQ2;
+    resultsQ1.resize(numberOfDOFs*numberOfSimulationToPerform);
+    resultsQ2.resize(numberOfDOFs*numberOfSimulationToPerform);
 
 
     auto begin = std::chrono::high_resolution_clock::now();
@@ -254,14 +250,9 @@
         rkStep(k, t);
       }
 
-      /* for(size_t t(0); t<2; ++t)
-        rkStep(k, t); */
-
-      // Copy trajectory back
-      CHECK_CUDA( cudaMemcpy(trajectory.data(), d_trajectory, 2*lengthOfeachExcitation*sizeof(reel), cudaMemcpyDeviceToHost) )
-
       // Copy the results of the performed simulation from the GPU to the CPU
-      CHECK_CUDA( cudaMemcpy(results.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
+      CHECK_CUDA( cudaMemcpy(resultsQ1.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
+      CHECK_CUDA( cudaMemcpy(resultsQ2.data()+k*numberOfDOFs, d_Q2, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
 
       // Reset Q1 and Q2 to initials conditions
@@ -283,6 +274,7 @@
       CHECK_CUDA( cudaMemset(d_k4, 0, numberOfDOFs*sizeof(reel)) )
     }
 
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end-begin;
     std::cout << "Elapsed time: " << elapsed_seconds.count() << "s" << std::endl;
@@ -290,13 +282,12 @@
 
     // Cut the results vector to the correct size
     if(exceedingSimulations != 0){
-      results.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
+      resultsQ1.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
+      resultsQ2.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
     }
 
 
-
-    // return results;
-    return trajectory; // For debug purpose
+    return std::array<std::vector<reel>, 2>{resultsQ1, resultsQ2};
    }
 
 
@@ -493,8 +484,8 @@
                             uint t){
 
     // "getTrajectory()" for debug purpose
-    cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t], 1);
-    cublasScopy(h_cublas, 1, &d_Q1 [1], 1, &d_trajectory[lengthOfeachExcitation+t], 1);
+    /* cublasScopy(h_cublas, 1, &d_Q1 [0], 1, &d_trajectory[t], 1);
+    cublasScopy(h_cublas, 1, &d_Q2 [1], 1, &d_trajectory[lengthOfeachExcitation+t], 1); */
 
 
 

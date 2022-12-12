@@ -138,19 +138,18 @@ n = 1
 # gpudriver.__setSystems(n*vecM1, n*vecB1, n*vecK1, n*vecGamma1, n*vecLambda1, n*vecForcePattern1, n*vecInitialCondition1)
 gpudriver.__setSystems(n*vecM2, n*vecB2, n*vecK2, n*vecGamma2, n*vecLambda2, n*vecForcePattern2, n*vecInitialCondition2)
 # gpudriver.__setSystems(n*vecM3, n*vecB3, n*vecK3, n*vecGamma3, n*vecLambda3, n*vecForcePattern3, n*vecInitialCondition3)
-amplitudes = gpudriver.__getAmplitudes()
+results = gpudriver.__getAmplitudes()
 
-""" print("Size of amplitudes vector: ", len(amplitudes))
-print("Amplitudes X1[0]: ", amplitudes[0])
-print("Amplitudes X1[1]: ", amplitudes[1])
+print("debug python 1")
 
-print("Amplitudes X2[0]: ", amplitudes[excitationLength])
-print("Amplitudes X2[1]: ", amplitudes[excitationLength+1]) """
-
+print("Size of results vector: ", len(results[0]))
+print("Results Q1: ", results[0])
+print("Results Q2: ", results[1])
 
 
 
-Q1 = amplitudes[0:excitationLength]
+
+""" Q1 = amplitudes[0:excitationLength]
 Q2 = amplitudes[excitationLength:2*excitationLength]
 
 import matplotlib.pyplot as plt
@@ -161,7 +160,7 @@ plt.plot(time, Q1)
 plt.subplot(2, 1, 2)
 plt.plot(time, Q2)
 
-plt.show()
+plt.show() """
 
 
 """ # Generate the time vector with the sample rate

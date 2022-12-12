@@ -27,7 +27,8 @@ class __GpuDriver{
                    std::vector< matrix > & Lambda_,
                    std::vector< std::vector<reel> > & ForcePattern_,
                    std::vector< std::vector<reel> > & InitialConditions_);
-  std::vector<reel> __getAmplitudes();
+                   
+  std::array<std::vector<reel>, 2> __getAmplitudes();
 
 
  private:
@@ -92,7 +93,7 @@ class __GpuDriver{
 
 
   // For debug purpose
-  reel* d_trajectory;
+  /* reel* d_trajectory; */
 
 
   //        Computation parameters

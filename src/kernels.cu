@@ -76,13 +76,13 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k < 1; k += stride){
+  /* for(uint k = index; k < 1; k += stride){
     Y[1] += 1 * X[0] * X[0];
-  }
-
-  /* for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
   } */
+
+  for(uint k = index; k < nzz; k += stride){
+    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
+  }
  }
 
 
