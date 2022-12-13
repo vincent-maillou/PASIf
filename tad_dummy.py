@@ -35,6 +35,8 @@ print("Number of excitation signals: ", len(excitationSet))
 
 import PASIf as pasif
 
+print( dir(pasif) )
+
 # Python chrono
 import time
 start = time.time()
