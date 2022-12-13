@@ -204,7 +204,7 @@
                 row.push_back(i+n);
                 col.push_back(j+n);
                 slice.push_back(k+n);
-                val.push_back(scaleMatrix[l][i][j]*denseTensor[l][k][i][j]);
+                val.push_back(scaleMatrix[l][k][k] * denseTensor[l][k][i][j]);
               }
             }
           }
@@ -292,12 +292,36 @@
         return out;
       }
 
+
+      /* // For debug print the array of the COO Tensor
+      std::cout << "val: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << val[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "row: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << row[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "col: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << col[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "slice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << slice[i] << " ";
+      }
+      std::cout << std::endl; */
+
+
       size_t p(0);
       for(size_t m(0); m<n; ++m){
         size_t k(p);
         for(size_t j(0); j<n; ++j){
           for(size_t i(0); i<n; ++i){
-            if(row[k] == i && col[k] == j && slice[k] == m){
+            if(row[k] == j && col[k] == i && slice[k] == m){
               out << val[k] << " ";
               ++k;
               ++p;
@@ -329,7 +353,7 @@
     * 
     * @param denseVector 
     */  
-    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector) : n(0) {
+    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector, std::vector< matrix > & scaleMatrix) : n(0) {
       d_val = nullptr;
       d_indice = nullptr;
 
@@ -337,7 +361,8 @@
         for(size_t j(0); j<denseVector[i].size(); ++j){
           if(std::abs(denseVector[i][j]) > reel_eps){
             indice.push_back(j+n);
-            val.push_back(denseVector[i][j]);
+            // std::abs because the forces applied should be positive
+            val.push_back(std::abs(scaleMatrix[i][j][j])*denseVector[i][j]);
           }
         }
         n += denseVector[i].size();

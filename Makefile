@@ -31,7 +31,7 @@ $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 
 profile: all
 	nsys profile python3 tad_dummy.py
-	mv *.nsys-tep reports/
+	mv *.nsys-rep reports/
 		
 
 clean:

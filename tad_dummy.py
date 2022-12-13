@@ -14,7 +14,7 @@ sampleRate = 16000
 excitationSet = []
 
 # Generate the dummy excitation signals
-for i in range(1200):
+for i in range(1):
       excitation = np.zeros(excitationLength)
       for t in range(excitationLength):
             excitation[t] = 1.0
@@ -46,45 +46,45 @@ print("Time to load the files: ", end - start)
 M1 = [[1.0]]
 
 M2 = [[1.0, 0.0],
-     [0.0,  0.0]]
+     [0.0,  10.0]]
 
 M3 = [[1.0, 0.0, 0.0],
-      [0.0, 1.5, 0.0],
-      [0.0, 0.0, 0.0]]
+      [0.0, 10, 0.0],
+      [0.0, 0.0, 1.0]]
 
 
 B1 = [[2.0]]
 
 B2 = [[2.0, 0.0],
-      [0.0,  0.0]]
+      [0.0, 10.0]]
 
 B3 = [[2.0, 0.0, 0.0],
-      [0.0, 2.0, 0.0],
+      [0.0, 10.0, 0.0],
       [0.0, 0.0, 0.0]]
 
 
 K1 = [[12.0]]
 
 K2 = [[12.0, 0.0],
-      [0.0,  0.0]]
+      [0.0,  10.0]]
 
-K3 = [[12.0, 1.2, 0.0],
-      [1.2, 12.0, 0.0],
+K3 = [[12.0, 0.0, 0.0],
+      [0.0, 10.0, 0.0],
       [0.0, 0.0, 0.0]]
 
 
 Gamma1 = [[[0.0]]]
 
-Gamma2 = [[[0.0, 0.0],
-           [0.0, 0.0]], [[-1.0, 0.0],
+Gamma2 = [[[0.0, 20.0],
+           [0.0, 0.0]], [[10.0, 0.0],
                          [0.0, 0.0]]]
 
-Gamma3 = [[[0.0, 0.0, 0.0],
+Gamma3 = [[[0.0, 20.0, 0.0],
            [0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
+           [0.0, 0.0, 0.0]], [[10.0, 0.0, 0.0],
                               [0.0, 0.0, 0.0],
-                              [0.0, 0.0, 0.0]], [[1.0, 0.0, 0.0],
-                                                 [0.0, 0.0, 0.0],
+                              [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
+                                                 [0.0, 1.0, 0.0],
                                                  [0.0, 0.0, 0.0]]]
 
 
@@ -94,7 +94,7 @@ Lambda2 = [[0.0, 0.0],
            [0.0, 0.0]] 
 
 Lambda3 = [[0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0],
+           [0.0, 40000.0, 0.0],
            [0.0, 0.0, 0.0]]
 
 
@@ -102,7 +102,7 @@ ForcePattern1 = [1.0]
 
 ForcePattern2 = [1.0, 0.0]
 
-ForcePattern3 = [1.0, 1.0, 0.0]
+ForcePattern3 = [1.0, 0.0, 0.0]
 
 
 InitialCondition1 = [0.0]
@@ -137,14 +137,14 @@ vecLambda3 = [Lambda3]
 vecForcePattern3 = [ForcePattern3]
 vecInitialCondition3 = [InitialCondition3]
 
-n = 200
+n = 1
 
 
 start = time.time()
 
 # gpudriver.__setSystems(n*vecM1, n*vecB1, n*vecK1, n*vecGamma1, n*vecLambda1, n*vecForcePattern1, n*vecInitialCondition1)
-gpudriver.__setSystems(n*vecM2, n*vecB2, n*vecK2, n*vecGamma2, n*vecLambda2, n*vecForcePattern2, n*vecInitialCondition2)
-# gpudriver.__setSystems(n*vecM3, n*vecB3, n*vecK3, n*vecGamma3, n*vecLambda3, n*vecForcePattern3, n*vecInitialCondition3)
+# gpudriver.__setSystems(n*vecM2, n*vecB2, n*vecK2, n*vecGamma2, n*vecLambda2, n*vecForcePattern2, n*vecInitialCondition2)
+gpudriver.__setSystems(n*vecM3, n*vecB3, n*vecK3, n*vecGamma3, n*vecLambda3, n*vecForcePattern3, n*vecInitialCondition3)
 results = gpudriver.__getAmplitudes()
 
 end = time.time()
@@ -153,9 +153,9 @@ print("Overall time: ", end - start)
 
 
 
-""" print("Size of results vector: ", len(results[0]))
+print("Size of results vector: ", len(results[0]))
 print("Results Q1: ", results[0])
-print("Results Q2: ", results[1]) """
+print("Results Q2: ", results[1])
 
 
 

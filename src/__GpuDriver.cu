@@ -139,11 +139,14 @@
       std::vector< matrix > invertedScaledM = M_;
       invertMatrix(invertedScaledM, -1.0);
 
+      /* std::cout << "M.invert:" << std::endl;
+      std::cout << invertedScaledM[0] << std::endl; */
+
       B      = new COOMatrix(B_, invertedScaledM);
       K      = new COOMatrix(K_, invertedScaledM);
       Gamma  = new COOTensor(Gamma_, invertedScaledM);
       Lambda = new COOMatrix(Lambda_, invertedScaledM);
-      ForcePattern = new COOVector(ForcePattern_);
+      ForcePattern = new COOVector(ForcePattern_, invertedScaledM);
       // Allocate the QinitCond vector with the set of initials conditions
       for(size_t k(0); k<InitialConditions_.size(); k++){
         for(size_t i(0); i<InitialConditions_[k].size(); i++){
@@ -168,7 +171,7 @@
    */
    std::array<std::vector<reel>, 2> __GpuDriver::__getAmplitudes(){
       
-    if(false){
+    if(true){
       std::cout << "Checking the system assembly" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
@@ -242,13 +245,32 @@
 
     auto begin = std::chrono::high_resolution_clock::now();
 
+    bool graphCreated = false;
+    cudaGraph_t graph;
+    cudaGraphExec_t graphInstance;
+
     // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
-      // Performe the rk4 steps
+
       std::cout << "  " << k+1 << " / " << numberOfSimulationToPerform  << std::endl;
+
+      // Performe the rk4 steps
       for(uint t(0); t<lengthOfeachExcitation; ++t){
-        rkStep(k, t);
+
+        if(!graphCreated){
+          cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal);
+
+            rkStep(k, t);
+
+          cudaStreamEndCapture(streams[0], &graph);
+          cudaGraphInstantiate(&graphInstance, graph, NULL, NULL, 0);
+          graphCreated = true;
+        }
+
+        cudaGraphLaunch(graphInstance, streams[0]);
       }
+
+
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(resultsQ1.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
@@ -382,9 +404,13 @@
       CHECK_CUBLAS( cublasCreate(&h_cublas) )
       CHECK_CUBLAS( cublasSetPointerMode(h_cublas, CUBLAS_POINTER_MODE_DEVICE) )
 
+      CHECK_CUBLAS( cublasSetStream(h_cublas, streams[0]) )
+
       // Create the cuSPARSE handle
       CHECK_CUSPARSE( cusparseCreate(&h_cuSPARSE) )
       CHECK_CUSPARSE( cusparseSetPointerMode(h_cuSPARSE, CUSPARSE_POINTER_MODE_DEVICE) )
+
+      CHECK_CUSPARSE( cusparseSetStream(h_cuSPARSE, streams[0]) )
 
       return 0;
     }
@@ -444,33 +470,33 @@
                  K->d_buffer);
     
     // k += Gamma.d_mi²
-    customSpTV2<<<nBlocks, nThreadsPerBlock>>>(Gamma->d_val,
-                                               Gamma->d_row, 
-                                               Gamma->d_col,
-                                               Gamma->d_slice, 
-                                               Gamma->nzz, 
-                                               pq1, 
-                                               pk);
+    customSpTV2<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
+                                                             Gamma->d_row, 
+                                                             Gamma->d_col,
+                                                             Gamma->d_slice, 
+                                                             Gamma->nzz, 
+                                                             pq1, 
+                                                             pk);
     
     // k += Lambda.d_mi³
-    customSpMV3<<<nBlocks, nThreadsPerBlock>>>(Lambda->d_val,
-                                               Lambda->d_row,
-                                               Lambda->d_col,
-                                               Lambda->nzz,
-                                               pq1,
-                                               pk);
+    customSpMV3<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
+                                                             Lambda->d_row,
+                                                             Lambda->d_col,
+                                                             Lambda->nzz,
+                                                             pq1,
+                                                             pk);
     
     // k += ForcePattern.d_ExcitationsSet
-    customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock>>>(ForcePattern->d_val,
-                                                          ForcePattern->d_indice,
-                                                          ForcePattern->nzz,
-                                                          d_ExcitationsSet,
-                                                          lengthOfeachExcitation,
-                                                          k,
-                                                          pk,
-                                                          numberOfDOFs,
-                                                          t,
-                                                          IntraStrmParallelism);
+    customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(ForcePattern->d_val,
+                                                                        ForcePattern->d_indice,
+                                                                        ForcePattern->nzz,
+                                                                        d_ExcitationsSet,
+                                                                        lengthOfeachExcitation,
+                                                                        k,
+                                                                        pk,
+                                                                        numberOfDOFs,
+                                                                        t,
+                                                                        IntraStrmParallelism);
     
    }
 
@@ -485,24 +511,24 @@
     // Compute the derivatives
     derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, k, t);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m1, h2, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k1, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m1, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k1, h2, numberOfDOFs);
 
     derivatives(d_m2_desc, d_k2_desc, d_mi_desc, d_ki_desc, k, t+1);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m2, h2, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k2, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m2, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k2, h2, numberOfDOFs);
 
     derivatives(d_m3_desc, d_k3_desc, d_mi_desc, d_ki_desc, k, t+1);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_mi, d_Q1, d_m3, h, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock>>>(d_ki, d_Q2, d_k3, h, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m3, h, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k3, h, numberOfDOFs);
 
     derivatives(d_m4_desc, d_k4_desc, d_mi_desc, d_ki_desc, k, t+2);
 
     // Compute next Q1 and Q2 vectors
-    integrate<<<nBlocks, nThreadsPerBlock>>>(d_Q1, d_m1, d_m2, d_m3, d_m4, h6, numberOfDOFs);
-    integrate<<<nBlocks, nThreadsPerBlock>>>(d_Q2, d_k1, d_k2, d_k3, d_k4, h6, numberOfDOFs);
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q1, d_m1, d_m2, d_m3, d_m4, h6, numberOfDOFs);
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q2, d_k1, d_k2, d_k3, d_k4, h6, numberOfDOFs);
 
    }
 

@@ -148,7 +148,7 @@
   
   struct COOVector{
     COOVector() {};
-    COOVector(std::vector< std::vector<reel> > & denseVector);
+    COOVector(std::vector< std::vector<reel> > & denseVector, std::vector< matrix > & scaleMatrix);
     ~COOVector();
 
     uint ExtendTheSystem(uint nTimes);
