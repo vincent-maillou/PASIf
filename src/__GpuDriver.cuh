@@ -17,7 +17,7 @@
 
 class __GpuDriver{
  public:
-  __GpuDriver(std::vector< std::vector<reel> > excitationSet_, uint sampleRate_);
+  __GpuDriver(std::vector< std::vector<double> > excitationSet_, uint sampleRate_);
   ~__GpuDriver();
 
   int __setSystems(std::vector< matrix > & M_,
@@ -32,7 +32,7 @@ class __GpuDriver{
 
 
  private:
-  int  loadExcitationsSet(std::vector<std::vector<reel>> ExcitationsSet_);
+  int  loadExcitationsSet(std::vector<std::vector<double>> ExcitationsSet_);
   int  setCUDA(uint nStreams_);
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t k_desc,

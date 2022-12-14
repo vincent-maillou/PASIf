@@ -18,11 +18,17 @@ namespace py = pybind11;
 #include "__GpuDriver.cuh"
 
 
+
+class test{
+
+};
+
+
 PYBIND11_MODULE(PASIf, m) {
   m.doc() = "Parallel Accelerated Solver Interface";
 
   py::class_<__GpuDriver>(m, "__GpuDriver")
-    .def(py::init<std::vector<std::vector<reel>>, uint>(),
+    .def(py::init<std::vector<std::vector<double>>, uint>(),
       py::arg("excitationSet_"),
       py::arg("sampleRate_"))
     .def("__setSystems", &__GpuDriver::__setSystems, 
@@ -34,5 +40,4 @@ PYBIND11_MODULE(PASIf, m) {
       py::arg("ForcePattern_"),
       py::arg("InitialConditions_"))
     .def("__getAmplitudes", &__GpuDriver::__getAmplitudes);
-
 }

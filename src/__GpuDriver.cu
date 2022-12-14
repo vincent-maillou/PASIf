@@ -22,7 +22,7 @@
     * @param excitationSet_ 
     * @param sampleRate_ 
     */
-    __GpuDriver::__GpuDriver(std::vector<std::vector<reel>> excitationSet_, uint sampleRate_) : 
+    __GpuDriver::__GpuDriver(std::vector<std::vector<double>> excitationSet_, uint sampleRate_) : 
         sampleRate(sampleRate_),
         numberOfDOFs(0),
         nStreams(1),
@@ -257,7 +257,10 @@
       // Performe the rk4 steps
       for(uint t(0); t<lengthOfeachExcitation; ++t){
 
-        if(!graphCreated){
+        rkStep(k, t);
+        
+
+        /* if(!graphCreated){
           cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal);
 
             rkStep(k, t);
@@ -267,7 +270,7 @@
           graphCreated = true;
         }
 
-        cudaGraphLaunch(graphInstance, streams[0]);
+        cudaGraphLaunch(graphInstance, streams[0]); */
       }
 
 
@@ -308,6 +311,12 @@
       resultsQ2.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
     }
 
+    // Print resultsQ1
+    std::cout << "Results Q1:" << std::endl;
+    for(auto &result : resultsQ1){
+      std::cout << result << std::endl;
+    }
+
 
     return std::array<std::vector<reel>, 2>{resultsQ1, resultsQ2};
    }
@@ -323,7 +332,7 @@
     * @param excitationSet_ 
     * @return int 
     */
-    int __GpuDriver::loadExcitationsSet(std::vector<std::vector<reel>> excitationSet_){
+    int __GpuDriver::loadExcitationsSet(std::vector<std::vector<double>> excitationSet_){
       // Check if the ExcitationsSet is already loaded
       excitationSet.clear();
       if(d_ExcitationsSet != nullptr){
@@ -349,7 +358,8 @@
       // Parse the input excitationSet_ to a 1D array
       for(auto &excitation : excitationSet_){
         for(auto &sample : excitation){
-          excitationSet.push_back(sample);
+          excitationSet.push_back((reel)sample);
+          std::cout << sample << " ";
         }
       }
 
