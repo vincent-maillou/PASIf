@@ -245,9 +245,6 @@
 
     auto begin = std::chrono::high_resolution_clock::now();
 
-    bool graphCreated = false;
-    cudaGraph_t graph;
-    cudaGraphExec_t graphInstance;
 
     // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
@@ -258,19 +255,7 @@
       for(uint t(0); t<lengthOfeachExcitation; ++t){
 
         rkStep(k, t);
-        
 
-        /* if(!graphCreated){
-          cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal);
-
-            rkStep(k, t);
-
-          cudaStreamEndCapture(streams[0], &graph);
-          cudaGraphInstantiate(&graphInstance, graph, NULL, NULL, 0);
-          graphCreated = true;
-        }
-
-        cudaGraphLaunch(graphInstance, streams[0]); */
       }
 
 
@@ -311,11 +296,6 @@
       resultsQ2.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
     }
 
-    // Print resultsQ1
-    std::cout << "Results Q1:" << std::endl;
-    for(auto &result : resultsQ1){
-      std::cout << result << std::endl;
-    }
 
 
     return std::array<std::vector<reel>, 2>{resultsQ1, resultsQ2};
@@ -359,7 +339,6 @@
       for(auto &excitation : excitationSet_){
         for(auto &sample : excitation){
           excitationSet.push_back((reel)sample);
-          std::cout << sample << " ";
         }
       }
 

@@ -30,9 +30,8 @@ $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
 
 profile: all
-	nsys profile python3 tad_dummy.py
-	mv *.nsys-rep reports/
-		
+	nsys profile python3 testanddebug.py
+	
 
 clean:
 	rm -f $(PBUILD)*.o $(PBUILD)*.so
