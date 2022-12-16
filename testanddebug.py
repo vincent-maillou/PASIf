@@ -23,13 +23,13 @@ for file in listOfFiles:
 
 # excitation = np.fromfile("data/training/soundfile_4")
 excitation = np.ones(78001)
-excitation[0:3] = 0
+# excitation[0:3] = 0
 # excitation = excitation[excitation!=0]
 excitationSet.append(excitation)  
 
-import matplotlib.pyplot as plt
+""" import matplotlib.pyplot as plt
 plt.plot(excitationSet[0])
-plt.show()
+plt.show() """
 
 import PASIf as pasif
 """ print( dir(pasif) ) """
@@ -73,10 +73,9 @@ Lambda3 = [[0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0]]
 
 ForcePattern1 = [1.0]
-
 ForcePattern3 = [1.0, 0.0, 0.0]
-InitialCondition1 = [0.0]
 
+InitialCondition1 = [0.0]
 InitialCondition3 = [0.0, 0.0, 0.0]
 
 vecM1 = [M1]

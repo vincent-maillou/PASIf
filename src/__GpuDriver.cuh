@@ -128,6 +128,53 @@ class __GpuDriver{
 
 
 
+IDRIS application:
+Background:
+We're a team of 3:
+- Vincent Maillou, doing his master thesis at AMOLF, graduating from Ecole Centrale Nantes in 2023. MSc computer science, specialization
+ in High Peformance Computing. Wrote the first version of the targeted code for this hackathon in C++ and CUDA.
+- Theophile louvet, PhD student at AMOLF. MSc Transport engineering from ESTACA and a data science specialization 
+degree at CentraleSupelec. He contributed to the gradient part of the code.
+- Parisa Omidvar, a PhD student in the field of computational mechanics at AMOLF. MSc in mechanical engineering. User of the
+code, working on a different project than Theophile and Vincent but benefit from the code. New to GPU programming but looking
+forward to improve her skills.
+Vincent will leave the team in Mai for a PhD at the ETH Zurich and therefore one of the side goal of this hackathon 
+for us is also to ensure that both Theophile and Parisa will be able to maintain the code after Vincent's departure.
+
+
+Skillsets:
+- Vincent: C++/CUDA/MPI/Cluster
+- Theophile: Python/C++/CUDA/Optimization
+- Parisa: Python/Computational mechanics/GPU programming enthousiast
+
+
+
+Brought together by our supervisor: Dr Marc Serra-Garcia, tenure track group leader (Hypermart Matter-group at AMOLF)
+Marc got his MSc in Aerospace, Aeronautical and Astronautical Engineering from Caltech in 2012. He got his PhD
+from ETH Zurich in 2017 in the field of non-linear and stochastic physics. He is a computational scientist with 
+a strong background in numerical methods.
+Refactor:
+  "Our research supervisor is Dr. Marc Serra-Garcia, a tenure track group leader at the Hypermart 
+  Matter-group at AMOLF. Dr. Serra-Garcia holds a MSc in Aerospace, Aeronautical and Astronautical 
+  Engineering from Caltech and a PhD in non-linear and stochastic physics from ETH Zurich. He is a 
+  highly skilled computational scientist with a strong background in numerical methods."
+
+
+
+
+What make us unique:
+- We're a team of 3, with complementary skills, working on connected but different projects that used
+the same code. 
+- We're higly motivated to improve the code and learn from this event. Some of us are already familiar with
+GPU programming and high performance computing, some of us are discovering this field. 
+We're all eager to learn and improve our skills!
+- We'll be 100% dedicated to this event during the all duration of the hackathon, looking forward to it.
+Refactor:
+  "Our team of 3 brings a range of complementary skills and diverse projects that utilize the same codebase. 
+  While some of us have prior experience with GPU programming and high performance computing, others are 
+  excited to dive into this field for the first time. We are highly motivated to improve our skills and the 
+  code through this hackathon, and are fully dedicated to the event for its duration. We look forward to the 
+  opportunity to learn and grow together."
 
 
 */
