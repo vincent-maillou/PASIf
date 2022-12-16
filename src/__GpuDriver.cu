@@ -23,7 +23,6 @@
     * @param sampleRate_ 
     */
     __GpuDriver::__GpuDriver(std::vector<std::vector<double>> excitationSet_, uint sampleRate_) : 
-        sampleRate(sampleRate_),
         numberOfDOFs(0),
         nStreams(1),
         IntraStrmParallelism(1),
@@ -60,8 +59,16 @@
       // CUDA
       streams    = nullptr;
       h_cuSPARSE = NULL;
+    
+      // Put on the device alpha and beta values for the cuSPARSE API
+      CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) )
+      CHECK_CUDA( cudaMalloc((void**)&d_beta1, sizeof(reel)) )
+      CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
+      CHECK_CUDA( cudaMemcpy(d_alpha, &alpha, sizeof(reel), cudaMemcpyHostToDevice) )
+      CHECK_CUDA( cudaMemcpy(d_beta1, &beta1, sizeof(reel), cudaMemcpyHostToDevice) )
+      CHECK_CUDA( cudaMemcpy(d_beta0, &beta0, sizeof(reel), cudaMemcpyHostToDevice) )
 
-      loadExcitationsSet(excitationSet_);
+      __loadExcitationsSet(excitationSet_, sampleRate_);
       setCUDA(nStreams);
     }
 
@@ -88,6 +95,54 @@
       }
 
     }
+
+
+  /** __GpuDriver::loadExcitationsSet()
+    * @brief Load the excitation set in the GPU memory
+    * 
+    * @param excitationSet_ 
+    */
+    int __GpuDriver::__loadExcitationsSet(std::vector< std::vector<double> > excitationSet_, uint sampleRate_){
+      sampleRate = sampleRate_;
+
+      // Check if the ExcitationsSet is already loaded
+      excitationSet.clear();
+      if(d_ExcitationsSet != nullptr){
+        CHECK_CUDA( cudaFree(d_ExcitationsSet) )
+        d_ExcitationsSet = nullptr;
+      }
+
+      // Check the size of all the excitation vectors
+      for(auto &excitation : excitationSet_){
+        if(excitation.size() != excitationSet_[0].size()){
+          std::cout << "Error : Excitations vectors are not of the same size" << std::endl;
+          return 1;
+        }
+      }
+
+      numberOfExcitations    = excitationSet_.size();
+      lengthOfeachExcitation = excitationSet_[0].size();
+      // Set the RK4 timesteps
+      h = 1.0/sampleRate;
+      h2 = h/2.0;
+      h6 = h/6.0;
+
+      // Parse the input excitationSet_ to a 1D array
+      for(auto &excitation : excitationSet_){
+        for(auto &sample : excitation){
+          excitationSet.push_back((reel)sample);
+        }
+      }
+
+      // Allocate memory on the GPU
+      CHECK_CUDA( cudaMalloc((void**)&d_ExcitationsSet, excitationSet.size()*sizeof(reel)) )
+      // Copy the ExcitationsSet to the GPU
+      CHECK_CUDA( cudaMemcpy(d_ExcitationsSet, excitationSet.data(), excitationSet.size()*sizeof(reel), cudaMemcpyHostToDevice) )
+      std::cout << "Loaded " << numberOfExcitations << " excitations of length " << lengthOfeachExcitation << " each." << std::endl;
+    
+      return 0;
+    }
+  
 
 
   /** __GpuDriver::__setSystems()
@@ -306,62 +361,6 @@
 /****************************************************
  *              Private functions                   *
  ****************************************************/
-  /** __GpuDriver::loadExcitationsSet()
-    * @brief Load the excitation set in the GPU memory
-    * 
-    * @param excitationSet_ 
-    * @return int 
-    */
-    int __GpuDriver::loadExcitationsSet(std::vector<std::vector<double>> excitationSet_){
-      // Check if the ExcitationsSet is already loaded
-      excitationSet.clear();
-      if(d_ExcitationsSet != nullptr){
-        CHECK_CUDA( cudaFree(d_ExcitationsSet) )
-        d_ExcitationsSet = nullptr;
-      }
-
-      // Check the size of all the excitation vectors
-      for(auto &excitation : excitationSet_){
-        if(excitation.size() != excitationSet_[0].size()){
-          std::cout << "Error : Excitations vectors are not of the same size" << std::endl;
-          return -1;
-        }
-      }
-
-      numberOfExcitations    = excitationSet_.size();
-      lengthOfeachExcitation = excitationSet_[0].size();
-      // Set the RK4 timesteps
-      h = 1.0/sampleRate;
-      h2 = h/2.0;
-      h6 = h/6.0;
-
-      // Parse the input excitationSet_ to a 1D array
-      for(auto &excitation : excitationSet_){
-        for(auto &sample : excitation){
-          excitationSet.push_back((reel)sample);
-        }
-      }
-
-      // Allocate memory on the GPU
-      CHECK_CUDA( cudaMalloc((void**)&d_ExcitationsSet, excitationSet.size()*sizeof(reel)) )
-      // Copy the ExcitationsSet to the GPU
-      CHECK_CUDA( cudaMemcpy(d_ExcitationsSet, excitationSet.data(), excitationSet.size()*sizeof(reel), cudaMemcpyHostToDevice) )
-      std::cout << "Loaded " << numberOfExcitations << " excitations of length " << lengthOfeachExcitation << " each." << std::endl;
-
-
-
-      // Put on the device alpha and beta values for the cuSPARSE API
-      CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) )
-      CHECK_CUDA( cudaMalloc((void**)&d_beta1, sizeof(reel)) )
-      CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
-      CHECK_CUDA( cudaMemcpy(d_alpha, &alpha, sizeof(reel), cudaMemcpyHostToDevice) )
-      CHECK_CUDA( cudaMemcpy(d_beta1, &beta1, sizeof(reel), cudaMemcpyHostToDevice) )
-      CHECK_CUDA( cudaMemcpy(d_beta0, &beta0, sizeof(reel), cudaMemcpyHostToDevice) )
-
-      return 0;
-    }
-
-
   /** __GpuDriver::setCUDA()
     * @brief Set the parameters of the computation
     * 

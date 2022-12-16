@@ -31,6 +31,9 @@ PYBIND11_MODULE(PASIf, m) {
     .def(py::init<std::vector<std::vector<double>>, uint>(),
       py::arg("excitationSet_"),
       py::arg("sampleRate_"))
+    .def("__loadExcitationsSet", &__GpuDriver::__loadExcitationsSet,
+      py::arg("excitationSet_"),
+      py::arg("sampleRate_"))
     .def("__setSystems", &__GpuDriver::__setSystems, 
       py::arg("M_"),
       py::arg("B_"),

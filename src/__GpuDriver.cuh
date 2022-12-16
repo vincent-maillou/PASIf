@@ -20,6 +20,8 @@ class __GpuDriver{
   __GpuDriver(std::vector< std::vector<double> > excitationSet_, uint sampleRate_);
   ~__GpuDriver();
 
+  int __loadExcitationsSet(std::vector< std::vector<double> > excitationSet_, uint sampleRate_);
+
   int __setSystems(std::vector< matrix > & M_,
                    std::vector< matrix > & B_,
                    std::vector< matrix > & K_,
@@ -32,7 +34,6 @@ class __GpuDriver{
 
 
  private:
-  int  loadExcitationsSet(std::vector<std::vector<double>> ExcitationsSet_);
   int  setCUDA(uint nStreams_);
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t k_desc,
@@ -138,8 +139,9 @@ degree at CentraleSupelec. He contributed to the gradient part of the code.
 - Parisa Omidvar, a PhD student in the field of computational mechanics at AMOLF. MSc in mechanical engineering. User of the
 code, working on a different project than Theophile and Vincent but benefit from the code. New to GPU programming but looking
 forward to improve her skills.
+
 Vincent will leave the team in Mai for a PhD at the ETH Zurich and therefore one of the side goal of this hackathon 
-for us is also to ensure that both Theophile and Parisa will be able to maintain the code after Vincent's departure.
+for us is to ensure that both Theophile and Parisa will be able to maintain the code after Vincent's departure.
 
 
 Skillsets:
