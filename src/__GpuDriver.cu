@@ -68,7 +68,7 @@
       CHECK_CUDA( cudaMemcpy(d_beta1, &beta1, sizeof(reel), cudaMemcpyHostToDevice) )
       CHECK_CUDA( cudaMemcpy(d_beta0, &beta0, sizeof(reel), cudaMemcpyHostToDevice) )
 
-      __loadExcitationsSet(excitationSet_, sampleRate_);
+      _loadExcitationsSet(excitationSet_, sampleRate_);
       setCUDA(nStreams);
     }
 
@@ -102,7 +102,9 @@
     * 
     * @param excitationSet_ 
     */
-    int __GpuDriver::__loadExcitationsSet(std::vector< std::vector<double> > excitationSet_, uint sampleRate_){
+    int __GpuDriver::_loadExcitationsSet(std::vector< std::vector<double> > excitationSet_, 
+                                         uint sampleRate_){
+
       sampleRate = sampleRate_;
 
       // Check if the ExcitationsSet is already loaded
@@ -145,10 +147,9 @@
   
 
 
-  /** __GpuDriver::__setSystems()
+  /** __GpuDriver::driver_setSystems()
     * @brief Set the parameters of the system
     * 
-    * @param M_ 
     * @param B_ 
     * @param K_ 
     * @param Gamma_ 
@@ -157,51 +158,27 @@
     * @param InitialConditions_
     * @return int 
     */
-    int __GpuDriver::__setSystems(std::vector< matrix > & M_,
-                                  std::vector< matrix > & B_,
-                                  std::vector< matrix > & K_,
-                                  std::vector< tensor >  & Gamma_,
-                                  std::vector< matrix > & Lambda_,
-                                  std::vector< std::vector<reel> > & ForcePattern_,
-                                  std::vector< std::vector<reel> > & InitialConditions_){
+    int __GpuDriver::_setSystems(std::vector< matrix > & B_,
+                                 std::vector< matrix > & K_,
+                                 std::vector< tensor >  & Gamma_,
+                                 std::vector< matrix > & Lambda_,
+                                 std::vector< std::vector<reel> > & ForcePattern_,
+                                 std::vector< std::vector<reel> > & InitialConditions_){
 
-      // Check the number of systems in all of the input vectors
-      if(M_.size() != B_.size() || M_.size() != K_.size() || M_.size() != Gamma_.size() || M_.size() != Lambda_.size() || M_.size() != ForcePattern_.size() || M_.size() != InitialConditions_.size()){
-        std::cout << "Error : The number of systems is not the same for all the input parameters" << std::endl;
-        return -1;
-      }
-
-      // Check that the matrix of each system are of the same size
-      for(uint i = 0; i < M_.size(); i++){
-        if(M_[i].size() != B_[i].size() || M_[i].size() != K_[i].size() || M_[i].size() != Gamma_[i].size() || M_[i].size() != Lambda_[i].size() || M_[i].size() != ForcePattern_[i].size() || M_[i].size() != InitialConditions_[i].size()){
-          std::cout << "Error : The size of the matrix of the system " << i << " is not the same for all the input parameters" << std::endl;
-          return -1;
-        }
-      }
 
       // Initialize the number of DOF at the original size of the system
-      numberOfDOFs = M_[0].size();
-
-
+      numberOfDOFs = InitialConditions_[0].size();
 
       // Check if the system matrix have already been loaded, 
       // if so delete them and free the memory
       checkAndDestroy();
 
+      B      = new COOMatrix(B_);
+      K      = new COOMatrix(K_);
+      Gamma  = new COOTensor(Gamma_);
+      Lambda = new COOMatrix(Lambda_);
+      ForcePattern = new COOVector(ForcePattern_);
 
-
-      // Set the matrix defining the system
-      std::vector< matrix > invertedScaledM = M_;
-      invertMatrix(invertedScaledM, -1.0);
-
-      /* std::cout << "M.invert:" << std::endl;
-      std::cout << invertedScaledM[0] << std::endl; */
-
-      B      = new COOMatrix(B_, invertedScaledM);
-      K      = new COOMatrix(K_, invertedScaledM);
-      Gamma  = new COOTensor(Gamma_, invertedScaledM);
-      Lambda = new COOMatrix(Lambda_, invertedScaledM);
-      ForcePattern = new COOVector(ForcePattern_, invertedScaledM);
       // Allocate the QinitCond vector with the set of initials conditions
       for(size_t k(0); k<InitialConditions_.size(); k++){
         for(size_t i(0); i<InitialConditions_[k].size(); i++){
@@ -209,22 +186,18 @@
         }
       }
 
-
-
-
       optimizeIntraStrmParallelisme();
-
 
       return 0;
     }
 
 
-  /** __GpuDriver::__getAmplitudes()
+  /** __GpuDriver::driver_getAmplitudes()
    * @brief 
    * 
    * @return std::array<std::vector<reel>, 2>
    */
-   std::array<std::vector<reel>, 2> __GpuDriver::__getAmplitudes(){
+   std::array<std::vector<reel>, 2> __GpuDriver::_getAmplitudes(){
       
     if(true){
       std::cout << "Checking the system assembly" << std::endl;
@@ -282,6 +255,7 @@
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_k3_desc, numberOfDOFs, d_k3, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_k4, numberOfDOFs*sizeof(reel)) )
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_k4_desc, numberOfDOFs, d_k4, CUDA_R_32F) )
+
 
 
     // Allocate the matrices and vectors on the GPU

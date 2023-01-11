@@ -15,16 +15,15 @@
 
 
 /****************************************************
- *              COO Tensor
+ *              COO Matrix
  ****************************************************/
-
   /**
   * @brief Construct a new COOMatrix::COOMatrix object
   * 
   * @param denseMatrix 
   * @param scaleMatrix 
   */
-    COOMatrix::COOMatrix(std::vector< matrix > & denseMatrix, std::vector< matrix > & scaleMatrix) :
+    COOMatrix::COOMatrix(std::vector< matrix > & denseMatrix) :
         n(0),
         alpha(1),
         beta(1){
@@ -44,10 +43,10 @@
 
         for(size_t i(0); i<denseMatrix[k].size(); ++i){
           for(size_t j(0); j<denseMatrix[k][i].size(); ++j){
-            if(std::abs(denseMatrix[k][i][j]) > reel_eps && std::abs(scaleMatrix[k][i][j]) > reel_eps){
+            if(std::abs(denseMatrix[k][i][j]) > reel_eps){
               row.push_back(i+n);
               col.push_back(j+n);
-              val.push_back(scaleMatrix[k][i][j]*denseMatrix[k][i][j]);
+              val.push_back(denseMatrix[k][i][j]);
             }
           }
         }
@@ -57,6 +56,8 @@
       nzz = val.size();
 
     }
+
+
 
   /**
   * @brief Destroy the COOMatrix::COOMatrix object
@@ -83,6 +84,8 @@
       }
     }
 
+
+
   /**
    * @brief Extend the COO Matrix by appending n times the same matrix
    * 
@@ -106,11 +109,16 @@
       return n;
     }
 
+
+
   /**
    * @brief Construct a new COOMatrix::AllocateOnGPU object
    * 
    */
-    void COOMatrix::AllocateOnGPU(cusparseHandle_t & handle, cusparseDnVecDescr_t & vecX, cusparseDnVecDescr_t & vecY){
+    void COOMatrix::AllocateOnGPU(cusparseHandle_t & handle, 
+                                  cusparseDnVecDescr_t & vecX, 
+                                  cusparseDnVecDescr_t & vecY){
+
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
@@ -179,14 +187,13 @@
 /****************************************************
  *              COO Tensor
  ****************************************************/
-
   /**
   * @brief Construct a new COOTensor::COOTensor object
   * 
   * @param denseTensor 
   * @param scaleMatrix 
   */
-    COOTensor::COOTensor(std::vector< tensor > & denseTensor, std::vector< matrix > & scaleMatrix) : n(0){
+    COOTensor::COOTensor(std::vector< tensor > & denseTensor) : n(0){
       // Set device pointer to nullprt
       d_val = nullptr;
       d_row = nullptr;
@@ -200,11 +207,11 @@
         for(size_t k(0); k<denseTensor[l].size(); ++k){
           for(size_t i(0); i<denseTensor[l][k].size(); ++i){
             for(size_t j(0); j<denseTensor[l][k][i].size(); ++j){
-              if(denseTensor[l][k][i][j] != 0){
+              if(std::abs(denseTensor[l][k][i][j]) > reel_eps){
                 row.push_back(i+n);
                 col.push_back(j+n);
                 slice.push_back(k+n);
-                val.push_back(scaleMatrix[l][k][k] * denseTensor[l][k][i][j]);
+                val.push_back(denseTensor[l][k][i][j]);
               }
             }
           }
@@ -215,6 +222,8 @@
       nzz = val.size();
 
     }
+
+
 
   /**
   * @brief Destroy the COOTensor::COOTensor object
@@ -234,6 +243,8 @@
         CHECK_CUDA( cudaFree(d_slice) );
       }
     }
+
+
 
   /**
    * @brief Extend the COO Tensor by appending n times the same tensor
@@ -258,6 +269,8 @@
 
       return n;
     }
+
+
 
   /**
    * @brief Construct a new COOTensor::AllocateOnGPU object
@@ -353,7 +366,7 @@
     * 
     * @param denseVector 
     */  
-    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector, std::vector< matrix > & scaleMatrix) : n(0) {
+    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector) : n(0) {
       d_val = nullptr;
       d_indice = nullptr;
 
@@ -361,8 +374,7 @@
         for(size_t j(0); j<denseVector[i].size(); ++j){
           if(std::abs(denseVector[i][j]) > reel_eps){
             indice.push_back(j+n);
-            // std::abs because the forces applied should be positive
-            val.push_back(std::abs(scaleMatrix[i][j][j])*denseVector[i][j]);
+            val.push_back(denseVector[i][j]);
           }
         }
         n += denseVector[i].size();
@@ -404,6 +416,8 @@
     return n;
   }
 
+
+
   void COOVector::AllocateOnGPU(){
     // Allocate memory on the device
     CHECK_CUDA( cudaMalloc((void**)&d_indice, nzz*sizeof(uint)) );
@@ -418,6 +432,8 @@
                                         CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
   }
 
+
+
   size_t COOVector::memFootprint(){
     // Return the number of bytes needed to store this element on the GPU
     size_t memFootprint;
@@ -426,6 +442,8 @@
 
     return memFootprint;
   }
+
+
 
   std::ostream& COOVector::print(std::ostream& out) const{
     if(nzz == 0){
@@ -462,6 +480,8 @@
     return out;
   }
 
+
+
   std::ostream& operator<<(std::ostream& out, COOVector const& vector_){
     return vector_.print(out);
   }
@@ -471,30 +491,6 @@
 /****************************************************
  *              Utilities
  ****************************************************/
-
-  /**
-  * @brief 
-  * 
-  * @param vectMat 
-  * @param scaleFactor 
-  */
-    void invertMatrix(std::vector< matrix > & vectMat, float scaleFactor){
-      // For now just return the invert of each element multiplied by the scale factor
-      for(size_t k(0); k<vectMat.size(); ++k){
-        for(size_t i(0); i<vectMat[k].size(); ++i){
-          for(size_t j(0); j<vectMat[k][i].size(); ++j){
-            if(std::abs(vectMat[k][i][j]) > reel_eps){
-              vectMat[k][i][j] = scaleFactor/vectMat[k][i][j];
-            }
-            else{
-              vectMat[k][i][j] = 0.;
-            }
-          }
-        }
-      }
-    }
-
-
   std::ostream& operator<<(std::ostream& out, matrix const& mat){
     // Print the row-major dense matrix in the output stream
     for(size_t i(0); i<mat.size(); ++i){
@@ -507,9 +503,12 @@
     return out;
   }
 
+
+
   void printVector(std::vector<reel> & vec){
     std::cout << vec << std::endl;
   }
+
 
 
   template <typename T>
@@ -520,6 +519,8 @@
     out << std::endl;
     return out;
   }      
+
+
 
   uint extendTheVector(std::vector<reel> & vec, uint nTimes){
     uint n(vec.size());

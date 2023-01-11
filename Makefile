@@ -9,15 +9,15 @@ PBUILD := build/
 PSRC := src/
 PREPORTS := reports/
 
-all: $(PBUILD)PASIf.so $(PBUILD)utest.out
+all: $(PBUILD)PASIfgpu.so $(PBUILD)utest.out
 
-$(PBUILD)PASIf.so: $(PBUILD)PASIf.o $(PBUILD)__GpuDriver.o $(PBUILD)kernels.o $(PBUILD)helpers.o 
+$(PBUILD)PASIfgpu.so: $(PBUILD)PASIfgpu.o $(PBUILD)__GpuDriver.o $(PBUILD)kernels.o $(PBUILD)helpers.o 
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -shared -o $@ $^
 
 $(PBUILD)utest.out: $(PSRC)utest.cu $(PBUILD)kernels.o $(PBUILD)helpers.o
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -o $@ $^
 
-$(PBUILD)PASIf.o: $(PSRC)PASIf.cpp $(PBUILD)helpers.o
+$(PBUILD)PASIfgpu.o: $(PSRC)PASIfgpu.cpp $(PBUILD)helpers.o
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC -c $(python3-config --includes) $(PYBIND11) -o $@ $<
 
 $(PBUILD)__GpuDriver.o: $(PSRC)__GpuDriver.cu $(PSRC)__GpuDriver.cuh $(PBUILD)helpers.o $(PBUILD)kernels.o

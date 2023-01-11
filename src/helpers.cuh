@@ -71,11 +71,13 @@
   
   struct COOMatrix{
     COOMatrix() {};
-    COOMatrix(std::vector< matrix > & denseMatrix, std::vector< matrix > & scaleMatrix);
+    COOMatrix(std::vector< matrix > & denseMatrix);
     ~COOMatrix();
 
     uint ExtendTheSystem(uint nTimes);
-    void AllocateOnGPU(cusparseHandle_t & handle, cusparseDnVecDescr_t & vecX, cusparseDnVecDescr_t & vecY);
+    void AllocateOnGPU(cusparseHandle_t & handle, 
+                       cusparseDnVecDescr_t & vecX, 
+                       cusparseDnVecDescr_t & vecY);
     size_t memFootprint();
     
     std::ostream& print(std::ostream& out) const;
@@ -113,7 +115,7 @@
 
   struct COOTensor{
     COOTensor() {};
-    COOTensor(std::vector< tensor > & denseTensor, std::vector< matrix > & scaleMatrix);
+    COOTensor(std::vector< tensor > & denseTensor);
     ~COOTensor();
 
     uint ExtendTheSystem(uint nTimes);
@@ -148,7 +150,7 @@
   
   struct COOVector{
     COOVector() {};
-    COOVector(std::vector< std::vector<reel> > & denseVector, std::vector< matrix > & scaleMatrix);
+    COOVector(std::vector< std::vector<reel> > & denseVector);
     ~COOVector();
 
     uint ExtendTheSystem(uint nTimes);
@@ -178,7 +180,6 @@
  *              Utilities
  ****************************************************/
   
-  void invertMatrix(std::vector< matrix > & vectMat, float scaleFactor);
 
   std::ostream& operator<<(std::ostream& out, matrix const& mat);
 
