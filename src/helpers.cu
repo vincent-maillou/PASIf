@@ -185,15 +185,15 @@
 
 
 /****************************************************
- *              COO Tensor
+ *              COO Tensor 3D
  ****************************************************/
   /**
-  * @brief Construct a new COOTensor::COOTensor object
+  * @brief Construct a new COOTensor3D::COOTensor3D object
   * 
   * @param denseTensor 
   * @param scaleMatrix 
   */
-    COOTensor::COOTensor(std::vector< tensor > & denseTensor) : n(0){
+    COOTensor3D::COOTensor3D(std::vector< tensor3d > & denseTensor) : n(0){
       // Set device pointer to nullprt
       d_val = nullptr;
       d_row = nullptr;
@@ -223,13 +223,11 @@
 
     }
 
-
-
   /**
-  * @brief Destroy the COOTensor::COOTensor object
+  * @brief Destroy the COOTensor3D::COOTensor3D object
   * 
   */
-    COOTensor::~COOTensor(){
+    COOTensor3D::~COOTensor3D(){
       if(d_val != nullptr){
         CHECK_CUDA( cudaFree(d_val) );
       }
@@ -244,14 +242,12 @@
       }
     }
 
-
-
   /**
    * @brief Extend the COO Tensor by appending n times the same tensor
    * 
    * @param nTimes 
    */
-    uint COOTensor::ExtendTheSystem(uint nTimes){
+    uint COOTensor3D::ExtendTheSystem(uint nTimes){
       if(nTimes == 0){
         return n;
       }
@@ -270,13 +266,11 @@
       return n;
     }
 
-
-
   /**
-   * @brief Construct a new COOTensor::AllocateOnGPU object
+   * @brief Construct a new COOTensor3D::AllocateOnGPU object
    * 
    */
-    void COOTensor::AllocateOnGPU(){
+    void COOTensor3D::AllocateOnGPU(){
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
@@ -290,7 +284,7 @@
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
     }
 
-    size_t COOTensor::memFootprint(){
+    size_t COOTensor3D::memFootprint(){
       // Return the number of bytes needed to store this element on the GPU
       size_t memFootprint;
 
@@ -299,35 +293,11 @@
       return memFootprint;
     }
 
-    std::ostream& COOTensor::print(std::ostream& out) const{
+    std::ostream& COOTensor3D::print(std::ostream& out) const{
       if(nzz == 0){
         out << "Empty COO Tensor" << std::endl;
         return out;
       }
-
-
-      /* // For debug print the array of the COO Tensor
-      std::cout << "val: ";
-      for(size_t i(0); i<nzz; ++i){
-        std::cout << val[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "row: ";
-      for(size_t i(0); i<nzz; ++i){
-        std::cout << row[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "col: ";
-      for(size_t i(0); i<nzz; ++i){
-        std::cout << col[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "slice: ";
-      for(size_t i(0); i<nzz; ++i){
-        std::cout << slice[i] << " ";
-      }
-      std::cout << std::endl; */
-
 
       size_t p(0);
       for(size_t m(0); m<n; ++m){
@@ -352,7 +322,177 @@
       return out;
     }
 
-    std::ostream& operator<<(std::ostream& out, COOTensor const& tensor_){
+    std::ostream& operator<<(std::ostream& out, COOTensor3D const& tensor_){
+      return tensor_.print(out);
+    }
+
+
+
+/****************************************************
+ *              COO Tensor 4D
+ ****************************************************/
+  /**
+    * @brief Construct a new COOTensor4D::COOTensor4D object
+    * 
+    * @param denseTensor 
+    * @param scaleMatrix 
+    */
+    COOTensor4D::COOTensor4D(std::vector< tensor4d > & denseTensor) : n(0){
+      // Set device pointer to nullprt
+      d_val = nullptr;
+      d_row = nullptr;
+      d_col = nullptr;
+      d_slice = nullptr;
+      d_hyperslice = nullptr;
+
+
+      // Fill the COO Tensor with the values of the vector of the 4D dense tensor
+      for(size_t l(0); l<denseTensor.size(); ++l){
+
+        for(size_t hs(0); hs<denseTensor[l].size(); ++hs){
+          for(size_t s(0); s<denseTensor[l][hs].size(); ++s){
+            for(size_t i(0); i<denseTensor[l][hs][s].size(); ++i){
+              for(size_t j(0); j<denseTensor[l][hs][s][i].size(); ++j){
+                if(std::abs(denseTensor[l][hs][s][i][j]) > reel_eps){
+                  row.push_back(i+n);
+                  col.push_back(j+n);
+                  slice.push_back(s+n);
+                  hyperslice.push_back(hs+n);
+                  val.push_back(denseTensor[l][hs][s][i][j]);
+                }
+              }
+            }
+          }
+        }
+        n += denseTensor[l].size();
+      
+      }
+      nzz = val.size();
+
+    }
+
+
+
+  /**
+  * @brief Destroy the COOTensor3D::COOTensor3D object
+  * 
+  */
+    COOTensor4D::~COOTensor4D(){
+      if(d_val != nullptr){
+        CHECK_CUDA( cudaFree(d_val) );
+      }
+      if(d_row != nullptr){
+        CHECK_CUDA( cudaFree(d_row) );
+      }
+      if(d_col != nullptr){
+        CHECK_CUDA( cudaFree(d_col) );
+      }
+      if(d_slice != nullptr){
+        CHECK_CUDA( cudaFree(d_slice) );
+      }
+      if(d_hyperslice != nullptr){
+        CHECK_CUDA( cudaFree(d_hyperslice) );
+      }
+    }
+
+
+
+  /**
+   * @brief Extend the COO Tensor by appending n times the same tensor
+   * 
+   * @param nTimes 
+   */
+    uint COOTensor4D::ExtendTheSystem(uint nTimes){
+      if(nTimes == 0){
+        return n;
+      }
+
+      for(uint i(0); i<nTimes; ++i){
+        for(uint j(0); j<nzz; ++j){
+          row.push_back(row[j]+(i+1)*n);
+          col.push_back(col[j]+(i+1)*n);
+          slice.push_back(slice[j]+(i+1)*n);
+          hyperslice.push_back(hyperslice[j]+(i+1)*n);
+          val.push_back(val[j]);
+        }
+      }
+      n += nTimes*n;
+      nzz = val.size();
+
+      return n;
+    }
+
+
+
+  /**
+   * @brief Construct a new COOTensor3D::AllocateOnGPU object
+   * 
+   */
+    void COOTensor4D::AllocateOnGPU(){
+      // Allocate memory on the device
+      CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_slice, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_hyperslice, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );
+
+      // Copy the data to the device
+      CHECK_CUDA( cudaMemcpy(d_row, row.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_col, col.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_slice, slice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_hyperslice, hyperslice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+    }
+
+
+
+    size_t COOTensor4D::memFootprint(){
+      // Return the number of bytes needed to store this element on the GPU
+      size_t memFootprint;
+
+      memFootprint = 4*nzz*sizeof(uint) + nzz*sizeof(reel); 
+
+      return memFootprint;
+    }
+
+
+
+    std::ostream& COOTensor4D::print(std::ostream& out) const{
+      if(nzz == 0){
+        out << "Empty COO Tensor" << std::endl;
+        return out;
+      }
+
+      std::cout << "val: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << val[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "row: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << row[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "col: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << col[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "slice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << slice[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "hyperslice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << hyperslice[i] << " ";
+      }
+      std::cout << std::endl;
+      
+      return out;
+    }
+
+    std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_){
       return tensor_.print(out);
     }
 

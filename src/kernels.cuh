@@ -14,33 +14,35 @@
 
 
 
-/** customSpMV3()
- * @brief Perform the coo sparse matrix - dense vector cube multiplication
- * 
- * @return __global__ 
- */
- __global__
- void customSpMV3(reel* d_val, 
-                  uint* d_row, 
-                  uint* d_col, 
-                  uint nzz, 
-                  reel* X, 
-                  reel* Y);
-
-
-
 /** customSpTV2()
- * @brief Perform the coo sparse tensor - dense vector square multiplication
+ * @brief Perform the coo sparse tensor 3d - dense vector multiplication (order 2)
  * 
  */
  __global__
- void customSpTV2(reel *d_val, 
-                  uint *d_row, 
-                  uint *d_col, 
-                  uint *d_slice, 
-                  uint nzz,
-                  reel* X, 
-                  reel* Y);
+ void customSpTd2V(reel *d_val, 
+                   uint *d_row, 
+                   uint *d_col, 
+                   uint *d_slice, 
+                   uint nzz,
+                   reel* X, 
+                   reel* Y);
+
+            
+          
+
+/** customSpTd3V()
+ * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
+ * 
+ */
+ __global__
+ void customSpTd3V(reel *d_val, 
+                   uint *d_row, 
+                   uint *d_col, 
+                   uint *d_slice, 
+                   uint *d_hyperslice,
+                   uint nzz,
+                   reel* X, 
+                   reel* Y);
 
 
 

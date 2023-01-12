@@ -31,12 +31,18 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("excitationSet_"),
       py::arg("sampleRate_"))
 
-    .def("_setSystems", &__GpuDriver::_setSystems, 
-      py::arg("B_"),
-      py::arg("K_"),
-      py::arg("Gamma_"),
-      py::arg("Lambda_"),
-      py::arg("ForcePattern_"),
+    // Setters for the system definition
+    .def("_setB", &__GpuDriver::_setB,
+      py::arg("B_"))
+    .def("_setK", &__GpuDriver::_setK,
+      py::arg("K_"))
+    .def("_setGamma", &__GpuDriver::_setGamma,
+      py::arg("Gamma_"))
+    .def("_setLambda", &__GpuDriver::_setLambda,
+      py::arg("Lambda_"))
+    .def("_setForcePattern", &__GpuDriver::_setForcePattern,
+      py::arg("ForcePattern_"))
+    .def("_setInitialConditions", &__GpuDriver::_setInitialConditions,
       py::arg("InitialConditions_"))
 
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes);

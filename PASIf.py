@@ -30,7 +30,7 @@ class PASIf(__GpuDriver):
     self._loadExcitationsSet(excitationSet, sampleRate)
 
 
-
+  
   def setSystems(self,
                  vecM,
                  vecB,
@@ -39,6 +39,10 @@ class PASIf(__GpuDriver):
                  vecLambda,
                  vecForcePattern,
                  vecInitialConditions):
+    """"Pre-process the matrix by -M^-1 and then set the syste on the GPU using the driver.
+    Chosen convention:
+    - Gamma defined positive
+    - Lambda defined negative."""
 
     # Check if the system is valid
     # Check the number of system in all of the inputs vectors
@@ -51,37 +55,23 @@ class PASIf(__GpuDriver):
         raise ValueError("The size of the matrix of each system must be the same.")
 
 
-
-    # Invert the M matrix and then pre-multiply the other matrices
+    # Invert the M matrix and then pre-multiply the others
     for i in range(len(vecM)):
       vecM[i] = np.linalg.inv(vecM[i])
       vecM[i] = vecM[i]
       vecB[i] = -1 * np.matmul(vecM[i], vecB[i])
       vecK[i] = -1 * np.matmul(vecM[i], vecK[i])
       vecGamma[i] = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
-      vecLambda[i] = np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
+      vecLambda[i] = -1 * np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
       vecForcePattern[i] = np.diag(vecM[i]) * vecForcePattern[i]
 
-    # For debugging purpose print the matrices
-    """ print("vecM: \n", vecM)
-    print("vecB: \n", vecB)
-    print("vecK: \n", vecK) """
-    # print("vecGamma: \n", vecGamma)
-    print("vecLambda: \n", vecLambda)
-    # print("vecForcePattern: \n", vecForcePattern)
-
-    """ Lambda3 = [[0.0, 0.0, 0.0],
-               [0.0, -4000.0, 0.0],
-               [0.0, 0.0, 0.0]] """
-
-    Lambda3 = [[0, 0, 0],
-               [0, 0, 0],
-               [0, 0, 0]]
-    
-    vecLambda3 = np.array([Lambda3])
-
     # Load the system in the GPU
-    self._setSystems(vecB, vecK, vecGamma, vecLambda3, vecForcePattern, vecInitialConditions)
+    self._setB(vecB)
+    self._setK(vecK)
+    self._setGamma(vecGamma)
+    self._setLambda(vecLambda)
+    self._setForcePattern(vecForcePattern)
+    self._setInitialConditions(vecInitialConditions)
 
 
 

@@ -9,7 +9,7 @@ PBUILD := build/
 PSRC := src/
 PREPORTS := reports/
 
-all: $(PBUILD)PASIfgpu.so $(PBUILD)utest.out
+all: $(PBUILD)PASIfgpu.so 
 
 $(PBUILD)PASIfgpu.so: $(PBUILD)PASIfgpu.o $(PBUILD)__GpuDriver.o $(PBUILD)kernels.o $(PBUILD)helpers.o 
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -shared -o $@ $^

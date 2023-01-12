@@ -93,7 +93,7 @@ Lambda = [[[[0.0, 0.0, 0.0],
            [[[0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0],
            [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                              [0.0, 0.0, 0.0],
+                              [0.0, 40000.0, 0.0],
                               [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
                                                  [0.0, 0.0, 0.0],
                                                  [0.0, 0.0, 0.0]]],
@@ -109,17 +109,23 @@ ForcePattern = [1.0, 0.0, 0.0]
 
 InitialCondition = [0.0, 0.0, 0.0]
 
-
-vecM = np.array([M])
-vecB = np.array([B])
-vecK = np.array([K])
-vecGamma = np.array([Gamma])
-vecLambda = np.array([Lambda])
-vecForcePattern = np.array([ForcePattern])
-vecInitialCondition = np.array([InitialCondition])
+n=1
+vecM = np.array(n*[M])
+vecB = np.array(n*[B])
+vecK = np.array(n*[K])
+vecGamma = np.array(n*[Gamma])
+vecLambda = np.array(n*[Lambda])
+vecForcePattern = np.array(n*[ForcePattern])
+vecInitialCondition = np.array(n*[InitialCondition])
 
 pasif.setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
 
 results = pasif.getAmplitudes()
 
 print(results)
+
+""" print(Gamma)
+
+Gamma = np.reshape(Gamma, (27))
+
+print(Gamma) """

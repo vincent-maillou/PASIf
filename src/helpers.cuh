@@ -28,7 +28,8 @@
 #define reel_eps  std::numeric_limits<reel>::epsilon()
 
 #define matrix std::vector<std::vector<reel>>
-#define tensor std::vector<std::vector<std::vector<reel>>>
+#define tensor3d std::vector<std::vector<std::vector<reel>>>
+#define tensor4d std::vector<std::vector<std::vector<std::vector<reel>>>>
 
 
 
@@ -110,13 +111,13 @@
 
 
 /****************************************************
- *              COO Tensor
+ *              COO Tensor 3D
  ****************************************************/
 
-  struct COOTensor{
-    COOTensor() {};
-    COOTensor(std::vector< tensor > & denseTensor);
-    ~COOTensor();
+  struct COOTensor3D{
+    COOTensor3D() {};
+    COOTensor3D(std::vector< tensor3d > & denseTensor);
+    ~COOTensor3D();
 
     uint ExtendTheSystem(uint nTimes);
     void AllocateOnGPU();
@@ -140,7 +141,44 @@
     uint *d_slice;
   };
 
-  std::ostream& operator<<(std::ostream& out, COOTensor const& tensor_);
+  std::ostream& operator<<(std::ostream& out, COOTensor3D const& tensor_);
+
+
+
+/****************************************************
+ *              COO Tensor 4D
+ ****************************************************/
+
+  struct COOTensor4D{
+    COOTensor4D() {};
+    COOTensor4D(std::vector< tensor4d > & denseTensor);
+    ~COOTensor4D();
+
+    uint ExtendTheSystem(uint nTimes);
+    void AllocateOnGPU();
+    size_t memFootprint();
+
+    std::ostream& print(std::ostream& out) const;
+
+
+   // Host-side data
+    uint nzz;
+    uint n;
+    std::vector<reel> val;
+    std::vector<uint> row;
+    std::vector<uint> col;
+    std::vector<uint> slice;
+    std::vector<uint> hyperslice;
+
+   // Device-side data
+    reel *d_val;
+    uint *d_row;
+    uint *d_col;
+    uint *d_slice;
+    uint *d_hyperslice;
+  };
+
+  std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_);
 
 
 

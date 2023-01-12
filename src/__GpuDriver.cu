@@ -73,6 +73,7 @@
     }
 
 
+
   /**
     * @brief Destroy the gpudriver::  gpudriver object
     * 
@@ -84,7 +85,14 @@
         d_ExcitationsSet = nullptr;
       }
 
-      checkAndDestroy();
+      clearB();
+      clearK();
+      clearGamma();
+      clearLambda();
+      clearForcePattern();
+      clearInitialConditions();
+
+      clearDeviceStatesVector();
 
       if(streams != nullptr){
         for(uint i = 0; i < nStreams; i++){
@@ -95,6 +103,7 @@
       }
 
     }
+
 
 
   /** __GpuDriver::loadExcitationsSet()
@@ -144,52 +153,53 @@
     
       return 0;
     }
-  
 
 
-  /** __GpuDriver::driver_setSystems()
-    * @brief Set the parameters of the system
-    * 
-    * @param B_ 
-    * @param K_ 
-    * @param Gamma_ 
-    * @param Lambda_ 
-    * @param ForcePattern_ 
-    * @param InitialConditions_
-    * @return int 
-    */
-    int __GpuDriver::_setSystems(std::vector< matrix > & B_,
-                                 std::vector< matrix > & K_,
-                                 std::vector< tensor >  & Gamma_,
-                                 std::vector< matrix > & Lambda_,
-                                 std::vector< std::vector<reel> > & ForcePattern_,
-                                 std::vector< std::vector<reel> > & InitialConditions_){
 
+  void __GpuDriver::_setB(std::vector< matrix > & B_){
+    clearB();
 
-      // Initialize the number of DOF at the original size of the system
-      numberOfDOFs = InitialConditions_[0].size();
+    B = new COOMatrix(B_);
+  }
 
-      // Check if the system matrix have already been loaded, 
-      // if so delete them and free the memory
-      checkAndDestroy();
+  void __GpuDriver::_setK(std::vector< matrix > & K_){
+    clearK();
 
-      B      = new COOMatrix(B_);
-      K      = new COOMatrix(K_);
-      Gamma  = new COOTensor(Gamma_);
-      Lambda = new COOMatrix(Lambda_);
-      ForcePattern = new COOVector(ForcePattern_);
+    K = new COOMatrix(K_);
+  }
 
-      // Allocate the QinitCond vector with the set of initials conditions
-      for(size_t k(0); k<InitialConditions_.size(); k++){
-        for(size_t i(0); i<InitialConditions_[k].size(); i++){
-          QinitCond.push_back(InitialConditions_[k][i]);
-        }
+  void __GpuDriver::_setGamma(std::vector< tensor3d > & Gamma_){
+    clearGamma();
+
+    Gamma = new COOTensor3D(Gamma_);
+  }
+
+  void __GpuDriver::_setLambda(std::vector< tensor4d > & Lambda_){
+    clearLambda();
+
+    Lambda = new COOTensor4D(Lambda_);
+  }
+
+  void __GpuDriver::_setForcePattern(std::vector< std::vector<reel> > & ForcePattern_){
+    clearForcePattern();
+
+    ForcePattern = new COOVector(ForcePattern_);
+  }
+
+  void __GpuDriver::_setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_){
+    clearInitialConditions();
+
+    // Initialize the number of DOF at the original size of the system
+    numberOfDOFs = InitialConditions_[0].size();
+
+    // Allocate the QinitCond vector with the set of initials conditions
+    for(size_t k(0); k<InitialConditions_.size(); k++){
+      for(size_t i(0); i<InitialConditions_[k].size(); i++){
+        QinitCond.push_back(InitialConditions_[k][i]);
       }
-
-      optimizeIntraStrmParallelisme();
-
-      return 0;
     }
+  }
+
 
 
   /** __GpuDriver::driver_getAmplitudes()
@@ -199,6 +209,8 @@
    */
    std::array<std::vector<reel>, 2> __GpuDriver::_getAmplitudes(){
       
+    optimizeIntraStrmParallelisme();
+
     if(true){
       std::cout << "Checking the system assembly" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
@@ -262,7 +274,7 @@
     B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_ki_desc);
     K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_ki_desc);
     Gamma->AllocateOnGPU();
-    Lambda->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_ki_desc);
+    Lambda->AllocateOnGPU();
     ForcePattern->AllocateOnGPU();
 
 
@@ -378,6 +390,7 @@
     }
 
 
+
   /**
    * @brief Compute the derivatives of the system
    * 
@@ -432,21 +445,23 @@
                  K->d_buffer);
     
     // k += Gamma.d_mi²
-    customSpTV2<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
-                                                             Gamma->d_row, 
-                                                             Gamma->d_col,
-                                                             Gamma->d_slice, 
-                                                             Gamma->nzz, 
-                                                             pq1, 
-                                                             pk);
+    customSpTd2V<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
+                                                               Gamma->d_row, 
+                                                               Gamma->d_col,
+                                                               Gamma->d_slice, 
+                                                               Gamma->nzz, 
+                                                               pq1, 
+                                                               pk);
     
     // k += Lambda.d_mi³
-    customSpMV3<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
-                                                             Lambda->d_row,
-                                                             Lambda->d_col,
-                                                             Lambda->nzz,
-                                                             pq1,
-                                                             pk);
+    customSpTd3V<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
+                                                               Lambda->d_row, 
+                                                               Lambda->d_col,
+                                                               Lambda->d_slice, 
+                                                               Lambda->d_hyperslice,
+                                                               Lambda->nzz, 
+                                                               pq1, 
+                                                               pk);
     
     // k += ForcePattern.d_ExcitationsSet
     customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(ForcePattern->d_val,
@@ -463,6 +478,7 @@
    }
 
   
+
   /**
    * @brief Performe a single Runge-Kutta step
    * 
@@ -500,35 +516,8 @@
    * @brief Check the device pointer array and destroy them if they are not null
    * 
    */
-   void __GpuDriver::checkAndDestroy(){
-    if(B != nullptr){
-      delete B;
-      B = nullptr;
-    }
-    if(K != nullptr){
-      delete K;
-      K = nullptr;
-    }
-    if(Gamma != nullptr){
-      delete Gamma;
-      Gamma = nullptr;
-    }
-    if(Lambda != nullptr){
-      delete Lambda;
-      Lambda = nullptr;
-    }
-    if(ForcePattern != nullptr){
-      delete ForcePattern;
-      ForcePattern = nullptr;
-    }
-    if(QinitCond.size() != 0){
-      QinitCond.clear();
-    }
-    if(d_QinitCond != nullptr){
-      CHECK_CUDA( cudaFree(d_QinitCond) )
-      d_QinitCond = nullptr;
-    }
-
+   void __GpuDriver::clearDeviceStatesVector(){
+    
     if(d_Q1 != nullptr){
       CHECK_CUDA( cudaFree(d_Q1) )
       d_Q1 = nullptr;
@@ -581,6 +570,51 @@
       d_k4 = nullptr;
     }
    }
+
+  void __GpuDriver::clearB(){
+    if(B != nullptr){
+      delete B;
+      B = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearK(){
+    if(K != nullptr){
+      delete K;
+      K = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearGamma(){
+    if(Gamma != nullptr){
+      delete Gamma;
+      Gamma = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearLambda(){
+    if(Lambda != nullptr){
+      delete Lambda;
+      Lambda = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearForcePattern(){
+    if(ForcePattern != nullptr){
+      delete ForcePattern;
+      ForcePattern = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearInitialConditions(){
+    if(QinitCond.size() != 0){
+      QinitCond.clear();
+    }
+    if(d_QinitCond != nullptr){
+      CHECK_CUDA( cudaFree(d_QinitCond) )
+      d_QinitCond = nullptr;
+    }
+  }
 
 
 

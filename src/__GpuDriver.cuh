@@ -18,18 +18,18 @@
 class __GpuDriver{
  public:
   __GpuDriver(std::vector<std::vector<double> > excitationSet_,
-                          uint sampleRate_);
+                                           uint sampleRate_);
   ~__GpuDriver();
 
   int _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
-                                uint sampleRate_);
+                                                        uint sampleRate_);
 
-  int _setSystems(std::vector< matrix > & B_,
-                  std::vector< matrix > & K_,
-                  std::vector< tensor > & Gamma_,
-                  std::vector< matrix > & Lambda_,
-                  std::vector< std::vector<reel> > & ForcePattern_,
-                  std::vector< std::vector<reel> > & InitialConditions_);
+  void _setB(std::vector< matrix > & B_); 
+  void _setK(std::vector< matrix > & K_);
+  void _setGamma(std::vector< tensor3d > & Gamma_);
+  void _setLambda(std::vector< tensor4d > & Lambda_);
+  void _setForcePattern(std::vector< std::vector<reel> > & ForcePattern_);
+  void _setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_);
                    
   std::array<std::vector<reel>, 2> _getAmplitudes();
 
@@ -44,8 +44,17 @@ class __GpuDriver{
                    uint t);
   void rkStep(uint k, 
               uint t);
-  void checkAndDestroy();
+
   void optimizeIntraStrmParallelisme();
+
+  void clearDeviceStatesVector();
+  void clearB();
+  void clearK();
+  void clearGamma();
+  void clearLambda();
+  void clearForcePattern();
+  void clearInitialConditions();
+
 
 
   //            Host-wise data
@@ -56,15 +65,14 @@ class __GpuDriver{
 
   uint numberOfDOFs;
 
-
   //            Device-wise data
   reel* d_ExcitationsSet;
 
   // System description
   COOMatrix* B;
   COOMatrix* K;
-  COOTensor* Gamma;
-  COOMatrix* Lambda;
+  COOTensor3D* Gamma;
+  COOTensor4D* Lambda;
   COOVector* ForcePattern;
 
   // RK4 related vectors

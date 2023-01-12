@@ -14,74 +14,48 @@
 
 
 
-
-
-
-/** customSpMV3()
- * @brief Perform the coo sparse matrix - dense vector cube multiplication
- * 
- * @return __global__ 
- */
- __global__
- void customSpMV3(reel* d_val, 
-                  uint* d_row, 
-                  uint* d_col, 
-                  uint nzz, 
-                  reel* X, 
-                  reel* Y){
-  
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_row[k]], d_val[k] * X[d_col[k]] * X[d_col[k]] * X[d_col[k]]);
-  }
-
-
-  // Some ressources that could improve the performance of this kernel
-  // https://medium.com/analytics-vidhya/sparse-matrix-vector-multiplication-with-cuda-42d191878e8f
-  // https://moderngpu.github.io/segreduce.html
-  /* // From Nvidia COO Implementation
-  __device__ void
-  segmented_reduction( const int lane , const int * rows , float * vals ){
-    // segmented reduction in shared memory
-    if ( lane >= 1 && rows [ threadIdx.x ] == rows [ threadIdx.x - 1] )
-    vals [ threadIdx.x ] += vals [ threadIdx.x - 1];
-    if ( lane >= 2 && rows [ threadIdx.x ] == rows [ threadIdx.x - 2] )
-    vals [ threadIdx.x ] += vals [ threadIdx.x - 2];
-    if ( lane >= 4 && rows [ threadIdx.x ] == rows [ threadIdx.x - 4] )
-    vals [ threadIdx.x ] += vals [ threadIdx.x - 4];
-    if ( lane >= 8 && rows [ threadIdx.x ] == rows [ threadIdx.x - 8] )
-    vals [ threadIdx.x ] += vals [ threadIdx.x - 8];
-    if ( lane >= 16 && rows [ threadIdx.x ] == rows [ threadIdx.x - 16] )
-    vals [ threadIdx.x ] += vals [ threadIdx.x - 16];
-  } */
- }
-
-
-
-/** customSpTV2()
+/** customSpTd2V()
  * @brief Perform the coo sparse tensor - dense vector square multiplication
  * 
  */
  __global__
- void customSpTV2(reel *d_val, 
-                  uint *d_row, 
-                  uint *d_col, 
-                  uint *d_slice, 
-                  uint nzz,
-                  reel* X, 
-                  reel* Y){
+ void customSpTd2V(reel *d_val, 
+                   uint *d_row, 
+                   uint *d_col, 
+                   uint *d_slice, 
+                   uint nzz,
+                   reel* X, 
+                   reel* Y){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  /* for(uint k = index; k < 1; k += stride){
-    Y[1] += 1 * X[0] * X[0];
-  } */
-
   for(uint k = index; k < nzz; k += stride){
     atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
+  }
+ }
+
+
+
+ /** customSpTd3V()
+ * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
+ * 
+ */
+ __global__
+ void customSpTd3V(reel *d_val, 
+                   uint *d_row, 
+                   uint *d_col, 
+                   uint *d_slice, 
+                   uint *d_hyperslice,
+                   uint nzz,
+                   reel* X, 
+                   reel* Y){
+
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
+
+  for(uint k = index; k < nzz; k += stride){
+    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]] * X[d_slice[k]]);
   }
  }
 
