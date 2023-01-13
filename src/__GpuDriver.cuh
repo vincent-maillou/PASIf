@@ -18,7 +18,9 @@
 class __GpuDriver{
  public:
   __GpuDriver(std::vector<std::vector<double> > excitationSet_,
-                                           uint sampleRate_);
+                                           uint sampleRate_,
+                                           uint numsteps_);
+
   ~__GpuDriver();
 
   int _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
@@ -62,6 +64,7 @@ class __GpuDriver{
   uint lengthOfeachExcitation;
 
   uint numberOfDOFs;
+  uint numsteps;
 
   //            Device-wise data
   reel* d_ExcitationsSet;

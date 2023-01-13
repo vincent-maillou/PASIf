@@ -61,7 +61,8 @@ ForcePattern = [1.0, 0.0, 0.0]
 
 InitialCondition = [0.0, 0.0, 0.0]
 
-n=8*1000*2
+#n=8*1000*2
+n=1
 
 vecM = np.array(n*[M])
 vecB = np.array(n*[B])
@@ -160,9 +161,9 @@ extendedInitialCondition = np.array(extendedInitialCondition)
 
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
 
-results = pasif.getAmplitudes(verbose_ = True, debug_ = False)
+results = pasif.getAmplitudes(verbose_ = True, debug_ = True)
 
-# print(results)
+print(results)
 
 # End python timer
 end = time.time()

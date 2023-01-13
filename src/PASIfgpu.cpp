@@ -23,9 +23,10 @@ PYBIND11_MODULE(PASIfgpu, m) {
   m.doc() = "Parallel Accelerated Solver Interface";
 
   py::class_<__GpuDriver>(m, "__GpuDriver")
-    .def(py::init<std::vector<std::vector<double>>, uint>(),
+    .def(py::init<std::vector<std::vector<double>>, uint, uint>(),
       py::arg("excitationSet_"),
-      py::arg("sampleRate_"))
+      py::arg("sampleRate_"),
+      py::arg("numsteps_"))
       
     .def("_loadExcitationsSet", &__GpuDriver::_loadExcitationsSet,
       py::arg("excitationSet_"),

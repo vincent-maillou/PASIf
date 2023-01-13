@@ -21,8 +21,12 @@ from PASIfgpu import __GpuDriver
 
 
 class PASIf(__GpuDriver):
-  def __init__(self, excitationSet, sampleRate):
-    super().__init__(excitationSet, sampleRate)
+  def __init__(self, excitationSet, sampleRate, numsteps_=0):
+    if(numsteps_ == 0):
+      self.numsteps = len(excitationSet[0])
+    else:
+      self.numsteps = numsteps_
+    super().__init__(excitationSet, sampleRate, self.numsteps)
 
 
 

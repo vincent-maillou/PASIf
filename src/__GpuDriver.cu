@@ -22,14 +22,18 @@
     * @param excitationSet_ 
     * @param sampleRate_ 
     */
-    __GpuDriver::__GpuDriver(std::vector<std::vector<double>> excitationSet_, uint sampleRate_) : 
+    __GpuDriver::__GpuDriver(std::vector<std::vector<double>> excitationSet_, 
+                             uint sampleRate_,
+                             uint numsteps_) : 
         numberOfDOFs(0),
+        numsteps(numsteps_),
         nStreams(1),
         IntraStrmParallelism(1),
         numberOfSimulationToPerform(0),
         alpha(1.0),
         beta1(1.0),
         beta0(0.0){
+
       // System
       B      = nullptr;
       K      = nullptr;
@@ -218,6 +222,9 @@
       std::cout << "  This system is composed of " << IntraStrmParallelism << " parallelized simulations of " << numberOfDOFs/IntraStrmParallelism << " DOF each." << std::endl;
       std::cout << "  The total number of excitation files is " << numberOfExcitations << std::endl;
       std::cout << "  Hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
+      if(numsteps < lengthOfeachExcitation){
+        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+      }
     }
     if(false){
       std::cout << "The timestep of the simulations are" << std::endl;
@@ -270,7 +277,7 @@
       std::cout << "  " << k+1 << " / " << numberOfSimulationToPerform  << std::endl;
 
       // Performe the rk4 steps
-      for(uint t(0); t<lengthOfeachExcitation; ++t){
+      for(uint t(0); t<numsteps; ++t){
 
         rkStep(k, t);
       }
@@ -366,15 +373,6 @@
     CHECK_CUSPARSE( cusparseDnVecGetValues(m_desc, (void**)&pm) )
     CHECK_CUSPARSE( cusparseDnVecGetValues(q_desc, (void**)&pq) )
 
-    // m = k
-    /* cublasScopy(h_cublas, 
-                numberOfDOFs, 
-                pq2, 
-                1, 
-                pm, 
-                1); */
-
-
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k = B.d_ki
     cusparseSpMV(h_cuSPARSE, 
@@ -420,17 +418,18 @@
                                                                pm);
     
     // k += ForcePattern.d_ExcitationsSet
-    customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(ForcePattern->d_val,
-                                                                         ForcePattern->d_indice,
-                                                                         ForcePattern->nzz,
-                                                                         d_ExcitationsSet,
-                                                                         lengthOfeachExcitation,
-                                                                         k,
-                                                                         pm,
-                                                                         numberOfDOFs,
-                                                                         t,
-                                                                         IntraStrmParallelism);
-    
+    if(t < lengthOfeachExcitation){
+      customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(ForcePattern->d_val,
+                                                                           ForcePattern->d_indice,
+                                                                           ForcePattern->nzz,
+                                                                           d_ExcitationsSet,
+                                                                           lengthOfeachExcitation,
+                                                                           k,
+                                                                           pm,
+                                                                           numberOfDOFs,
+                                                                           t,
+                                                                           IntraStrmParallelism);
+    }
    }
 
   
