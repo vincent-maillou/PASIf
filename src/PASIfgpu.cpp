@@ -45,5 +45,7 @@ PYBIND11_MODULE(PASIfgpu, m) {
     .def("_setInitialConditions", &__GpuDriver::_setInitialConditions,
       py::arg("InitialConditions_"))
 
-    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes);
+    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes,
+      py::arg("verbose_") = false,
+      py::arg("debug_")   = false);
 }

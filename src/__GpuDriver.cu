@@ -40,21 +40,14 @@
 
       // RK4
       d_QinitCond = nullptr;
-      d_Q1 = nullptr;
-      d_Q2 = nullptr;
+      d_Q = nullptr;
 
       d_mi = nullptr;
-      d_ki = nullptr;
 
       d_m1 = nullptr;
       d_m2 = nullptr;
       d_m3 = nullptr;
       d_m4 = nullptr;
-
-      d_k1 = nullptr;
-      d_k2 = nullptr;
-      d_k3 = nullptr;
-      d_k4 = nullptr;
 
       // CUDA
       streams    = nullptr;
@@ -112,7 +105,7 @@
     * @param excitationSet_ 
     */
     int __GpuDriver::_loadExcitationsSet(std::vector< std::vector<double> > excitationSet_, 
-                                         uint sampleRate_){
+                                                                       uint sampleRate_){
 
       sampleRate = sampleRate_;
 
@@ -205,14 +198,14 @@
   /** __GpuDriver::driver_getAmplitudes()
    * @brief 
    * 
-   * @return std::array<std::vector<reel>, 2>
+   * @return std::vector<reel>
    */
-   std::array<std::vector<reel>, 2> __GpuDriver::_getAmplitudes(){
+   std::vector<reel> __GpuDriver::_getAmplitudes(bool verbose_, bool debug_){
       
     optimizeIntraStrmParallelisme();
 
-    if(true){
-      std::cout << "Checking the system assembly" << std::endl;
+    if(debug_){
+      std::cout << "Here is the assembled system" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
       std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
@@ -220,7 +213,7 @@
       std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
       std::cout << "QinitCond:" << std::endl; printVector(QinitCond);
     }
-    if(true){
+    if(verbose_){
       std::cout << "A system with " << numberOfDOFs << " DOFs has been assembled" << std::endl;
       std::cout << "  This system is composed of " << IntraStrmParallelism << " parallelized simulations of " << numberOfDOFs/IntraStrmParallelism << " DOF each." << std::endl;
       std::cout << "  The total number of excitation files is " << numberOfExcitations << std::endl;
@@ -237,18 +230,14 @@
     // Allocate the memory for the states and RK4 vectors coefficients,
     // and create the dense vector descriptors
     CHECK_CUDA( cudaMalloc((void**)&d_QinitCond, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUDA( cudaMalloc((void**)&d_Q1, numberOfDOFs*sizeof(reel)) )
+    CHECK_CUDA( cudaMalloc((void**)&d_Q, numberOfDOFs*sizeof(reel)) )
     CHECK_CUDA( cudaMemcpy(d_QinitCond, QinitCond.data(), numberOfDOFs*sizeof(reel), cudaMemcpyHostToDevice) )
-    // Copy the device QinitCond initial conditions vector to Q1 device vector
-    CHECK_CUDA( cudaMemcpy(d_Q1, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q1_desc, numberOfDOFs, d_Q1, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_Q2, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q2_desc, numberOfDOFs, d_Q2, CUDA_R_32F) )
+    // Copy the device QinitCond initial conditions vector to Q device vector
+    CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q_desc, numberOfDOFs, d_Q, CUDA_R_32F) )
 
     CHECK_CUDA( cudaMalloc((void**)&d_mi, numberOfDOFs*sizeof(reel)) )
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_mi_desc, numberOfDOFs, d_mi, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_ki, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_ki_desc, numberOfDOFs, d_ki, CUDA_R_32F) )
     
     CHECK_CUDA( cudaMalloc((void**)&d_m1, numberOfDOFs*sizeof(reel)) )
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_m1_desc, numberOfDOFs, d_m1, CUDA_R_32F) )
@@ -259,33 +248,21 @@
     CHECK_CUDA( cudaMalloc((void**)&d_m4, numberOfDOFs*sizeof(reel)) )
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_m4_desc, numberOfDOFs, d_m4, CUDA_R_32F) )
 
-    CHECK_CUDA( cudaMalloc((void**)&d_k1, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_k1_desc, numberOfDOFs, d_k1, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_k2, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_k2_desc, numberOfDOFs, d_k2, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_k3, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_k3_desc, numberOfDOFs, d_k3, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_k4, numberOfDOFs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_k4_desc, numberOfDOFs, d_k4, CUDA_R_32F) )
-
 
 
     // Allocate the matrices and vectors on the GPU
-    B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_ki_desc);
-    K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_ki_desc);
+    B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
+    K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
     Gamma->AllocateOnGPU();
     Lambda->AllocateOnGPU();
     ForcePattern->AllocateOnGPU();
 
 
-    std::vector<reel> resultsQ1;
-    std::vector<reel> resultsQ2;
-    resultsQ1.resize(numberOfDOFs*numberOfSimulationToPerform);
-    resultsQ2.resize(numberOfDOFs*numberOfSimulationToPerform);
+    std::vector<reel> resultsQ;
+    resultsQ.resize(numberOfDOFs*numberOfSimulationToPerform);
 
 
     auto begin = std::chrono::high_resolution_clock::now();
-
 
     // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; k++){
@@ -296,50 +273,34 @@
       for(uint t(0); t<lengthOfeachExcitation; ++t){
 
         rkStep(k, t);
-
       }
 
-
-
       // Copy the results of the performed simulation from the GPU to the CPU
-      CHECK_CUDA( cudaMemcpy(resultsQ1.data()+k*numberOfDOFs, d_Q1, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
-      CHECK_CUDA( cudaMemcpy(resultsQ2.data()+k*numberOfDOFs, d_Q2, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
+      CHECK_CUDA( cudaMemcpy(resultsQ.data()+k*numberOfDOFs, d_Q, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
 
       // Reset Q1 and Q2 to initials conditions
-      CHECK_CUDA( cudaMemcpy(d_Q1, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
-      CHECK_CUDA( cudaMemset(d_Q2, 0, numberOfDOFs*sizeof(reel)) )
+      CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, numberOfDOFs*sizeof(reel), cudaMemcpyDeviceToDevice) )
 
       // Reset all of the other vectors to 0
       CHECK_CUDA( cudaMemset(d_mi, 0, numberOfDOFs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_ki, 0, numberOfDOFs*sizeof(reel)) )
 
       CHECK_CUDA( cudaMemset(d_m1, 0, numberOfDOFs*sizeof(reel)) )
       CHECK_CUDA( cudaMemset(d_m2, 0, numberOfDOFs*sizeof(reel)) )
       CHECK_CUDA( cudaMemset(d_m3, 0, numberOfDOFs*sizeof(reel)) )
       CHECK_CUDA( cudaMemset(d_m4, 0, numberOfDOFs*sizeof(reel)) )
-
-      CHECK_CUDA( cudaMemset(d_k1, 0, numberOfDOFs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_k2, 0, numberOfDOFs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_k3, 0, numberOfDOFs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_k4, 0, numberOfDOFs*sizeof(reel)) )
     }
-
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end-begin;
     std::cout << "CUDA solver execution time: " << elapsed_seconds.count() << "s" << std::endl;
 
-
     // Cut the results vector to the correct size
     if(exceedingSimulations != 0){
-      resultsQ1.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
-      resultsQ2.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
+      resultsQ.resize(numberOfDOFs*(numberOfSimulationToPerform-1)+exceedingSimulations);
     }
 
-
-
-    return std::array<std::vector<reel>, 2>{resultsQ1, resultsQ2};
+    return std::vector<reel>{resultsQ};
    }
 
 
@@ -396,27 +357,22 @@
    * 
    */
    void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
-                                 cusparseDnVecDescr_t k_desc,
-                                 cusparseDnVecDescr_t q1_desc, 
-                                 cusparseDnVecDescr_t q2_desc,
+                                 cusparseDnVecDescr_t q_desc, 
                                  uint k, 
                                  uint t){
 
     // Get the pointers from the descriptors
-    reel *pm; reel *pk; 
-    reel *pq1; reel *pq2;
+    reel *pm; reel *pq;
     CHECK_CUSPARSE( cusparseDnVecGetValues(m_desc, (void**)&pm) )
-    CHECK_CUSPARSE( cusparseDnVecGetValues(k_desc, (void**)&pk) )
-    CHECK_CUSPARSE( cusparseDnVecGetValues(q1_desc, (void**)&pq1) )
-    CHECK_CUSPARSE( cusparseDnVecGetValues(q2_desc, (void**)&pq2) )
+    CHECK_CUSPARSE( cusparseDnVecGetValues(q_desc, (void**)&pq) )
 
     // m = k
-    cublasScopy(h_cublas, 
+    /* cublasScopy(h_cublas, 
                 numberOfDOFs, 
                 pq2, 
                 1, 
                 pm, 
-                1);
+                1); */
 
 
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
@@ -425,9 +381,9 @@
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
                  d_alpha, 
                  B->sparseMat_desc, 
-                 q2_desc,
+                 q_desc,
                  d_beta0, 
-                 k_desc, 
+                 m_desc, 
                  CUDA_R_32F, 
                  CUSPARSE_SPMV_ALG_DEFAULT, 
                  B->d_buffer);
@@ -437,9 +393,9 @@
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
                  d_alpha, 
                  K->sparseMat_desc, 
-                 q1_desc, 
+                 q_desc, 
                  d_beta1, 
-                 k_desc, 
+                 m_desc, 
                  CUDA_R_32F, 
                  CUSPARSE_SPMV_ALG_DEFAULT, 
                  K->d_buffer);
@@ -450,8 +406,8 @@
                                                                Gamma->d_col,
                                                                Gamma->d_slice, 
                                                                Gamma->nzz, 
-                                                               pq1, 
-                                                               pk);
+                                                               pq, 
+                                                               pm);
     
     // k += Lambda.d_mi³
     customSpTd3V<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
@@ -460,20 +416,20 @@
                                                                Lambda->d_slice, 
                                                                Lambda->d_hyperslice,
                                                                Lambda->nzz, 
-                                                               pq1, 
-                                                               pk);
+                                                               pq, 
+                                                               pm);
     
     // k += ForcePattern.d_ExcitationsSet
     customAxpbyMultiForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(ForcePattern->d_val,
-                                                                        ForcePattern->d_indice,
-                                                                        ForcePattern->nzz,
-                                                                        d_ExcitationsSet,
-                                                                        lengthOfeachExcitation,
-                                                                        k,
-                                                                        pk,
-                                                                        numberOfDOFs,
-                                                                        t,
-                                                                        IntraStrmParallelism);
+                                                                         ForcePattern->d_indice,
+                                                                         ForcePattern->nzz,
+                                                                         d_ExcitationsSet,
+                                                                         lengthOfeachExcitation,
+                                                                         k,
+                                                                         pm,
+                                                                         numberOfDOFs,
+                                                                         t,
+                                                                         IntraStrmParallelism);
     
    }
 
@@ -487,26 +443,22 @@
                             uint t){
 
     // Compute the derivatives
-    derivatives(d_m1_desc, d_k1_desc, d_Q1_desc, d_Q2_desc, k, t);
+    derivatives(d_m1_desc, d_Q_desc, k, t);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m1, h2, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k1, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, numberOfDOFs);
 
-    derivatives(d_m2_desc, d_k2_desc, d_mi_desc, d_ki_desc, k, t+1);
+    derivatives(d_m2_desc, d_mi_desc, k, t+1);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m2, h2, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k2, h2, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, numberOfDOFs);
 
-    derivatives(d_m3_desc, d_k3_desc, d_mi_desc, d_ki_desc, k, t+1);
+    derivatives(d_m3_desc, d_mi_desc, k, t+1);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q1, d_m3, h, numberOfDOFs);
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_ki, d_Q2, d_k3, h, numberOfDOFs);
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, numberOfDOFs);
 
-    derivatives(d_m4_desc, d_k4_desc, d_mi_desc, d_ki_desc, k, t+2);
+    derivatives(d_m4_desc, d_mi_desc, k, t+2);
 
-    // Compute next Q1 and Q2 vectors
-    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q1, d_m1, d_m2, d_m3, d_m4, h6, numberOfDOFs);
-    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q2, d_k1, d_k2, d_k3, d_k4, h6, numberOfDOFs);
+    // Compute next state vector Q
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, numberOfDOFs);
 
    }
 
@@ -518,22 +470,14 @@
    */
    void __GpuDriver::clearDeviceStatesVector(){
     
-    if(d_Q1 != nullptr){
-      CHECK_CUDA( cudaFree(d_Q1) )
-      d_Q1 = nullptr;
-    }
-    if(d_Q2 != nullptr){
-      CHECK_CUDA( cudaFree(d_Q2) )
-      d_Q2 = nullptr;
+    if(d_Q != nullptr){
+      CHECK_CUDA( cudaFree(d_Q) )
+      d_Q = nullptr;
     }
 
     if(d_mi != nullptr){
       CHECK_CUDA( cudaFree(d_mi) )
       d_mi = nullptr;
-    }
-    if(d_ki != nullptr){
-      CHECK_CUDA( cudaFree(d_ki) )
-      d_ki = nullptr;
     }
 
     if(d_m1 != nullptr){
@@ -551,23 +495,6 @@
     if(d_m4 != nullptr){
       CHECK_CUDA( cudaFree(d_m4) )
       d_m4 = nullptr;
-    }
-
-    if(d_k1 != nullptr){
-      CHECK_CUDA( cudaFree(d_k1) )
-      d_k1 = nullptr;
-    }
-    if(d_k2 != nullptr){
-      CHECK_CUDA( cudaFree(d_k2) )
-      d_k2 = nullptr;
-    }
-    if(d_k3 != nullptr){
-      CHECK_CUDA( cudaFree(d_k3) )
-      d_k3 = nullptr;
-    }
-    if(d_k4 != nullptr){
-      CHECK_CUDA( cudaFree(d_k4) )
-      d_k4 = nullptr;
     }
    }
 
@@ -670,11 +597,11 @@
 
     // Extend each system by the number of intra-stream parallelization wanted
     std::array<uint, 6> dofChecking = {B->ExtendTheSystem(IntraStrmParallelism-1), 
-                                      K->ExtendTheSystem(IntraStrmParallelism-1), 
-                                      Gamma->ExtendTheSystem(IntraStrmParallelism-1), 
-                                      Lambda->ExtendTheSystem(IntraStrmParallelism-1), 
-                                      ForcePattern->ExtendTheSystem(IntraStrmParallelism-1),
-                                      extendTheVector(QinitCond, IntraStrmParallelism-1)};
+                                       K->ExtendTheSystem(IntraStrmParallelism-1), 
+                                       Gamma->ExtendTheSystem(IntraStrmParallelism-1), 
+                                       Lambda->ExtendTheSystem(IntraStrmParallelism-1), 
+                                       ForcePattern->ExtendTheSystem(IntraStrmParallelism-1),
+                                       extendTheVector(QinitCond, IntraStrmParallelism-1)};
 
     // Checking that each system is of the same size
     for(uint i = 0; i < dofChecking.size(); i++){

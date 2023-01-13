@@ -31,15 +31,13 @@ class __GpuDriver{
   void _setForcePattern(std::vector< std::vector<reel> > & ForcePattern_);
   void _setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_);
                    
-  std::array<std::vector<reel>, 2> _getAmplitudes();
+  std::vector<reel> _getAmplitudes(bool verbose_ = false, bool debug_ = false);
 
 
  private:
   int  setCUDA(uint nStreams_);
   void derivatives(cusparseDnVecDescr_t m_desc, 
-                   cusparseDnVecDescr_t k_desc,
-                   cusparseDnVecDescr_t q1_desc, 
-                   cusparseDnVecDescr_t q2_desc,
+                   cusparseDnVecDescr_t q_desc, 
                    uint k, 
                    uint t);
   void rkStep(uint k, 
@@ -69,29 +67,22 @@ class __GpuDriver{
   reel* d_ExcitationsSet;
 
   // System description
-  COOMatrix* B;
-  COOMatrix* K;
+  COOMatrix*   B;
+  COOMatrix*   K;
   COOTensor3D* Gamma;
   COOTensor4D* Lambda;
-  COOVector* ForcePattern;
+  COOVector*   ForcePattern;
 
   // RK4 related vectors
   std::vector<reel> QinitCond; reel* d_QinitCond; 
-  reel* d_Q1; cusparseDnVecDescr_t d_Q1_desc;
-  reel* d_Q2; cusparseDnVecDescr_t d_Q2_desc;
+  reel* d_Q;  cusparseDnVecDescr_t d_Q_desc;
 
   reel* d_mi; cusparseDnVecDescr_t d_mi_desc;
-  reel* d_ki; cusparseDnVecDescr_t d_ki_desc;
 
   reel* d_m1; cusparseDnVecDescr_t d_m1_desc;
   reel* d_m2; cusparseDnVecDescr_t d_m2_desc;
   reel* d_m3; cusparseDnVecDescr_t d_m3_desc;
   reel* d_m4; cusparseDnVecDescr_t d_m4_desc;
-
-  reel* d_k1; cusparseDnVecDescr_t d_k1_desc;
-  reel* d_k2; cusparseDnVecDescr_t d_k2_desc;
-  reel* d_k3; cusparseDnVecDescr_t d_k3_desc;
-  reel* d_k4; cusparseDnVecDescr_t d_k4_desc;
 
   reel h; 
   reel h2; 
