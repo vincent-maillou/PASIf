@@ -161,9 +161,29 @@ extendedInitialCondition = np.array(extendedInitialCondition)
 
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
 
+
+
+# Tests with the interpolation matrix
+""" intMat = np.array([[2/10, 4/10, 3/10, 1/10], 
+                   [1/10, 3/10, 4/10, 2/10]]) """
+
+intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
+
+pasif.setInterpolationMatrix(intMat)
+
+
 results = pasif.getAmplitudes(verbose_ = True, debug_ = True)
 
-print(results)
+print("Amplitudes: ", results)
+
+trajectory = pasif.getTrajectory()
+
+print("Number of steps: ", len(trajectory))
+
+# Plot the trajectory
+import matplotlib.pyplot as plt
+plt.plot(trajectory)
+plt.show()
 
 # End python timer
 end = time.time()

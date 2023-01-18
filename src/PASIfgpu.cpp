@@ -46,7 +46,13 @@ PYBIND11_MODULE(PASIfgpu, m) {
     .def("_setInitialConditions", &__GpuDriver::_setInitialConditions,
       py::arg("InitialConditions_"))
 
+    .def("_setInterpolationMatrix", &__GpuDriver::_setInterpolationMatrix,
+      py::arg("interpolationMatrix_"),
+      py::arg("interpolationWindowSize_"))
+
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes,
-      py::arg("verbose_") = false,
-      py::arg("debug_")   = false);
+      py::arg("displayComputeInfos_") = false,
+      py::arg("displaySystem_")   = false)
+
+    .def("_getTrajectory", &__GpuDriver::_getTrajectory);
 }

@@ -18,13 +18,13 @@
 class __GpuDriver{
  public:
   __GpuDriver(std::vector<std::vector<double> > excitationSet_,
-                                           uint sampleRate_,
-                                           uint numsteps_);
+              uint sampleRate_,
+              uint numsteps_);
 
   ~__GpuDriver();
 
-  int _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
-                                                        uint sampleRate_);
+  int  _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
+                           uint sampleRate_);
 
   void _setB(std::vector< matrix > & B_); 
   void _setK(std::vector< matrix > & K_);
@@ -33,19 +33,29 @@ class __GpuDriver{
   void _setForcePattern(std::vector< std::vector<reel> > & ForcePattern_);
   void _setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_);
                    
-  std::vector<reel> _getAmplitudes(bool verbose_ = false, bool debug_ = false);
-
+  void _setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,
+                               uint interpolationWindowSize_);
+                  
+  std::vector<reel> _getAmplitudes(bool displayComputeInfos_ = false, bool displaySystem_ = false);
+  std::vector<reel> _getTrajectory() { return h_trajectory; }
 
  private:
   int  setCUDA(uint nStreams_);
+  void setTimesteps();
+
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t q_desc, 
                    uint k, 
-                   uint t);
+                   uint t,
+                   int  i);
   void rkStep(uint k, 
-              uint t);
+              uint t,
+              int  i=-1);
 
   void optimizeIntraStrmParallelisme();
+
+  void displayAssembledSystem();
+  void displayComputationInfos();
 
   void clearDeviceStatesVector();
   void clearB();
@@ -54,17 +64,26 @@ class __GpuDriver{
   void clearLambda();
   void clearForcePattern();
   void clearInitialConditions();
+  void clearInterpolationMatrix();
 
 
+  std::vector<reel> h_trajectory;
 
-  //            Host-wise data
+
+  //            Simulation related data
   std::vector<reel> excitationSet;
   uint sampleRate;
   uint numberOfExcitations;
   uint lengthOfeachExcitation;
 
-  uint numberOfDOFs;
-  uint numsteps;
+  uint n_dofs;
+  uint baseNumsteps; // = keeping track of the base steps number to reset it in case of interpolation matrix modification
+
+  //            Interpolation related data
+  uint   interpolationNumberOfPoints; // = Height of the interpolation matrix
+  uint   interpolationWindowSize; // = Width of the interpolation matrix
+  std::vector<reel> interpolationMatrix;
+  reel*             d_interpolationMatrix;
 
   //            Device-wise data
   reel* d_ExcitationsSet;
@@ -95,16 +114,11 @@ class __GpuDriver{
   reel beta1; reel* d_beta1;
   reel beta0; reel* d_beta0;
 
-
-  // For debug purpose
-  /* reel* d_trajectory; */
-
-
   //        Computation parameters
   uint nStreams;
   cudaStream_t *streams;
 
-  uint IntraStrmParallelism;
+  uint intraStrmParallelism;
   uint numberOfSimulationToPerform;
   uint exceedingSimulations;
 

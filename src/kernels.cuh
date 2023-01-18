@@ -14,54 +14,75 @@
 
 
 
-/** customSpTV2()
+/** SpTV2()
  * @brief Perform the coo sparse tensor 3d - dense vector multiplication (order 2)
  * 
  */
  __global__
- void customSpTd2V(reel *d_val, 
-                   uint *d_row, 
-                   uint *d_col, 
-                   uint *d_slice, 
-                   uint nzz,
-                   reel* X, 
-                   reel* Y);
+ void SpTd2V(reel *d_val, 
+             uint *d_row, 
+             uint *d_col, 
+             uint *d_slice, 
+             uint  nzz,
+             reel* X, 
+             reel* Y);
 
             
           
 
-/** customSpTd3V()
+/** SpTd3V()
  * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
  * 
  */
  __global__
- void customSpTd3V(reel *d_val, 
-                   uint *d_row, 
-                   uint *d_col, 
-                   uint *d_slice, 
-                   uint *d_hyperslice,
-                   uint nzz,
-                   reel* X, 
-                   reel* Y);
+ void SpTd3V(reel *d_val, 
+             uint *d_row, 
+             uint *d_col, 
+             uint *d_slice, 
+             uint *d_hyperslice,
+             uint  nzz,
+             reel* X, 
+             reel* Y);
 
 
 
-/** customAxpbyMultiForces()
+/** applyExcitationFiles()
  * @brief Performe a custom Axpby operation on the forces vector to accomodate multi excitation file
  * parallelisme acrose a single system
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* d_val, 
-                             uint* d_indice, 
-                             uint nzz, 
-                             reel* excitationsSet,
-                             uint lengthOfeachExcitation, 
-                             uint kSim, 
-                             reel* Y, 
-                             uint n, 
-                             uint t,
-                             uint intraStrmParallelism);
+ void applyExcitationFiles(reel* d_val, 
+                           uint* d_indice, 
+                           uint  nzz, 
+                           reel* excitationsSet,
+                           uint  lengthOfeachExcitation, 
+                           uint  currentSimulation,
+                           uint  systemStride,
+                           reel* Y, 
+                           uint  t);
+
+
+
+/** interpolateExcitationFiles()
+ * @brief Performe a custom Axpby operation on the forces vector, it interpolate
+ * it regarding the interpolation matrix, to accomodate multi excitation file
+ * parallelisme acrose a single system
+ * 
+ */
+ __global__
+ void interpolateExcitationFiles(reel* d_val, 
+                                 uint* d_indice, 
+                                 uint  nzz, 
+                                 reel* excitationsSet,
+                                 uint  lengthOfeachExcitation, 
+                                 uint  currentSimulation,
+                                 uint  systemStride,
+                                 reel* Y, 
+                                 uint  t,
+                                 reel* interpolationMatrix,
+                                 uint  interpolationWindowSize,
+                                 int   i);
 
 
 

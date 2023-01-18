@@ -14,18 +14,18 @@
 
 
 
-/** customSpTd2V()
+/** SpTd2V()
  * @brief Perform the coo sparse tensor - dense vector square multiplication
  * 
  */
  __global__
- void customSpTd2V(reel *d_val, 
-                   uint *d_row, 
-                   uint *d_col, 
-                   uint *d_slice, 
-                   uint nzz,
-                   reel* X, 
-                   reel* Y){
+ void SpTd2V(reel *d_val, 
+             uint *d_row, 
+             uint *d_col, 
+             uint *d_slice, 
+             uint nzz,
+             reel* X, 
+             reel* Y){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
@@ -37,19 +37,19 @@
 
 
 
- /** customSpTd3V()
+ /** SpTd3V()
  * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
  * 
  */
  __global__
- void customSpTd3V(reel *d_val, 
-                   uint *d_row, 
-                   uint *d_col, 
-                   uint *d_slice, 
-                   uint *d_hyperslice,
-                   uint nzz,
-                   reel* X, 
-                   reel* Y){
+ void SpTd3V(reel *d_val, 
+             uint *d_row, 
+             uint *d_col, 
+             uint *d_slice, 
+             uint *d_hyperslice,
+             uint nzz,
+             reel* X, 
+             reel* Y){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
@@ -61,33 +61,84 @@
 
 
 
-/** customAxpbyMultiForces()
- * @brief Performe a custom Axpby operation on the forces vector to accomodate multi excitation file
- * parallelisme acrose a single system
+/** applyExcitationFiles()
+ * @brief Performe a custom Axpby operation on the forces vector to accomodate 
+ * multi excitation file parallelisme acrose a single system
  * 
  */
  __global__
- void customAxpbyMultiForces(reel* d_val, 
-                             uint* d_indice, 
-                             uint nzz, 
-                             reel* excitationsSet,
-                             uint lengthOfeachExcitation, 
-                             uint kSim, 
-                             reel* Y, 
-                             uint n, 
-                             uint t,
-                             uint intraStrmParallelism){
+ void applyExcitationFiles(reel* d_val, 
+                           uint* d_indice, 
+                           uint  nzz, 
+                           reel* excitationsSet,
+                           uint  lengthOfeachExcitation, 
+                           uint  currentSimulation,
+                           uint  systemStride,
+                           reel* Y, 
+                           uint  t){
 
-  uint dofStride = n/intraStrmParallelism;
-  uint selectedExcitation = kSim*intraStrmParallelism;
+  uint selectedExcitation = currentSimulation;
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k<nzz; k += stride){
-    // Y[d_indice[k]] += 0.0;
-    Y[d_indice[k]] += d_val[k]*excitationsSet[(selectedExcitation+d_indice[k]/dofStride)*lengthOfeachExcitation + t];
+    selectedExcitation += d_indice[k]/systemStride;
+    Y[d_indice[k]] += d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
+  }
+ }
 
+
+
+/** interpolateExcitationFiles()
+ * @brief Performe a custom Axpby operation on the forces vector, it interpolate
+ * it regarding the interpolation matrix, to accomodate multi excitation file
+ * parallelisme acrose a single system
+ * 
+ */
+ __global__
+ void interpolateExcitationFiles(reel* d_val, 
+                                 uint* d_indice, 
+                                 uint  nzz, 
+                                 reel* excitationsSet,
+                                 uint  lengthOfeachExcitation, 
+                                 uint  currentSimulation,
+                                 uint  systemStride,
+                                 reel* Y, 
+                                 uint  t,
+                                 reel* interpolationMatrix,
+                                 uint  interpolationWindowSize,
+                                 int   i){
+
+  uint selectedExcitation = currentSimulation;
+  int  iws2m1 = interpolationWindowSize/2 - 1;
+
+  int startInterpolate = -iws2m1;
+  int endInterpolate   = iws2m1+1;
+
+  // Prevent out of bound interpolation
+  if((int)t+startInterpolate < 0){
+    startInterpolate = -t;
+  }
+  if((int)t+endInterpolate > lengthOfeachExcitation){
+    endInterpolate = lengthOfeachExcitation - t;
+  }
+
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
+  for(uint k = index; k<nzz; k += stride){
+    selectedExcitation += d_indice[k]/systemStride;
+
+    // Interpolate the excitations
+    reel tmp = 0.;
+    for(int j=startInterpolate; j<=endInterpolate; ++j){
+      reel a = interpolationMatrix[interpolationWindowSize*i + j + iws2m1];
+      reel b = excitationsSet[(selectedExcitation)*lengthOfeachExcitation + t + j];
+
+      tmp += a * b;
+    }
+
+    Y[d_indice[k]] += d_val[k] * tmp;
   }
  }
 
@@ -134,3 +185,6 @@
     q[k] += h6*(rk1[k] + 2*rk2[k] + 2*rk3[k] + rk4[k]);
   }
  }
+
+
+

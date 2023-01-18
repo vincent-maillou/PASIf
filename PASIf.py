@@ -78,8 +78,23 @@ class PASIf(__GpuDriver):
     self._setInitialConditions(vecInitialConditions)
 
 
+  def setInterpolationMatrix(self, interpolationMatrix_):
+    # Verify that each row of the interpolation matrix are even and of the same size
+    for i in range(len(interpolationMatrix_)):
+      if(len(interpolationMatrix_[i])%2 != 0):
+        raise ValueError("The windows size must be even.")
+      elif(len(interpolationMatrix_[i]) != len(interpolationMatrix_[0])):
+        raise ValueError("The windows size must be the same for all the rows.")  
+
+    # Modify the matrix into a single vector
+    self.interpolationMatrix = np.array(interpolationMatrix_).flatten()  
+
+    self._setInterpolationMatrix(self.interpolationMatrix, len(interpolationMatrix_[0]))
+
 
   def getAmplitudes(self, verbose_ = True, debug_ = False):
     return self._getAmplitudes(verbose_, debug_)
 
+  def getTrajectory(self):
+    return self._getTrajectory()
 
