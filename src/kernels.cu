@@ -14,12 +14,12 @@
 
 
 
-/** SpTd2V()
+/** SpT3dV()
  * @brief Perform the coo sparse tensor - dense vector square multiplication
  * 
  */
  __global__
- void SpTd2V(reel *d_val, 
+ void SpT3dV(reel *d_val, 
              uint *d_row, 
              uint *d_col, 
              uint *d_slice, 
@@ -37,12 +37,12 @@
 
 
 
- /** SpTd3V()
+ /** SpT4dV()
  * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
  * 
  */
  __global__
- void SpTd3V(reel *d_val, 
+ void SpT4dV(reel *d_val, 
              uint *d_row, 
              uint *d_col, 
              uint *d_slice, 
@@ -61,75 +61,12 @@
 
 
 
+/** applyForces()
+ * @brief Performe a custom AXPY operation on the state vector using the targeted 
+ * excitation.
+ * 
+ */
  __global__
- void modterpolator(reel* d_val, 
-                    uint* d_indice, 
-                    uint  nzz, 
-                    reel* excitationsSet,
-                    uint  lengthOfeachExcitation, 
-                    uint  currentSimulation,
-                    uint  systemStride,
-                    reel* Y, 
-                    uint  t,
-                    reel* interpolationMatrix,
-                    uint  interpolationNumberOfPoints,
-                    uint  interpolationWindowSize,
-                    int   i){
-
-  uint useCase = 0;
-
-  uint virtualTime = t;
-  uint virtualInterpolation = i;
-
-  if(interpolationNumberOfPoints == 0){
-    useCase = 0;
-    virtualTime += i;
-    virtualInterpolation = 0;
-  }
-  else{
-    if(i>interpolationNumberOfPoints){
-      virtualTime += 1;
-      virtualInterpolation -= (interpolationNumberOfPoints+1);
-    }
-    
-    if(virtualInterpolation == 0){
-      useCase = 0;
-    }
-    else{
-      useCase = 1;
-    }
-  }
-
-  switch(useCase){
-    case 0: // Just apply the force
-      applyForces(d_val, 
-                  d_indice, 
-                  nzz, 
-                  excitationsSet,
-                  lengthOfeachExcitation, 
-                  currentSimulation,
-                  systemStride,
-                  Y, 
-                  virtualTime);
-      break;
-    case 1: // Interpolate the force
-      interpolate(d_val, 
-                  d_indice, 
-                  nzz, 
-                  excitationsSet,
-                  lengthOfeachExcitation, 
-                  currentSimulation,
-                  systemStride,
-                  Y, 
-                  virtualTime,
-                  interpolationMatrix,
-                  interpolationWindowSize,
-                  virtualInterpolation);
-      break;
-  }
- }
-
- __device__
  void applyForces(reel* d_val, 
                   uint* d_indice, 
                   uint  nzz, 
@@ -138,32 +75,44 @@
                   uint  currentSimulation,
                   uint  systemStride,
                   reel* Y, 
-                  uint  t){
+                  uint  t,
+                  reel* modulationBuffer,
+                  uint  m){
 
   uint selectedExcitation = currentSimulation;
 
+  reel modulation = modulate // TODODODODODO -------------
+
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
-
   for(uint k = index; k<nzz; k += stride){
     selectedExcitation += d_indice[k]/systemStride;
-    Y[d_indice[k]] += d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
+    Y[d_indice[k]] += modulation * d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
   }
  }
 
- __device__
- void interpolate(reel* d_val, 
-                  uint* d_indice, 
-                  uint  nzz, 
-                  reel* excitationsSet,
-                  uint  lengthOfeachExcitation, 
-                  uint  currentSimulation,
-                  uint  systemStride,
-                  reel* Y, 
-                  uint  t,
-                  reel* interpolationMatrix,
-                  uint  interpolationWindowSize,
-                  int   i){
+
+
+/** interpolateForces()
+ * @brief Apply the interpolation matrix to the targeted excitation and add it to the
+ * state vector.
+ * 
+ */
+ __global__
+ void interpolateForces(reel* d_val, 
+                        uint* d_indice, 
+                        uint  nzz, 
+                        reel* excitationsSet,
+                        uint  lengthOfeachExcitation, 
+                        uint  currentSimulation,
+                        uint  systemStride,
+                        reel* Y, 
+                        uint  t,
+                        reel* interpolationMatrix,
+                        uint  interpolationWindowSize,
+                        int   i,
+                        reel* modulationBuffer,
+                        uint  m){
 
   uint selectedExcitation = currentSimulation;
   int  iws2m1 = interpolationWindowSize/2 - 1;
@@ -171,7 +120,8 @@
   int startInterpolate = -iws2m1;
   int endInterpolate   = iws2m1+1;
 
-  // Prevent out of bound interpolation
+  // Prevent out of bound interpolation, 0 value (no force) will be used
+  // in case of out of bound
   if((int)t+startInterpolate < 0){
     startInterpolate = -t;
   }
@@ -199,91 +149,19 @@
 
 
 
-
-
-
-
-
-/** interpolateExcitationFiles()
- * @brief Performe a custom Axpby operation on the forces vector, it interpolate
- * it regarding the interpolation matrix, to accomodate multi excitation file
- * parallelisme acrose a single system
+ /** modulate()
+ * @brief 
  * 
  */
- __global__
- void interpolateExcitationFiles(reel* d_val, 
-                                 uint* d_indice, 
-                                 uint  nzz, 
-                                 reel* excitationsSet,
-                                 uint  lengthOfeachExcitation, 
-                                 uint  currentSimulation,
-                                 uint  systemStride,
-                                 reel* Y, 
-                                 uint  t,
-                                 reel* interpolationMatrix,
-                                 uint  interpolationWindowSize,
-                                 int   i){
+ __device__
+ reel modulate(reel* modulationBuffer, 
+               uint  m){
 
-  uint selectedExcitation = currentSimulation;
-  int  iws2m1 = interpolationWindowSize/2 - 1;
+  if(modulationBuffer != NULL)
+    return modulationBuffer[m];
 
-  int startInterpolate = -iws2m1;
-  int endInterpolate   = iws2m1+1;
-
-  // Prevent out of bound interpolation
-  if((int)t+startInterpolate < 0){
-    startInterpolate = -t;
-  }
-  if((int)t+endInterpolate > lengthOfeachExcitation){
-    endInterpolate = lengthOfeachExcitation - t;
-  }
-
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-  for(uint k = index; k<nzz; k += stride){
-    selectedExcitation += d_indice[k]/systemStride;
-
-    // Interpolate the excitations
-    reel tmp = 0.;
-    for(int j=startInterpolate; j<=endInterpolate; ++j){
-      reel a = interpolationMatrix[interpolationWindowSize*i + j + iws2m1];
-      reel b = excitationsSet[(selectedExcitation)*lengthOfeachExcitation + t + j];
-
-      tmp += a * b;
-    }
-
-    Y[d_indice[k]] += d_val[k] * tmp;
-  }
+  return 1.;
  }
- 
-
-
-/** applyExcitationFiles()
- * @brief Performe a custom Axpby operation on the forces vector to accomodate 
- * multi excitation file parallelisme acrose a single system
- * 
- */
-/*  __global__
- void applyExcitationFiles(reel* d_val, 
-                           uint* d_indice, 
-                           uint  nzz, 
-                           reel* excitationsSet,
-                           uint  lengthOfeachExcitation, 
-                           uint  currentSimulation,
-                           uint  systemStride,
-                           reel* Y, 
-                           uint  t){
-
-  uint selectedExcitation = currentSimulation;
-
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint k = index; k<nzz; k += stride){
-    selectedExcitation += d_indice[k]/systemStride;
-    Y[d_indice[k]] += d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
-  }
- } */
 
 
 

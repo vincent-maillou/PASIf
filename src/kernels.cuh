@@ -14,12 +14,12 @@
 
 
 
-/** SpTV2()
+/** SpT3dV()
  * @brief Perform the coo sparse tensor 3d - dense vector multiplication (order 2)
  * 
  */
  __global__
- void SpTd2V(reel *d_val, 
+ void SpT3dV(reel *d_val, 
              uint *d_row, 
              uint *d_col, 
              uint *d_slice, 
@@ -30,12 +30,12 @@
             
           
 
-/** SpTd3V()
- * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
+/** SpT4dV()
+ * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3).
  * 
  */
  __global__
- void SpTd3V(reel *d_val, 
+ void SpT4dV(reel *d_val, 
              uint *d_row, 
              uint *d_col, 
              uint *d_slice, 
@@ -46,92 +46,57 @@
 
 
 
-/** applyExcitationFiles()
- * @brief Performe a custom Axpby operation on the forces vector to accomodate multi excitation file
- * parallelisme acrose a single system
- * 
- */
-/*  __global__
- void applyExcitationFiles(reel* d_val, 
-                           uint* d_indice, 
-                           uint  nzz, 
-                           reel* excitationsSet,
-                           uint  lengthOfeachExcitation, 
-                           uint  currentSimulation,
-                           uint  systemStride,
-                           reel* Y, 
-                           uint  t); */
-
-
-
-/** interpolateExcitationFiles()
- * @brief Performe a custom Axpby operation on the forces vector, it interpolate
- * it regarding the interpolation matrix, to accomodate multi excitation file
- * parallelisme acrose a single system
- * 
- */
-/*  __global__
- void interpolateExcitationFiles(reel* d_val, 
-                                 uint* d_indice, 
-                                 uint  nzz, 
-                                 reel* excitationsSet,
-                                 uint  lengthOfeachExcitation, 
-                                 uint  currentSimulation,
-                                 uint  systemStride,
-                                 reel* Y, 
-                                 uint  t,
-                                 reel* interpolationMatrix,
-                                 uint  interpolationWindowSize,
-                                 int   i); */
-
-
-
-/** modterpolator()
- * @brief Performe a custom Axpby operation on the forces vector, if needed
- * it interpolate the forces w.r.t the interpolation matrix otherwise it just
- * apply the forces.
+/** applyForces()
+ * @brief Performe a custom AXPY operation on the state vector using the targeted 
+ * excitation.
  * 
  */
  __global__
- void modterpolator(reel* d_val, 
-                    uint* d_indice, 
-                    uint  nzz, 
-                    reel* excitationsSet,
-                    uint  lengthOfeachExcitation, 
-                    uint  currentSimulation,
-                    uint  systemStride,
-                    reel* Y, 
-                    uint  t,
-                    reel* interpolationMatrix,
-                    uint  interpolationNumberOfPoints,
-                    uint  interpolationWindowSize,
-                    int   i);
+ void applyForces(reel* d_val, 
+                  uint* d_indice, 
+                  uint  nzz, 
+                  reel* excitationsSet,
+                  uint  lengthOfeachExcitation, 
+                  uint  currentSimulation,
+                  uint  systemStride,
+                  reel* Y, 
+                  uint  t,
+                  reel* modulationBuffer,
+                  uint  m);
 
-__device__
-void applyForces(reel* d_val, 
-                 uint* d_indice, 
-                 uint  nzz, 
-                 reel* excitationsSet,
-                 uint  lengthOfeachExcitation, 
-                 uint  currentSimulation,
-                 uint  systemStride,
-                 reel* Y, 
-                 uint  t);
 
-__device__
-void interpolate(reel* d_val, 
-                 uint* d_indice, 
-                 uint  nzz, 
-                 reel* excitationsSet,
-                 uint  lengthOfeachExcitation, 
-                 uint  currentSimulation,
-                 uint  systemStride,
-                 reel* Y, 
-                 uint  t,
-                 reel* interpolationMatrix,
-                 uint  interpolationWindowSize,
-                 int   i);
 
+/** interpolateForces()
+ * @brief Apply the interpolation matrix to the targeted excitation and add it to the
+ * state vector.
+ * 
+ */
+ __global__
+ void interpolateForces(reel* d_val, 
+                        uint* d_indice, 
+                        uint  nzz, 
+                        reel* excitationsSet,
+                        uint  lengthOfeachExcitation, 
+                        uint  currentSimulation,
+                        uint  systemStride,
+                        reel* Y, 
+                        uint  t,
+                        reel* interpolationMatrix,
+                        uint  interpolationWindowSize,
+                        int   i,
+                        reel* modulationBuffer,
+                        uint  m);
+
+
+
+
+/** modulate()
+ * @brief 
+ * 
+ */
+ __device__
+ reel modulate(reel* modulationBuffer, 
+               uint  m);
 
 
 /** updateSlope()

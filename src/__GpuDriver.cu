@@ -102,6 +102,7 @@
       clearForcePattern();
       clearInitialConditions();
       clearInterpolationMatrix();
+      clearModulationBuffer();
       clearDeviceStatesVector();
 
       if(streams != nullptr){
@@ -111,7 +112,6 @@
         delete[] streams;
         streams = nullptr;
       }
-
     }
 
 
@@ -223,6 +223,18 @@
 
 
 
+  void __GpuDriver::_setModulationBuffer(std::vector<reel> & modulationBuffer_){
+    modulationBuffer = modulationBuffer_;
+    modulationBufferSize = modulationBuffer_.size();
+
+    // Allocate the modulation buffer on the GPU
+    CHECK_CUDA( cudaMalloc((void**)&d_modulationBuffer, modulationBufferSize*sizeof(reel)) )
+    // Copy the modulation buffer to the GPU
+    CHECK_CUDA( cudaMemcpy(d_modulationBuffer, modulationBuffer.data(), modulationBufferSize*sizeof(reel), cudaMemcpyHostToDevice) )
+  }
+
+
+
   /** __GpuDriver::driver_getAmplitudes()
    * @brief 
    * 
@@ -290,21 +302,29 @@
     auto begin = std::chrono::high_resolution_clock::now();
 
     // Perform the simulations
-    for(size_t simIndex(0); simIndex<numberOfSimulationToPerform; simIndex++){
+    for(size_t k(0); k<numberOfSimulationToPerform; ++k){
+
+      uint m(0); // Modulation index
 
       // Performe the rk4 steps
       for(uint t(0); t<baseNumsteps ; ++t){
         // Always performe one step without interpolation, and then performe the
         // interpolation steps
         for(uint i(0); i<=interpolationNumberOfPoints; ++i){
-          rkStep(simIndex, t, i);
+          rkStep(k, t, i, m);
+          
+          ++m;
+          if(m == modulationBufferSize){
+            m = 0;
+          }
         }
+
       }
 
 
 
       // Copy the results of the performed simulation from the GPU to the CPU
-      CHECK_CUDA( cudaMemcpy(resultsQ.data()+simIndex*n_dofs, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToHost) )
+      CHECK_CUDA( cudaMemcpy(resultsQ.data()+k*n_dofs, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
 
       // Reset Q1 and Q2 to initials conditions
@@ -398,11 +418,12 @@
    * @brief Compute the derivatives of the system
    * 
    */
-   void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
-                                 cusparseDnVecDescr_t q_desc, 
-                                 uint simIndex, 
-                                 uint t,
-                                 int  i){
+   inline void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
+                                        cusparseDnVecDescr_t q_desc, 
+                                        uint k, 
+                                        uint t,
+                                        uint i,
+                                        uint m){
 
     // Get the pointers from the descriptors
     reel *pm; reel *pq;
@@ -435,7 +456,7 @@
                  K->d_buffer);
     
     // k += Gamma.d_mi²
-    SpTd2V<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
+    SpT3dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
                                                          Gamma->d_row, 
                                                          Gamma->d_col,
                                                          Gamma->d_slice, 
@@ -444,7 +465,7 @@
                                                          pm);
     
     // k += Lambda.d_mi³
-    SpTd3V<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
+    SpT4dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
                                                          Lambda->d_row, 
                                                          Lambda->d_col,
                                                          Lambda->d_slice, 
@@ -456,28 +477,8 @@
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
     if(t < lengthOfeachExcitation){
-
-      // "currentSimulation" refers to the simulation number in the case of
-      // wich multiple simulation are needed to compute the system against all
-      // of the excitation file
-      uint currentSimulation = simIndex/intraStrmParallelism;
-      uint systemStride = n_dofs/intraStrmParallelism;
-
       // k += ForcePattern.d_ExcitationsSet
-      modterpolator<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
-                                                      (ForcePattern->d_val,
-                                                      ForcePattern->d_indice,
-                                                      ForcePattern->nzz,
-                                                      d_ExcitationsSet,
-                                                      lengthOfeachExcitation,
-                                                      currentSimulation,
-                                                      systemStride,
-                                                      pm,
-                                                      t,
-                                                      d_interpolationMatrix,
-                                                      interpolationNumberOfPoints,
-                                                      interpolationWindowSize,
-                                                      i);                                                
+      modterpolator(pm, k, t, i, m);
     }
    }
 
@@ -487,26 +488,25 @@
    * @brief Performe a single Runge-Kutta step
    * 
    */
-   void __GpuDriver::rkStep(uint simIndex, 
+   void __GpuDriver::rkStep(uint k, 
                             uint t,
-                            int  i){
-
-    /* std::cout << "t=" << t << " i=" << i << std::endl; */
+                            uint i,
+                            uint m){
 
     // Compute the derivatives
-    derivatives(d_m1_desc, d_Q_desc, simIndex, t, i);
+    derivatives(d_m1_desc, d_Q_desc, k, t, i, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2_desc, d_mi_desc, simIndex, t, i+1);
+    derivatives(d_m2_desc, d_mi_desc, k, t, i+1, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3_desc, d_mi_desc, simIndex, t, i+1);
+    derivatives(d_m3_desc, d_mi_desc, k, t, i+1, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4_desc, d_mi_desc, simIndex, t, i+2);
+    derivatives(d_m4_desc, d_mi_desc, k, t, i+2, m);
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
@@ -518,6 +518,79 @@
 
     h_trajectory.push_back(temp);
    }
+
+
+
+  inline void __GpuDriver::modterpolator(reel* Y,
+                                         uint  k,
+                                         uint  t,
+                                         uint  i,
+                                         uint  m){
+
+    // "currentSimulation" refers to the simulation number in the case of
+    // wich multiple simulation are needed to compute the system against all
+    // of the excitation file
+    uint currentSimulation = k/intraStrmParallelism;
+    uint systemStride      = n_dofs/intraStrmParallelism;
+    uint adjustedTime          = t;
+    uint adjustedInterpolation = i;
+
+    uint useCase = 0;
+
+    if(interpolationNumberOfPoints == 0){
+      adjustedTime         += i;
+      adjustedInterpolation = 0;
+
+      useCase = 0;
+    }
+    else{
+      if(i > interpolationNumberOfPoints){
+        adjustedTime          += 1;
+        adjustedInterpolation -= (interpolationNumberOfPoints+1);
+      }
+      
+      if(adjustedInterpolation == 0){
+        useCase = 0;
+      }
+      else{
+        useCase = 1;
+      }
+    }
+
+    switch(useCase){
+      case 0: // Just apply the force
+        applyForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+                                              (ForcePattern->d_val, 
+                                              ForcePattern->d_indice, 
+                                              ForcePattern->nzz, 
+                                              d_ExcitationsSet,
+                                              lengthOfeachExcitation, 
+                                              currentSimulation,
+                                              systemStride,
+                                              Y, 
+                                              adjustedTime,
+                                              d_modulationBuffer,
+                                              m);
+        break;
+      case 1: // Interpolate the force
+        interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+                                                    (ForcePattern->d_val, 
+                                                    ForcePattern->d_indice, 
+                                                    ForcePattern->nzz, 
+                                                    d_ExcitationsSet,
+                                                    lengthOfeachExcitation, 
+                                                    currentSimulation,
+                                                    systemStride,
+                                                    Y, 
+                                                    adjustedTime,
+                                                    d_interpolationMatrix,
+                                                    interpolationWindowSize,
+                                                    adjustedInterpolation,
+                                                    d_modulationBuffer,
+                                                    m);
+        break;
+    }
+  }
 
 
 
@@ -543,6 +616,9 @@
       std::cout << "No interpolation matrix has been provided" << std::endl;
     }
     std::cout << std::endl;
+
+    std::cout << "Modulation buffer:" <<  std::endl;
+    printVector(modulationBuffer);
 
   }
 
@@ -646,6 +722,16 @@
     if(d_interpolationMatrix != nullptr){
       CHECK_CUDA( cudaFree(d_interpolationMatrix) )
       d_interpolationMatrix = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearModulationBuffer(){
+    if(modulationBuffer.size() != 0){
+      modulationBuffer.clear();
+    }
+    if(d_modulationBuffer != nullptr){
+      CHECK_CUDA( cudaFree(d_modulationBuffer) )
+      d_modulationBuffer = nullptr;
     }
   }
 

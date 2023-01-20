@@ -78,6 +78,7 @@ class PASIf(__GpuDriver):
     self._setInitialConditions(vecInitialConditions)
 
 
+
   def setInterpolationMatrix(self, interpolationMatrix_):
     # Verify that each row of the interpolation matrix are even and of the same size
     for i in range(len(interpolationMatrix_)):
@@ -92,8 +93,21 @@ class PASIf(__GpuDriver):
     self._setInterpolationMatrix(self.interpolationMatrix, len(interpolationMatrix_[0]))
 
 
+
+  def setModulationBuffer(self, modulationBuffer_):
+    if(len(modulationBuffer_) == 0):
+      raise ValueError("The modulation buffer must be non-empty.")
+
+    self.modulationBuffer = modulationBuffer_
+
+    self._setModulationBuffer(self.modulationBuffer)
+    
+
+
   def getAmplitudes(self, verbose_ = True, debug_ = False):
     return self._getAmplitudes(verbose_, debug_)
+
+
 
   def getTrajectory(self):
     return self._getTrajectory()

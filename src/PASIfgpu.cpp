@@ -50,6 +50,9 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("interpolationMatrix_"),
       py::arg("interpolationWindowSize_"))
 
+    .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
+      py::arg("modulationBuffer_"))
+
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes,
       py::arg("displayComputeInfos_") = false,
       py::arg("displaySystem_")   = false)

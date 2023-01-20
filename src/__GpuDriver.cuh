@@ -35,28 +35,44 @@ class __GpuDriver{
                    
   void _setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,
                                uint interpolationWindowSize_);
+
+  void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
                   
   std::vector<reel> _getAmplitudes(bool displayComputeInfos_ = false, bool displaySystem_ = false);
   std::vector<reel> _getTrajectory() { return h_trajectory; }
 
  private:
+  // Initialization functions
   int  setCUDA(uint nStreams_);
   void setTimesteps();
 
+  // Simulation related functions
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t q_desc, 
                    uint k, 
                    uint t,
-                   int  i);
+                   uint i,
+                   uint m);
+
   void rkStep(uint k, 
               uint t,
-              int  i);
+              uint i,
+              uint m);
 
+  void modterpolator(reel* Y,
+                     uint  k,
+                     uint  t,
+                     uint  i,
+                     uint  m);
+
+  // GPU work distribution functions
   void optimizeIntraStrmParallelisme();
 
+  // Display functions
   void displayAssembledSystem();
   void displayComputationInfos();
 
+  // Memory cleaning functions
   void clearDeviceStatesVector();
   void clearB();
   void clearK();
@@ -65,6 +81,7 @@ class __GpuDriver{
   void clearForcePattern();
   void clearInitialConditions();
   void clearInterpolationMatrix();
+  void clearModulationBuffer();
 
 
   std::vector<reel> h_trajectory;
@@ -80,10 +97,15 @@ class __GpuDriver{
   uint baseNumsteps; // = keeping track of the base steps number to reset it in case of interpolation matrix modification
 
   //            Interpolation related data
-  uint   interpolationNumberOfPoints; // = Height of the interpolation matrix
-  uint   interpolationWindowSize; // = Width of the interpolation matrix
+  uint interpolationNumberOfPoints; // = Height of the interpolation matrix
+  uint interpolationWindowSize;     // = Width of the interpolation matrix
   std::vector<reel> interpolationMatrix;
   reel*             d_interpolationMatrix;
+
+  //            Modulation related data
+  uint modulationBufferSize;
+  std::vector<reel> modulationBuffer;
+  reel*             d_modulationBuffer;
 
   //            Device-wise data
   reel* d_ExcitationsSet;
@@ -138,11 +160,10 @@ class __GpuDriver{
  */
 
 /*
-
 - [ ] Try COO conversion to CSR or CSC (bench speedup)
 - [ ] CUBLAS_COMPUTE_32F_FAST_TF32
 - [ ] Interleaved excitations files
-
+- [ ] Adapted thread/block for sparse Tensors kernels
 */
 
 
