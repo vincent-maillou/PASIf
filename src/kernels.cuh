@@ -51,7 +51,7 @@
  * parallelisme acrose a single system
  * 
  */
- __global__
+/*  __global__
  void applyExcitationFiles(reel* d_val, 
                            uint* d_indice, 
                            uint  nzz, 
@@ -60,7 +60,7 @@
                            uint  currentSimulation,
                            uint  systemStride,
                            reel* Y, 
-                           uint  t);
+                           uint  t); */
 
 
 
@@ -70,7 +70,7 @@
  * parallelisme acrose a single system
  * 
  */
- __global__
+/*  __global__
  void interpolateExcitationFiles(reel* d_val, 
                                  uint* d_indice, 
                                  uint  nzz, 
@@ -82,7 +82,55 @@
                                  uint  t,
                                  reel* interpolationMatrix,
                                  uint  interpolationWindowSize,
-                                 int   i);
+                                 int   i); */
+
+
+
+/** modterpolator()
+ * @brief Performe a custom Axpby operation on the forces vector, if needed
+ * it interpolate the forces w.r.t the interpolation matrix otherwise it just
+ * apply the forces.
+ * 
+ */
+ __global__
+ void modterpolator(reel* d_val, 
+                    uint* d_indice, 
+                    uint  nzz, 
+                    reel* excitationsSet,
+                    uint  lengthOfeachExcitation, 
+                    uint  currentSimulation,
+                    uint  systemStride,
+                    reel* Y, 
+                    uint  t,
+                    reel* interpolationMatrix,
+                    uint  interpolationNumberOfPoints,
+                    uint  interpolationWindowSize,
+                    int   i);
+
+__device__
+void applyForces(reel* d_val, 
+                 uint* d_indice, 
+                 uint  nzz, 
+                 reel* excitationsSet,
+                 uint  lengthOfeachExcitation, 
+                 uint  currentSimulation,
+                 uint  systemStride,
+                 reel* Y, 
+                 uint  t);
+
+__device__
+void interpolate(reel* d_val, 
+                 uint* d_indice, 
+                 uint  nzz, 
+                 reel* excitationsSet,
+                 uint  lengthOfeachExcitation, 
+                 uint  currentSimulation,
+                 uint  systemStride,
+                 reel* Y, 
+                 uint  t,
+                 reel* interpolationMatrix,
+                 uint  interpolationWindowSize,
+                 int   i);
 
 
 

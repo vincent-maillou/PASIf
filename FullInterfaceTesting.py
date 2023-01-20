@@ -6,6 +6,11 @@ import numpy as np
 # Generate the excitation set
 excitationSet = []
 excitation = np.ones(78001)
+# Fill the excitation vector with a ramp
+""" excitation = []
+for i in range(78001):
+      excitation.append(i/78001) """
+
 excitationSet.append(excitation)
 sampleRate = 16000
 

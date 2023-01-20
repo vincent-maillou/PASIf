@@ -294,9 +294,10 @@
 
       // Performe the rk4 steps
       for(uint t(0); t<baseNumsteps ; ++t){
-        rkStep(simIndex, t); // Performe one rk4 step (the one without interpolation)
-        for(uint i(0); i<interpolationNumberOfPoints; ++i){
-          rkStep(simIndex, t, i); // Performe one rk4 step for each interpolation point
+        // Always performe one step without interpolation, and then performe the
+        // interpolation steps
+        for(uint i(0); i<=interpolationNumberOfPoints; ++i){
+          rkStep(simIndex, t, i);
         }
       }
 
@@ -456,44 +457,27 @@
     // than the excitation length
     if(t < lengthOfeachExcitation){
 
-      // The currentSimulation refers to the simulation number in the case of
+      // "currentSimulation" refers to the simulation number in the case of
       // wich multiple simulation are needed to compute the system against all
       // of the excitation file
       uint currentSimulation = simIndex/intraStrmParallelism;
       uint systemStride = n_dofs/intraStrmParallelism;
 
-
-      if(i==-1){
-        // k += ForcePattern.d_ExcitationsSet
-        applyExcitationFiles<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
-                                                          (ForcePattern->d_val,
-                                                          ForcePattern->d_indice,
-                                                          ForcePattern->nzz,
-                                                          d_ExcitationsSet,
-                                                          lengthOfeachExcitation,
-                                                          currentSimulation,
-                                                          systemStride,
-                                                          pm,
-                                                          t);
-        
-      }
-      else{
-        // k += InterpolationMatrix.ForcePattern.d_ExcitationsSet
-        interpolateExcitationFiles<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
-                                                          (ForcePattern->d_val,
-                                                          ForcePattern->d_indice,
-                                                          ForcePattern->nzz,
-                                                          d_ExcitationsSet,
-                                                          lengthOfeachExcitation,
-                                                          currentSimulation,
-                                                          systemStride,
-                                                          pm,
-                                                          t,
-                                                          d_interpolationMatrix,
-                                                          interpolationWindowSize,
-                                                          i);
-
-      }
+      // k += ForcePattern.d_ExcitationsSet
+      modterpolator<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+                                                      (ForcePattern->d_val,
+                                                      ForcePattern->d_indice,
+                                                      ForcePattern->nzz,
+                                                      d_ExcitationsSet,
+                                                      lengthOfeachExcitation,
+                                                      currentSimulation,
+                                                      systemStride,
+                                                      pm,
+                                                      t,
+                                                      d_interpolationMatrix,
+                                                      interpolationNumberOfPoints,
+                                                      interpolationWindowSize,
+                                                      i);                                                
     }
    }
 
@@ -514,15 +498,15 @@
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2_desc, d_mi_desc, simIndex, t+1, i);
+    derivatives(d_m2_desc, d_mi_desc, simIndex, t, i+1);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3_desc, d_mi_desc, simIndex, t+1, i);
+    derivatives(d_m3_desc, d_mi_desc, simIndex, t, i+1);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4_desc, d_mi_desc, simIndex, t+2, i);
+    derivatives(d_m4_desc, d_mi_desc, simIndex, t, i+2);
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);

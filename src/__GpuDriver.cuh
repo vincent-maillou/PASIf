@@ -50,7 +50,7 @@ class __GpuDriver{
                    int  i);
   void rkStep(uint k, 
               uint t,
-              int  i=-1);
+              int  i);
 
   void optimizeIntraStrmParallelisme();
 
