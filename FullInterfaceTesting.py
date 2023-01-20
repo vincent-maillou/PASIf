@@ -178,6 +178,12 @@ pasif.setInterpolationMatrix(intMat)
 
 # Modulation buffer
 modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
+#modulationBuffer = np.array([0.5, 0.5, 0.5, 0.5])
+#modulationBuffer = np.array([0, 1, 0, 1])
+
+# Fill the modulation buffer with a sine wave of period 1Hz and amplitude 1
+#modulationBuffer = np.sin(2*np.pi*1*np.linspace(0, 1, 1000))
+
 
 pasif.setModulationBuffer(modulationBuffer)
 

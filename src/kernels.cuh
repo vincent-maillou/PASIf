@@ -89,14 +89,14 @@
 
 
 
-
 /** modulate()
- * @brief 
+ * @brief If the modulation buffer is not null, return the value at the given index
  * 
  */
  __device__
  reel modulate(reel* modulationBuffer, 
                uint  m);
+
 
 
 /** updateSlope()

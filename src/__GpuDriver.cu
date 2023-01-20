@@ -534,11 +534,13 @@
     uint systemStride      = n_dofs/intraStrmParallelism;
     uint adjustedTime          = t;
     uint adjustedInterpolation = i;
+    uint adjustedModulation    = m;
 
     uint useCase = 0;
 
     if(interpolationNumberOfPoints == 0){
       adjustedTime         += i;
+      adjustedModulation   += i;
       adjustedInterpolation = 0;
 
       useCase = 0;
@@ -546,6 +548,7 @@
     else{
       if(i > interpolationNumberOfPoints){
         adjustedTime          += 1;
+        adjustedModulation    += 1;
         adjustedInterpolation -= (interpolationNumberOfPoints+1);
       }
       
@@ -554,7 +557,12 @@
       }
       else{
         useCase = 1;
+        adjustedModulation    += adjustedInterpolation;
       }
+    }
+
+    if(adjustedModulation >= modulationBufferSize){
+      adjustedModulation -= modulationBufferSize;
     }
 
     switch(useCase){
@@ -570,7 +578,7 @@
                                               Y, 
                                               adjustedTime,
                                               d_modulationBuffer,
-                                              m);
+                                              adjustedModulation);
         break;
       case 1: // Interpolate the force
         interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
@@ -587,7 +595,7 @@
                                                     interpolationWindowSize,
                                                     adjustedInterpolation,
                                                     d_modulationBuffer,
-                                                    m);
+                                                    adjustedModulation);
         break;
     }
   }

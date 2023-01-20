@@ -81,7 +81,7 @@
 
   uint selectedExcitation = currentSimulation;
 
-  reel modulation = modulate // TODODODODODO -------------
+  reel modulation = modulate(modulationBuffer, m);
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
@@ -129,6 +129,8 @@
     endInterpolate = lengthOfeachExcitation - t;
   }
 
+  reel modulation = modulate(modulationBuffer, m);
+
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
   for(uint k = index; k<nzz; k += stride){
@@ -140,7 +142,7 @@
       reel a = interpolationMatrix[interpolationWindowSize*(i-1) + j + iws2m1];
       reel b = excitationsSet[(selectedExcitation)*lengthOfeachExcitation + t + j];
 
-      tmp += a * b;
+      tmp += modulation * a * b;
     }
 
     Y[d_indice[k]] += d_val[k] * tmp;
@@ -150,7 +152,7 @@
 
 
  /** modulate()
- * @brief 
+ * @brief If the modulation buffer is not null, return the value at the given index
  * 
  */
  __device__
