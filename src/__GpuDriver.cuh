@@ -160,10 +160,11 @@ class __GpuDriver{
  */
 
 /*
-- [ ] Try COO conversion to CSR or CSC (bench speedup)
+- [ ] Interpola/Mod matrix in cst memory
+- [ ] Try COO conversion to CSR (bench speedup)
+- [ ] Adapted thread/block for sparse Tensors and forces kernels 
 - [ ] CUBLAS_COMPUTE_32F_FAST_TF32
 - [ ] Interleaved excitations files
-- [ ] Adapted thread/block for sparse Tensors kernels
 */
 
 

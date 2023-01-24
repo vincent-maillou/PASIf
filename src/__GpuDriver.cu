@@ -46,6 +46,7 @@
 
       // Interpolation
       d_interpolationMatrix = nullptr;
+      d_modulationBuffer    = nullptr;
 
       // System
       B      = nullptr;

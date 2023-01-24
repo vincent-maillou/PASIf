@@ -174,7 +174,7 @@ pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, ext
 
 intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 
-pasif.setInterpolationMatrix(intMat)
+#pasif.setInterpolationMatrix(intMat)
 
 # Modulation buffer
 modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
@@ -185,7 +185,7 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 #modulationBuffer = np.sin(2*np.pi*1*np.linspace(0, 1, 1000))
 
 
-pasif.setModulationBuffer(modulationBuffer)
+#pasif.setModulationBuffer(modulationBuffer)
 
 
 results = pasif.getAmplitudes(verbose_ = True, debug_ = True)
