@@ -43,7 +43,7 @@ class PASIf(__GpuDriver):
                  vecLambda,
                  vecForcePattern,
                  vecInitialConditions):
-    """"Pre-process the matrix by -M^-1 and then set the syste on the GPU using the driver.
+    """"Pre-process the matrix by -M^-1 and then set the system on the GPU using the driver.
     Chosen convention:
     - Gamma defined positive
     - Lambda defined negative."""

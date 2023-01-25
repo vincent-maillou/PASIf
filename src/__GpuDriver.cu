@@ -139,7 +139,7 @@
       // Check the size of all the excitation vectors
       for(auto &excitation : excitationSet_){
         if(excitation.size() != excitationSet_[0].size()){
-          std::cout << "Error : Excitations vectors are not of the same size" << std::endl;
+          std::cout << "[Error] __GpuDriver: Excitations vectors are not of the same size" << std::endl;
           return 1;
         }
       }
@@ -157,7 +157,7 @@
       CHECK_CUDA( cudaMalloc((void**)&d_ExcitationsSet, excitationSet.size()*sizeof(reel)) )
       // Copy the ExcitationsSet to the GPU
       CHECK_CUDA( cudaMemcpy(d_ExcitationsSet, excitationSet.data(), excitationSet.size()*sizeof(reel), cudaMemcpyHostToDevice) )
-      std::cout << "Loaded " << numberOfExcitations << " excitations of length " << lengthOfeachExcitation << " each." << std::endl;
+      std::cout << "[Info] __GpuDriver: Loaded " << numberOfExcitations << " excitations of length " << lengthOfeachExcitation << " each." << std::endl;
     
       return 0;
     }
@@ -220,6 +220,8 @@
     CHECK_CUDA( cudaMalloc((void**)&d_interpolationMatrix, interpolationMatrix.size()*sizeof(reel)) )
     // Copy the interpolation matrix to the GPU
     CHECK_CUDA( cudaMemcpy(d_interpolationMatrix, interpolationMatrix.data(), interpolationMatrix.size()*sizeof(reel), cudaMemcpyHostToDevice) )
+    
+    std::cout << "[Info] __GpuDriver: Loaded interpolation matrix, " << interpolationNumberOfPoints << " points, windows length " << interpolationWindowSize << std::endl;
   }
 
 
@@ -232,6 +234,8 @@
     CHECK_CUDA( cudaMalloc((void**)&d_modulationBuffer, modulationBufferSize*sizeof(reel)) )
     // Copy the modulation buffer to the GPU
     CHECK_CUDA( cudaMemcpy(d_modulationBuffer, modulationBuffer.data(), modulationBufferSize*sizeof(reel), cudaMemcpyHostToDevice) )
+  
+    std::cout << "[Info] __GpuDriver: Loaded modulation buffer of " << modulationBufferSize << " points." << std::endl;
   }
 
 
@@ -807,7 +811,7 @@
     // Checking that each system is of the same size
     for(uint i = 0; i < dofChecking.size(); i++){
       if(dofChecking[i] != dofChecking[0]){
-        std::cout << "Error : The number of DOFs is not the same for all the Matrix describing the system" << std::endl;
+        std::cout << "[Error] __GpuDriver: The number of DOFs is not the same for all the Matrix describing the system" << std::endl;
       }
     }
 
