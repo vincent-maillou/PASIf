@@ -97,6 +97,8 @@ class PASIf(__GpuDriver):
   def setModulationBuffer(self, modulationBuffer_):
     if(len(modulationBuffer_) == 0):
       raise ValueError("The modulation buffer must be non-empty.")
+    elif(len(modulationBuffer_) > 32000):
+      raise ValueError("The modulation buffer don't fit in the GPU cst memory.")
 
     self.modulationBuffer = modulationBuffer_
 

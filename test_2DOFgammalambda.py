@@ -44,14 +44,8 @@ system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].degreesOf
 system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].degreesOfFreedom[mechanicalDOF] = 1
 #optomechanical coupling (gamma)
 
-
-
-
-
-
-
-system.excitationSources['soundData'] = spr.DirectCInjectionSource(force)
-system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'soundData', 1.0)
+system.excitationSources['step'] = spr.DirectCInjectionSource(force)
+system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1.0)
 
 
 
@@ -84,6 +78,7 @@ system.excitationSources['soundData2'] = spr.BinaryFileSource(fileList=trainingS
                                                   fileDataType='double',
                                                   modulationFrequency=10500.0,
                                                   log2Upsampling=2)
+system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 1.0)
 
 
 
@@ -93,13 +88,7 @@ system.excitationSources['soundData2'] = spr.BinaryFileSource(fileList=trainingS
 
 
 
-
-
-
-
-
-
-#probe string
+# Probe string
 system.probes['system_output'] = spr.WindowedA2Probe(opticalDOF,
                                                     startIndex=0,
                                                     endIndex=filelength)
@@ -107,7 +96,7 @@ system.probes['system_output'] = spr.WindowedA2Probe(opticalDOF,
 # Define an adjoint source (used to compute the gradient efficiently: https://en.wikipedia.org/wiki/Adjoint_state_method)
 system.interactionPotentials['adjoint_source'] = system.probes['system_output'].makeAdjointSource()
 
-#probe cantilever
+# Probe cantilever
 system.probes['cant_output'] = spr.WindowedA2Probe(mechanicalDOF,
                                                     startIndex=0,
                                                     endIndex=filelength)
@@ -129,8 +118,7 @@ plt.show() """
 
 
 # From now CUDA Env testing
-
-vecSystem = [system]
+vecSystem = [system, system]
 excitation = []
 for i in range(filelength):
     excitation.append(1)
@@ -141,7 +129,15 @@ gpuenv = spr.CUDAEnvironment(vecSystem,
                              timeStep = 1.0/sr)
 
 
-excitationSet.append(excitation)
-# gpuenv.setExcitations(excitationSet, timeStep = 1.0/sr)
+# gpuenv.setModulationBuffer(8, 195)
+
+gpuenv.setExcitations(excitationSet, timeStep = 1.0/sr)
 
 
+import time
+start = time.time()
+amplitudes = gpuenv.getAmplitudes(vecSystem)
+stop = time.time()
+print(f'Total getAmplitude() time: {stop-start} s')
+
+print("Probes amplitudes: ", amplitudes)
