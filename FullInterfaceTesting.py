@@ -12,6 +12,7 @@ for i in range(78001):
       excitation.append(i/78001) """
 
 excitationSet.append(excitation)
+
 sampleRate = 16000
 
 
@@ -190,6 +191,12 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 results = pasif.getAmplitudes(verbose_ = True, debug_ = True)
 
+# End python timer
+end = time.time()
+print("Overlall elapsed time: ", end - start)
+
+
+
 print("Amplitudes: ", results)
 
 trajectory = pasif.getTrajectory()
@@ -201,6 +208,4 @@ import matplotlib.pyplot as plt
 plt.plot(trajectory)
 plt.show()
 
-# End python timer
-end = time.time()
-print("Overlall elapsed time: ", end - start)
+

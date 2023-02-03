@@ -38,26 +38,35 @@ class __GpuDriver{
 
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
                   
-  std::vector<reel> _getAmplitudes(bool displayComputeInfos_ = false, bool displaySystem_ = false);
-  std::vector<reel> _getTrajectory() { return h_trajectory; }
+  std::vector<reel> _getAmplitudes(bool dCompute_ = false,
+                                   bool dSystem_  = false);
+
+  std::vector<std::vector<reel>> _getTrajectory(std::vector<uint> relevantsTrajs_);
 
  private:
   // Initialization functions
   int  setCUDA(uint nStreams_);
   void setTimesteps();
+  void allocateDeviceStatesVector();
+  void allocateDeviceSystems();
+  void resetStatesVectors();
 
   // Simulation related functions
+  void forwardRungeKutta(uint tStart_, 
+                         uint tEnd_,
+                         uint k);
+
+  void rkStep(uint k, 
+              uint t,
+              uint i,
+              uint m);
+
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t q_desc, 
                    uint k, 
                    uint t,
                    uint i,
                    uint m);
-
-  void rkStep(uint k, 
-              uint t,
-              uint i,
-              uint m);
 
   void modterpolator(reel* Y,
                      uint  k,
@@ -69,8 +78,9 @@ class __GpuDriver{
   void optimizeIntraStrmParallelisme();
 
   // Display functions
-  void displayAssembledSystem();
-  void displayComputationInfos();
+  void displaySimuInfos(bool dCompute_=false,
+                        bool dSystem_=false,
+                        bool dSolver_=false);
 
   // Memory cleaning functions
   void clearDeviceStatesVector();
@@ -84,7 +94,6 @@ class __GpuDriver{
   void clearModulationBuffer();
 
 
-  std::vector<reel> h_trajectory;
 
 
   //            Simulation related data
@@ -94,7 +103,7 @@ class __GpuDriver{
   uint lengthOfeachExcitation;
 
   uint n_dofs;
-  uint baseNumsteps; // = keeping track of the base steps number to reset it in case of interpolation matrix modification
+  uint numsteps; 
 
   //            Interpolation related data
   uint interpolationNumberOfPoints; // = Height of the interpolation matrix
@@ -110,14 +119,14 @@ class __GpuDriver{
   //            Device-wise data
   reel* d_ExcitationsSet;
 
-  // System description
+  // System matrix description
   COOMatrix*   B;
   COOMatrix*   K;
   COOTensor3D* Gamma;
   COOTensor4D* Lambda;
   COOVector*   ForcePattern;
 
-  // RK4 related vectors
+  // RK4 States vectors
   std::vector<reel> QinitCond; reel* d_QinitCond; 
   reel* d_Q;  cusparseDnVecDescr_t d_Q_desc;
 
@@ -135,6 +144,11 @@ class __GpuDriver{
   reel alpha; reel* d_alpha;
   reel beta1; reel* d_beta1;
   reel beta0; reel* d_beta0;
+
+  // getTrajectory() related attributes
+  std::vector<uint> relevantsTrajs;
+  std::vector<std::vector<reel>> h_trajectories; reel* d_trajectories;
+  
 
   //        Computation parameters
   uint nStreams;

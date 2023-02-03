@@ -160,6 +160,7 @@
         return out;
       }
 
+      out << "  ";
       size_t k(0);
       for(size_t i(0); i<n; ++i){
         for(size_t j(0); j<n; ++j){
@@ -171,7 +172,7 @@
             out << "_ ";
           }
         } 
-        out << std::endl;
+        out << std::endl << "  ";
       }
       out << std::endl;
       
@@ -299,6 +300,7 @@
         return out;
       }
 
+      out << "  ";
       size_t p(0);
       for(size_t m(0); m<n; ++m){
         size_t k(p);
@@ -313,9 +315,9 @@
               out << "_ ";
             }
           }
-          out << std::endl;
+          out << std::endl << "  ";
         }
-        out << std::endl;
+        out << std::endl << "  ";
       }
       out << std::endl;
       
@@ -463,27 +465,27 @@
         return out;
       }
 
-      std::cout << "val: ";
+      std::cout << "  val: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << val[i] << " ";
       }
       std::cout << std::endl;
-      std::cout << "row: ";
+      std::cout << "  row: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << row[i] << " ";
       }
       std::cout << std::endl;
-      std::cout << "col: ";
+      std::cout << "  col: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << col[i] << " ";
       }
       std::cout << std::endl;
-      std::cout << "slice: ";
+      std::cout << "  slice: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << slice[i] << " ";
       }
       std::cout << std::endl;
-      std::cout << "hyperslice: ";
+      std::cout << "  hyperslice: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << hyperslice[i] << " ";
       }
@@ -591,7 +593,7 @@
       return out;
     }
 
-    out << "val: ";
+    out << "  val: ";
     size_t p(0);
     for(size_t i(0); i<n; ++i){
       if(indice[p] == i){
@@ -604,7 +606,7 @@
     }
     out << std::endl;
 
-    out << "ind: ";
+    out << "  ind: ";
     p = 0;
     for(size_t i(0); i<n; ++i){
       if(indice[p] == i){

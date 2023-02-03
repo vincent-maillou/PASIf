@@ -107,7 +107,9 @@ class PASIf(__GpuDriver):
 
 
   def getAmplitudes(self, verbose_ = True, debug_ = False):
-    return self._getAmplitudes(verbose_, debug_)
+    tStart = 0
+    tEnd   = 0
+    return self._getAmplitudes(tStart, tEnd, verbose_, debug_)
 
 
 

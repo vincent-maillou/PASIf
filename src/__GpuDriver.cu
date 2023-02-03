@@ -27,8 +27,7 @@
                              uint numsteps_) : 
         // Simulation
         n_dofs(0),
-        baseNumsteps(numsteps_),
-        //simNumsteps(numsteps_),
+        numsteps(numsteps_),
 
         // Interpolation
         interpolationNumberOfPoints(0),
@@ -245,106 +244,38 @@
    * 
    * @return std::vector<reel>
    */
-   std::vector<reel> __GpuDriver::_getAmplitudes(bool displayComputeInfos_, bool displaySystem_){
+   std::vector<reel> __GpuDriver::_getAmplitudes(bool dCompute_,
+                                                 bool dSystem_){
       
+    // Assemble the excitation parallelized system  
     optimizeIntraStrmParallelisme();
-
-    if(displaySystem_){
-      displayAssembledSystem();
-    }
-    if(displayComputeInfos_){
-      displayComputationInfos();
-    }
-    if(true){
-      std::cout << "The number of steps of the simulations are" << std::endl;
-      reel duration = baseNumsteps*(interpolationNumberOfPoints+1)*h;
-      std::cout << "  duration = " << duration << "s" << std::endl;
-      /* std::cout << "  baseNumsteps = " << baseNumsteps << std::endl;
-      std::cout << "  interpolationNumberOfPoints = " << interpolationNumberOfPoints << std::endl;
-      std::cout << "  total number of steps = " << baseNumsteps*(interpolationNumberOfPoints+1) << std::endl; */
-      std::cout << "The timestep of the simulations are" << std::endl;
-      std::cout << "  h = " << h << std::endl;
-      std::cout << "  h2 = " << h2 << std::endl;
-      std::cout << "  h6 = " << h6 << std::endl;
-    }
+    displaySimuInfos(dCompute_, dSystem_, true);
     
-
-    // Allocate the memory for the states and RK4 vectors coefficients,
-    // and create the dense vector descriptors
-    CHECK_CUDA( cudaMalloc((void**)&d_QinitCond, n_dofs*sizeof(reel)) )
-    CHECK_CUDA( cudaMalloc((void**)&d_Q, n_dofs*sizeof(reel)) )
-    CHECK_CUDA( cudaMemcpy(d_QinitCond, QinitCond.data(), n_dofs*sizeof(reel), cudaMemcpyHostToDevice) )
-    // Copy the device QinitCond initial conditions vector to Q device vector
-    CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q_desc, n_dofs, d_Q, CUDA_R_32F) )
-
-    CHECK_CUDA( cudaMalloc((void**)&d_mi, n_dofs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_mi_desc, n_dofs, d_mi, CUDA_R_32F) )
+    // Allocate the memory on the GPU
+    allocateDeviceStatesVector();
+    allocateDeviceSystems();
     
-    CHECK_CUDA( cudaMalloc((void**)&d_m1, n_dofs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m1_desc, n_dofs, d_m1, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_m2, n_dofs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m2_desc, n_dofs, d_m2, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_m3, n_dofs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m3_desc, n_dofs, d_m3, CUDA_R_32F) )
-    CHECK_CUDA( cudaMalloc((void**)&d_m4, n_dofs*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m4_desc, n_dofs, d_m4, CUDA_R_32F) )
-
-
-
-    // Allocate the matrices and vectors on the GPU
-    B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
-    K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
-    Gamma->AllocateOnGPU();
-    Lambda->AllocateOnGPU();
-    ForcePattern->AllocateOnGPU();
-
 
     std::vector<reel> resultsQ;
     resultsQ.resize(n_dofs*numberOfSimulationToPerform);
 
 
     auto begin = std::chrono::high_resolution_clock::now();
-
     // Perform the simulations
     for(size_t k(0); k<numberOfSimulationToPerform; ++k){
 
-      uint m(0); // Modulation index
-
-      // Performe the rk4 steps
-      for(uint t(0); t<baseNumsteps ; ++t){
-        // Always performe one step without interpolation, and then performe the
-        // interpolation steps
-        for(uint i(0); i<=interpolationNumberOfPoints; ++i){
-          rkStep(k, t, i, m);
-          
-          ++m;
-          if(m == modulationBufferSize){
-            m = 0;
-          }
-        }
-
-      }
-
-
+      forwardRungeKutta(0, numsteps, k);
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(resultsQ.data()+k*n_dofs, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
 
-      // Reset Q1 and Q2 to initials conditions
-      CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
+      resetStatesVectors();
 
-      // Reset all of the other vectors to 0
-      CHECK_CUDA( cudaMemset(d_mi, 0, n_dofs*sizeof(reel)) )
-
-      CHECK_CUDA( cudaMemset(d_m1, 0, n_dofs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_m2, 0, n_dofs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_m3, 0, n_dofs*sizeof(reel)) )
-      CHECK_CUDA( cudaMemset(d_m4, 0, n_dofs*sizeof(reel)) )
     }
-
     auto end = std::chrono::high_resolution_clock::now();
+
+
     std::chrono::duration<double> elapsed_seconds = end-begin;
     std::cout << "CUDA solver execution time: " << elapsed_seconds.count() << "s" << std::endl;
 
@@ -356,6 +287,14 @@
     return std::vector<reel>{resultsQ};
    }
 
+
+
+  std::vector<std::vector<reel>> __GpuDriver::_getTrajectory(std::vector<uint> relevantsTrajs){
+
+    ;
+
+  }
+  
 
 
 /****************************************************
@@ -416,6 +355,114 @@
     h2 = h/2.0;
     h6 = h/6.0;
   }
+
+
+
+  void __GpuDriver::allocateDeviceStatesVector(){
+    // Allocate the memory for the states and RK4 vectors coefficients,
+    // and create the dense vector descriptors
+    CHECK_CUDA( cudaMalloc((void**)&d_QinitCond, n_dofs*sizeof(reel)) )
+    CHECK_CUDA( cudaMalloc((void**)&d_Q, n_dofs*sizeof(reel)) )
+    CHECK_CUDA( cudaMemcpy(d_QinitCond, QinitCond.data(), n_dofs*sizeof(reel), cudaMemcpyHostToDevice) )
+    
+    // Copy the device QinitCond initial conditions vector to Q device vector
+    CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_Q_desc, n_dofs, d_Q, CUDA_R_32F) )
+
+    CHECK_CUDA( cudaMalloc((void**)&d_mi, n_dofs*sizeof(reel)) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_mi_desc, n_dofs, d_mi, CUDA_R_32F) )
+    
+    CHECK_CUDA( cudaMalloc((void**)&d_m1, n_dofs*sizeof(reel)) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m1_desc, n_dofs, d_m1, CUDA_R_32F) )
+    CHECK_CUDA( cudaMalloc((void**)&d_m2, n_dofs*sizeof(reel)) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m2_desc, n_dofs, d_m2, CUDA_R_32F) )
+    CHECK_CUDA( cudaMalloc((void**)&d_m3, n_dofs*sizeof(reel)) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m3_desc, n_dofs, d_m3, CUDA_R_32F) )
+    CHECK_CUDA( cudaMalloc((void**)&d_m4, n_dofs*sizeof(reel)) )
+    CHECK_CUSPARSE( cusparseCreateDnVec(&d_m4_desc, n_dofs, d_m4, CUDA_R_32F) )
+  }
+
+
+
+  void __GpuDriver::allocateDeviceSystems(){
+    // Allocate the matrices and vectors on the GPU
+    B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
+    K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
+    Gamma->AllocateOnGPU();
+    Lambda->AllocateOnGPU();
+    ForcePattern->AllocateOnGPU();
+  }
+
+
+
+  void __GpuDriver::resetStatesVectors(){
+    // Reset Q1 and Q2 to initials conditions
+    CHECK_CUDA( cudaMemcpy(d_Q, d_QinitCond, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
+
+    // Reset all of the other vectors to 0
+    CHECK_CUDA( cudaMemset(d_mi, 0, n_dofs*sizeof(reel)) )
+
+    CHECK_CUDA( cudaMemset(d_m1, 0, n_dofs*sizeof(reel)) )
+    CHECK_CUDA( cudaMemset(d_m2, 0, n_dofs*sizeof(reel)) )
+    CHECK_CUDA( cudaMemset(d_m3, 0, n_dofs*sizeof(reel)) )
+    CHECK_CUDA( cudaMemset(d_m4, 0, n_dofs*sizeof(reel)) )
+  }
+
+
+
+  void __GpuDriver::forwardRungeKutta(uint tStart_, 
+                                      uint tEnd_,
+                                      uint k){
+                          
+    uint m(0); // Modulation index
+
+    // Performe the rk4 steps
+    for(uint t(tStart_); t<tEnd_ ; ++t){
+      // Always performe one step without interpolation, and then performe the
+      // interpolation steps
+      for(uint i(0); i<=interpolationNumberOfPoints; ++i){
+        rkStep(k, t, i, m);
+        
+        ++m;
+        if(m == modulationBufferSize){
+          m = 0;
+        }
+      }
+
+    }                       
+  }
+
+
+  
+
+  /**
+   * @brief Performe a single Runge-Kutta step
+   * 
+   */
+   void __GpuDriver::rkStep(uint k, 
+                            uint t,
+                            uint i,
+                            uint m){
+
+    // Compute the derivatives
+    derivatives(d_m1_desc, d_Q_desc, k, t, i, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+
+    derivatives(d_m2_desc, d_mi_desc, k, t, i+1, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+
+    derivatives(d_m3_desc, d_mi_desc, k, t, i+1, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+
+    derivatives(d_m4_desc, d_mi_desc, k, t, i+2, m);
+
+    // Compute next state vector Q
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+
+   }
 
 
 
@@ -485,44 +532,7 @@
       // k += ForcePattern.d_ExcitationsSet
       modterpolator(pm, k, t, i, m);
     }
-   }
-
-  
-
-  /**
-   * @brief Performe a single Runge-Kutta step
-   * 
-   */
-   void __GpuDriver::rkStep(uint k, 
-                            uint t,
-                            uint i,
-                            uint m){
-
-    // Compute the derivatives
-    derivatives(d_m1_desc, d_Q_desc, k, t, i, m);
-
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
-
-    derivatives(d_m2_desc, d_mi_desc, k, t, i+1, m);
-
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
-
-    derivatives(d_m3_desc, d_mi_desc, k, t, i+1, m);
-
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
-
-    derivatives(d_m4_desc, d_mi_desc, k, t, i+2, m);
-
-    // Compute next state vector Q
-    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
-   
-
-    // Store the result in the trajectory
-    reel temp = 0.;
-    cudaMemcpy(&temp, d_Q, sizeof(reel), cudaMemcpyDeviceToHost);
-
-    h_trajectory.push_back(temp);
-   }
+   } 
 
 
 
@@ -607,43 +617,58 @@
 
 
 
-  inline void __GpuDriver::displayAssembledSystem(){
-    std::cout << "Here is the assembled system" << std::endl;
-    std::cout << "B:" << std::endl << *B << std::endl;
-    std::cout << "K:" << std::endl << *K << std::endl;
-    std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
-    std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
-    std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
-    std::cout << "QinitCond:" << std::endl; printVector(QinitCond);
+  void __GpuDriver::displaySimuInfos(bool dCompute_,
+                                     bool dSystem_,
+                                     bool dSolver_){
+    
+    if(dSystem_){
+      std::cout << "Here is the assembled system" << std::endl;
+      std::cout << "B:" << std::endl << *B << std::endl;
+      std::cout << "K:" << std::endl << *K << std::endl;
+      std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
+      std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
+      std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
+      std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
 
-    std::cout << "InterpolationMatrix:" << std::endl;
-    if(!interpolationMatrix.empty()){
-      for(uint i=0; i<interpolationNumberOfPoints; ++i){
-        for(uint j=0; j<interpolationWindowSize; ++j){
-          std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
+      std::cout << "InterpolationMatrix:" << std::endl;
+      if(!interpolationMatrix.empty()){
+        for(uint i=0; i<interpolationNumberOfPoints; ++i){
+          for(uint j=0; j<interpolationWindowSize; ++j){
+            std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
+          }
+          std::cout << std::endl;
         }
-        std::cout << std::endl;
+      }
+      else{
+        std::cout << "  No interpolation matrix has been provided" << std::endl;
+      }
+      std::cout << std::endl;
+
+      std::cout << "Modulation buffer:" <<  std::endl;
+      if(!modulationBuffer.empty()){
+        printVector(modulationBuffer);
+      }
+      else{
+        std::cout << "  No modulation buffer has been provided" << std::endl << std::endl;
       }
     }
-    else{
-      std::cout << "No interpolation matrix has been provided" << std::endl;
+
+    if(dCompute_){
+      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
+      std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
+      std::cout << "  The total number of excitation files is " << numberOfExcitations;
+      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
+      if(numsteps < lengthOfeachExcitation){
+        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+      }
     }
-    std::cout << std::endl;
 
-    std::cout << "Modulation buffer:" <<  std::endl;
-    printVector(modulationBuffer);
-
-  }
-
-
-  
-  inline void __GpuDriver::displayComputationInfos(){
-    std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
-    std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
-    std::cout << "  The total number of excitation files is " << numberOfExcitations << std::endl;
-    std::cout << "  Hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
-    if(baseNumsteps < lengthOfeachExcitation){
-      std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+    if(dSolver_){
+      std::cout << "Solver info:" << std::endl;
+      std::cout << "  Number of steps to perform: " << numsteps << std::endl;
+      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
+      std::cout << "  Duration length: " << duration << "s" << std::endl;
+      std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
     }
   }
 

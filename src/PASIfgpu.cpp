@@ -54,8 +54,11 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("modulationBuffer_"))
 
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes,
-      py::arg("displayComputeInfos_") = false,
-      py::arg("displaySystem_")   = false)
+      py::arg("dCompute_") = false,
+      py::arg("dSystem_")  = false)
+
+    .def("_getTrajectory", &__GpuDriver::_getTrajectory,
+      py::arg("relevantsTrajs_"))
 
     .def("_getTrajectory", &__GpuDriver::_getTrajectory);
 }
