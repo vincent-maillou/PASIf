@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 system = spr.MechanicalSystem()
-m = 1
+m = 2
 b= 2
 k= 6
 force = 1
@@ -118,7 +118,7 @@ plt.show() """
 
 
 # From now CUDA Env testing
-vecSystem = [system, system]
+vecSystem = [system]
 excitation = []
 for i in range(filelength):
     excitation.append(1)

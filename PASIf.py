@@ -27,11 +27,16 @@ class PASIf(__GpuDriver):
     else:
       self.numsteps = numsteps_
     super().__init__(excitationSet, sampleRate, self.numsteps)
-
+    
+    self.sampleRate   = sampleRate
+    self.totalNumDOF  = 0
+    self.interpolSize = 0
+    self.saveSteps    = 1
 
 
   def setExcitations(self, excitationSet, sampleRate):
-    self._loadExcitationsSet(excitationSet, sampleRate)
+    self.sampleRate = sampleRate
+    self._loadExcitationsSet(excitationSet, self.sampleRate)
 
 
   
@@ -57,6 +62,7 @@ class PASIf(__GpuDriver):
     for i in range(len(vecM)):
       if len(vecM[i]) != len(vecB[i]) or len(vecM[i]) != len(vecK[i]) or len(vecM[i]) != len(vecGamma[i]) or len(vecM[i]) != len(vecLambda[i]) or len(vecM[i]) != len(vecForcePattern[i]) or len(vecM[i]) != len(vecInitialConditions[i]):
         raise ValueError("The size of the matrix of each system must be the same.")
+      self.totalNumDOF += len(vecM[i])
 
 
     # Invert the M matrix and then pre-multiply the others
@@ -87,6 +93,8 @@ class PASIf(__GpuDriver):
       elif(len(interpolationMatrix_[i]) != len(interpolationMatrix_[0])):
         raise ValueError("The windows size must be the same for all the rows.")  
 
+    self.interpolSize = len(interpolationMatrix_[0])
+
     # Modify the matrix into a single vector
     self.interpolationMatrix = np.array(interpolationMatrix_).flatten()  
 
@@ -106,13 +114,21 @@ class PASIf(__GpuDriver):
     
 
 
-  def getAmplitudes(self, verbose_ = True, debug_ = False):
-    tStart = 0
-    tEnd   = 0
-    return self._getAmplitudes(tStart, tEnd, verbose_, debug_)
+  def getAmplitudes(self, displayCompute = True, displaySystem = False):
+    return self._getAmplitudes(displayCompute, displaySystem)
 
 
 
-  def getTrajectory(self):
-    return self._getTrajectory()
+  def getTrajectory(self, saveSteps = 1, displayCompute = True, displaySystem = False):
+    self.saveSteps = saveSteps
+    trajectory = self._getTrajectory(saveSteps, displayCompute, displaySystem)
+    
+    numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/self.saveSteps)
+    unwrappedTrajectory = np.array([np.zeros(numOfSavedSteps) for i in range(self.totalNumDOF)])
+    
+    for t in range(numOfSavedSteps):
+      for i in range(self.totalNumDOF):
+        unwrappedTrajectory[i][t] = trajectory[t*self.totalNumDOF + i]
+    
+    return unwrappedTrajectory
 

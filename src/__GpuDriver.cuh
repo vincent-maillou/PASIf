@@ -41,7 +41,9 @@ class __GpuDriver{
   std::vector<reel> _getAmplitudes(bool dCompute_ = false,
                                    bool dSystem_  = false);
 
-  std::vector<std::vector<reel>> _getTrajectory(std::vector<uint> relevantsTrajs_);
+  std::vector<reel> _getTrajectory(uint saveSteps_ = 1,
+                                   bool dCompute_  = false,
+                                   bool dSystem_   = false);
 
  private:
   // Initialization functions
@@ -54,7 +56,8 @@ class __GpuDriver{
   // Simulation related functions
   void forwardRungeKutta(uint tStart_, 
                          uint tEnd_,
-                         uint k);
+                         uint k,
+                         uint saveSteps = 1);
 
   void rkStep(uint k, 
               uint t,
@@ -146,8 +149,7 @@ class __GpuDriver{
   reel beta0; reel* d_beta0;
 
   // getTrajectory() related attributes
-  std::vector<uint> relevantsTrajs;
-  std::vector<std::vector<reel>> h_trajectories; reel* d_trajectories;
+  std::vector<reel> h_trajectories; reel* d_trajectories;
   
 
   //        Computation parameters

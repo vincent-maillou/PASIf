@@ -58,7 +58,7 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("dSystem_")  = false)
 
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
-      py::arg("relevantsTrajs_"))
-
-    .def("_getTrajectory", &__GpuDriver::_getTrajectory);
+      py::arg("saveSteps_") = 1,
+      py::arg("dCompute_") = false,
+      py::arg("dSystem_")  = false);
 }

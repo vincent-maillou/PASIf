@@ -66,6 +66,9 @@
       d_m3 = nullptr;
       d_m4 = nullptr;
 
+      // getTrajectory()
+      d_trajectories = nullptr;
+
       // CUDA
       streams    = nullptr;
       h_cuSPARSE = NULL;
@@ -277,7 +280,7 @@
 
 
     std::chrono::duration<double> elapsed_seconds = end-begin;
-    std::cout << "CUDA solver execution time: " << elapsed_seconds.count() << "s" << std::endl;
+    std::cout << "CUDA getAmplitudes() execution time: " << elapsed_seconds.count() << "s" << std::endl;
 
     // Cut the results vector to the correct size
     if(exceedingSimulations != 0){
@@ -289,10 +292,48 @@
 
 
 
-  std::vector<std::vector<reel>> __GpuDriver::_getTrajectory(std::vector<uint> relevantsTrajs){
+  std::vector<reel> __GpuDriver::_getTrajectory(uint saveSteps_,
+                                                bool dCompute_,
+                                                bool dSystem_){
+    // Assemble the excitation parallelized system  
+    //optimizeIntraStrmParallelisme();
+    displaySimuInfos(dCompute_, dSystem_, true);
+    
+    // Allocate the memory on the GPU
+    allocateDeviceStatesVector();
+    allocateDeviceSystems();
 
-    ;
 
+    // Reserve the size of the trajectories vector on the CPU
+    size_t reservedTrajSize = (n_dofs*numberOfSimulationToPerform*(interpolationNumberOfPoints+1)*numsteps)/saveSteps_;
+    std::cout << "reservedTrajSize = " << reservedTrajSize << std::endl;
+    h_trajectories.resize(reservedTrajSize);
+
+    // Allocate the memory on the GPU
+    CHECK_CUDA( cudaMalloc((void**)&d_trajectories, h_trajectories.size()*sizeof(reel)) )
+    CHECK_CUDA( cudaMemset(d_trajectories, 0, h_trajectories.size()*sizeof(reel)) )
+
+
+    auto begin = std::chrono::high_resolution_clock::now();
+    // Perform the simulations
+    for(size_t k(0); k<numberOfSimulationToPerform; ++k){
+
+      forwardRungeKutta(0, numsteps, k, saveSteps_);
+
+      resetStatesVectors();
+
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+
+
+    std::chrono::duration<double> elapsed_seconds = end-begin;
+    std::cout << "CUDA getTrajectory() execution time: " << elapsed_seconds.count() << "s" << std::endl;
+
+
+    // Copy the results of the performed simulation from the GPU to the CPU
+    CHECK_CUDA( cudaMemcpy(h_trajectories.data(), d_trajectories, h_trajectories.size()*sizeof(reel), cudaMemcpyDeviceToHost) )
+
+    return h_trajectories;
   }
   
 
@@ -412,9 +453,11 @@
 
   void __GpuDriver::forwardRungeKutta(uint tStart_, 
                                       uint tEnd_,
-                                      uint k){
+                                      uint k,
+                                      uint saveSteps){
                           
-    uint m(0); // Modulation index
+    uint   m(0); // Modulation index
+    size_t trajSaveIndex(0);
 
     // Performe the rk4 steps
     for(uint t(tStart_); t<tEnd_ ; ++t){
@@ -422,6 +465,16 @@
       // interpolation steps
       for(uint i(0); i<=interpolationNumberOfPoints; ++i){
         rkStep(k, t, i, m);
+
+        if(d_trajectories != NULL && (t*(interpolationNumberOfPoints+1)+i)%saveSteps==0){
+          CHECK_CUBLAS( cublasScopy(h_cublas,
+                                    n_dofs, 
+                                    d_Q, 
+                                    1, 
+                                    d_trajectories + trajSaveIndex*n_dofs, 
+                                    1) )
+          ++trajSaveIndex;
+        }
         
         ++m;
         if(m == modulationBufferSize){
@@ -705,6 +758,11 @@
     if(d_m4 != nullptr){
       CHECK_CUDA( cudaFree(d_m4) )
       d_m4 = nullptr;
+    }
+
+    if(d_trajectories != nullptr){
+      CHECK_CUDA( cudaFree(d_trajectories) )
+      d_trajectories = nullptr;
     }
    }
 

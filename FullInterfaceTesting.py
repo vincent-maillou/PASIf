@@ -189,23 +189,31 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 #pasif.setModulationBuffer(modulationBuffer)
 
 
-results = pasif.getAmplitudes(verbose_ = True, debug_ = True)
+results = pasif.getAmplitudes(displayCompute = True, displaySystem = True)
 
-# End python timer
 end = time.time()
-print("Overlall elapsed time: ", end - start)
+print("setMatrix() + getAmplitude() overall time: ", end - start)
 
 
 
 print("Amplitudes: ", results)
 
-trajectory = pasif.getTrajectory()
+start = time.time()
+trajectory = pasif.getTrajectory(saveSteps = 10, displayCompute = True, displaySystem = False)
+end = time.time()
+print("getTrajectories() overall time: ", end - start)
 
-print("Number of steps: ", len(trajectory))
 
 # Plot the trajectory
 import matplotlib.pyplot as plt
-plt.plot(trajectory)
+""" for i in range(len(trajectory)):
+      plt.plot(trajectory[i]) """
+      
+plt.plot(trajectory[0])
 plt.show()
 
+plt.plot(trajectory[1])
+plt.show()
 
+plt.plot(trajectory[2])
+plt.show()
