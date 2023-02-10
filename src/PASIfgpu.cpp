@@ -23,10 +23,13 @@ PYBIND11_MODULE(PASIfgpu, m) {
   m.doc() = "Parallel Accelerated Solver Interface";
 
   py::class_<__GpuDriver>(m, "__GpuDriver")
-    .def(py::init<std::vector<std::vector<double>>, uint, uint>(),
+    .def(py::init<std::vector<std::vector<double>>, uint, uint, bool, bool, bool>(),
       py::arg("excitationSet_"),
       py::arg("sampleRate_"),
-      py::arg("numsteps_"))
+      py::arg("numsteps_"),
+      py::arg("dCompute_") = false,
+      py::arg("dSystem_")  = false,
+      py::arg("dSolver_")  = false)
       
     .def("_loadExcitationsSet", &__GpuDriver::_loadExcitationsSet,
       py::arg("excitationSet_"),
@@ -53,12 +56,10 @@ PYBIND11_MODULE(PASIfgpu, m) {
     .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
       py::arg("modulationBuffer_"))
 
-    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes,
-      py::arg("dCompute_") = false,
-      py::arg("dSystem_")  = false)
+    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
 
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
-      py::arg("saveSteps_") = 1,
-      py::arg("dCompute_") = false,
-      py::arg("dSystem_")  = false);
+      py::arg("saveSteps_") = 1)
+      
+    /* .def("_getGradient", &__GpuDriver::_getGradient) */;
 }

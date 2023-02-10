@@ -24,10 +24,18 @@
     */
     __GpuDriver::__GpuDriver(std::vector<std::vector<double>> excitationSet_, 
                              uint sampleRate_,
-                             uint numsteps_) : 
+                             uint numsteps_,
+                             bool dCompute_,
+                             bool dSystem_,
+                             bool dSolver_) : 
         // Simulation
         n_dofs(0),
         numsteps(numsteps_),
+        totalNumsteps(numsteps),
+
+        dCompute(dCompute_),
+        dSystem(dSystem_),
+        dSolver(dSolver_),
 
         // Interpolation
         interpolationNumberOfPoints(0),
@@ -68,6 +76,9 @@
 
       // getTrajectory()
       d_trajectories = nullptr;
+      numSetpoints   = 0;
+      chunkSize      = 0;
+      lastChunkSize  = 0;
 
       // CUDA
       streams    = nullptr;
@@ -217,6 +228,7 @@
     interpolationNumberOfPoints = interpolationMatrix_.size()/interpolationWindowSize_;
 
     setTimesteps();
+    totalNumsteps = numsteps*(1+interpolationNumberOfPoints);
 
     // Allocate the interpolation matrix on the GPU
     CHECK_CUDA( cudaMalloc((void**)&d_interpolationMatrix, interpolationMatrix.size()*sizeof(reel)) )
@@ -247,12 +259,11 @@
    * 
    * @return std::vector<reel>
    */
-   std::vector<reel> __GpuDriver::_getAmplitudes(bool dCompute_,
-                                                 bool dSystem_){
+   std::vector<reel> __GpuDriver::_getAmplitudes(){
       
     // Assemble the excitation parallelized system  
     optimizeIntraStrmParallelisme();
-    displaySimuInfos(dCompute_, dSystem_, true);
+    displaySimuInfos();
     
     // Allocate the memory on the GPU
     allocateDeviceStatesVector();
@@ -292,21 +303,20 @@
 
 
 
-  std::vector<reel> __GpuDriver::_getTrajectory(uint saveSteps_,
-                                                bool dCompute_,
-                                                bool dSystem_){
+  std::vector<reel> __GpuDriver::_getTrajectory(uint saveSteps_){
     // Assemble the excitation parallelized system  
-    //optimizeIntraStrmParallelisme();
-    displaySimuInfos(dCompute_, dSystem_, true);
+    optimizeIntraStrmParallelisme();
+    displaySimuInfos();
     
     // Allocate the memory on the GPU
     allocateDeviceStatesVector();
     allocateDeviceSystems();
 
 
+
     // Reserve the size of the trajectories vector on the CPU
+    h_trajectories.clear();
     size_t reservedTrajSize = (n_dofs*numberOfSimulationToPerform*(interpolationNumberOfPoints+1)*numsteps)/saveSteps_;
-    std::cout << "reservedTrajSize = " << reservedTrajSize << std::endl;
     h_trajectories.resize(reservedTrajSize);
 
     // Allocate the memory on the GPU
@@ -335,6 +345,45 @@
 
     return h_trajectories;
   }
+
+
+
+  /* std::vector<reel> __GpuDriver::_getGradient(){
+    // Assemble the excitation parallelized system  
+    optimizeIntraStrmParallelisme();
+    displaySimuInfos();
+    
+    // Allocate the memory on the GPU
+    allocateDeviceStatesVector();
+    allocateDeviceSystems();
+
+    numSetpoints  = std::sqrt(totalNumsteps);
+    chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
+    lastChunkSize = chunkSize - (numSetpoints*chunkSize)%totalNumsteps;
+
+
+    // 1. Compute the setPoints (chunks first step)
+    size_t reservedTrajSize = (numSetpoints+chunkSize)*n_dofs;
+    CHECK_CUDA( cudaMalloc((void**)&d_trajectories, reservedTrajSize*sizeof(reel)) )
+    CHECK_CUDA( cudaMemset(d_trajectories, 0, reservedTrajSize*sizeof(reel)) )
+
+    forwardRungeKutta(0, numsteps, 0, chunkSize);
+
+    std::cout << "numsteps: " << numsteps << std::endl;
+    std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
+    std::cout << "numSetpoints: " << numSetpoints << std::endl;
+    std::cout << "chunkSize: " << chunkSize << std::endl;
+    std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
+    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl;
+
+
+    // 2. Compute the entire trajectory of the current chunk
+    
+      // 3. Compute the gradient of the current chunk
+
+      // Repeat 2. and 3. running backward for all the chunks
+
+  } */
   
 
 
@@ -473,6 +522,7 @@
                                     1, 
                                     d_trajectories + trajSaveIndex*n_dofs, 
                                     1) )
+          // std::cout << "trajSaveIndex = " << trajSaveIndex << std::endl;                          
           ++trajSaveIndex;
         }
         
@@ -670,11 +720,23 @@
 
 
 
-  void __GpuDriver::displaySimuInfos(bool dCompute_,
-                                     bool dSystem_,
-                                     bool dSolver_){
+  void __GpuDriver::displaySimuInfos(){
+    std::cout << "dCompute: " << dCompute << std::endl;
+    std::cout << "dSystem: " << dSystem << std::endl;
+    std::cout << "dSolver: " << dSolver << std::endl;
     
-    if(dSystem_){
+
+    if(dCompute){
+      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
+      std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
+      std::cout << "  The total number of excitation files is " << numberOfExcitations;
+      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
+      if(numsteps < lengthOfeachExcitation){
+        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+      }
+    }
+    
+    if(dSystem){
       std::cout << "Here is the assembled system" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
@@ -706,17 +768,7 @@
       }
     }
 
-    if(dCompute_){
-      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
-      std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
-      std::cout << "  The total number of excitation files is " << numberOfExcitations;
-      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
-      if(numsteps < lengthOfeachExcitation){
-        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
-      }
-    }
-
-    if(dSolver_){
+    if(dSolver){
       std::cout << "Solver info:" << std::endl;
       std::cout << "  Number of steps to perform: " << numsteps << std::endl;
       reel duration = numsteps*(interpolationNumberOfPoints+1)*h;

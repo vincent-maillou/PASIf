@@ -16,7 +16,7 @@ excitationSet.append(excitation)
 sampleRate = 16000
 
 
-pasif = PASIf(excitationSet, sampleRate)
+pasif = PASIf(excitationSet, sampleRate, 0, True, True, False)
 
 # pasif.setExcitations(excitationSet, sampleRate)
 
@@ -175,7 +175,7 @@ pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, ext
 
 intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 
-#pasif.setInterpolationMatrix(intMat)
+# pasif.setInterpolationMatrix(intMat)
 
 # Modulation buffer
 modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
@@ -189,7 +189,7 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 #pasif.setModulationBuffer(modulationBuffer)
 
 
-results = pasif.getAmplitudes(displayCompute = True, displaySystem = True)
+results = pasif.getAmplitudes()
 
 end = time.time()
 print("setMatrix() + getAmplitude() overall time: ", end - start)
@@ -199,21 +199,16 @@ print("setMatrix() + getAmplitude() overall time: ", end - start)
 print("Amplitudes: ", results)
 
 start = time.time()
-trajectory = pasif.getTrajectory(saveSteps = 10, displayCompute = True, displaySystem = False)
+trajectory = pasif.getTrajectory(saveSteps = 1)
 end = time.time()
 print("getTrajectories() overall time: ", end - start)
 
 
 # Plot the trajectory
 import matplotlib.pyplot as plt
-""" for i in range(len(trajectory)):
-      plt.plot(trajectory[i]) """
       
-plt.plot(trajectory[0])
+plt.plot(trajectory[0], trajectory[1])
 plt.show()
 
-plt.plot(trajectory[1])
-plt.show()
 
-plt.plot(trajectory[2])
-plt.show()
+# gradient = pasif.getGradient()

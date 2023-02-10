@@ -17,9 +17,12 @@
 
 class __GpuDriver{
  public:
-  __GpuDriver(std::vector<std::vector<double> > excitationSet_,
+  __GpuDriver(std::vector<std::vector<double>> excitationSet_,
               uint sampleRate_,
-              uint numsteps_);
+              uint numsteps_,
+              bool dCompute_ = false,
+              bool dSystem_  = false,
+              bool dSolver_  = false);
 
   ~__GpuDriver();
 
@@ -38,12 +41,11 @@ class __GpuDriver{
 
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
                   
-  std::vector<reel> _getAmplitudes(bool dCompute_ = false,
-                                   bool dSystem_  = false);
+  std::vector<reel> _getAmplitudes();
 
-  std::vector<reel> _getTrajectory(uint saveSteps_ = 1,
-                                   bool dCompute_  = false,
-                                   bool dSystem_   = false);
+  std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
+
+  /* std::vector<reel> _getGradient(); */
 
  private:
   // Initialization functions
@@ -81,9 +83,7 @@ class __GpuDriver{
   void optimizeIntraStrmParallelisme();
 
   // Display functions
-  void displaySimuInfos(bool dCompute_=false,
-                        bool dSystem_=false,
-                        bool dSolver_=false);
+  void displaySimuInfos();
 
   // Memory cleaning functions
   void clearDeviceStatesVector();
@@ -107,6 +107,11 @@ class __GpuDriver{
 
   uint n_dofs;
   uint numsteps; 
+  uint totalNumsteps; // Take into acount the interpolated steps
+
+  bool dCompute;
+  bool dSystem;
+  bool dSolver;
 
   //            Interpolation related data
   uint interpolationNumberOfPoints; // = Height of the interpolation matrix
@@ -148,8 +153,12 @@ class __GpuDriver{
   reel beta1; reel* d_beta1;
   reel beta0; reel* d_beta0;
 
-  // getTrajectory() related attributes
+  // Trajectory storage
   std::vector<reel> h_trajectories; reel* d_trajectories;
+
+  uint numSetpoints;
+  uint chunkSize;
+  uint lastChunkSize;
   
 
   //        Computation parameters
