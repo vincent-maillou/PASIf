@@ -238,8 +238,6 @@
     std::cout << "[Info] __GpuDriver: Loaded interpolation matrix, " << interpolationNumberOfPoints << " points, windows length " << interpolationWindowSize << std::endl;
   }
 
-
-
   void __GpuDriver::_setModulationBuffer(std::vector<reel> & modulationBuffer_){
     modulationBuffer = modulationBuffer_;
     modulationBufferSize = modulationBuffer_.size();
@@ -252,7 +250,63 @@
     std::cout << "[Info] __GpuDriver: Loaded modulation buffer of " << modulationBufferSize << " points." << std::endl;
   }
 
+  void __GpuDriver::_allocateOnDevice(){
+    optimizeIntraStrmParallelisme();
+    allocateDeviceStatesVector();
+    allocateDeviceSystems();
+  }
 
+  void __GpuDriver::_displaySimuInfos(){
+    if(dCompute){
+      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
+      std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
+      std::cout << "  The total number of excitation files is " << numberOfExcitations;
+      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
+      if(numsteps < lengthOfeachExcitation){
+        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+      }
+    }
+    
+    if(dSystem){
+      std::cout << "Here is the assembled system" << std::endl;
+      std::cout << "B:" << std::endl << *B << std::endl;
+      std::cout << "K:" << std::endl << *K << std::endl;
+      std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
+      std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
+      std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
+      std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
+
+      std::cout << "InterpolationMatrix:" << std::endl;
+      if(!interpolationMatrix.empty()){
+        for(uint i=0; i<interpolationNumberOfPoints; ++i){
+          for(uint j=0; j<interpolationWindowSize; ++j){
+            std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
+          }
+          std::cout << std::endl;
+        }
+      }
+      else{
+        std::cout << "  No interpolation matrix has been provided" << std::endl;
+      }
+      std::cout << std::endl;
+
+      std::cout << "Modulation buffer:" <<  std::endl;
+      if(!modulationBuffer.empty()){
+        printVector(modulationBuffer);
+      }
+      else{
+        std::cout << "  No modulation buffer has been provided" << std::endl << std::endl;
+      }
+    }
+
+    if(dSolver){
+      std::cout << "Solver info:" << std::endl;
+      std::cout << "  Number of steps to perform: " << numsteps << std::endl;
+      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
+      std::cout << "  Duration length: " << duration << "s" << std::endl;
+      std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
+    }
+  }
 
   /** __GpuDriver::driver_getAmplitudes()
    * @brief 
@@ -260,16 +314,6 @@
    * @return std::vector<reel>
    */
    std::vector<reel> __GpuDriver::_getAmplitudes(){
-      
-    // Assemble the excitation parallelized system  
-    optimizeIntraStrmParallelisme();
-    displaySimuInfos();
-    
-    // Allocate the memory on the GPU
-    allocateDeviceStatesVector();
-    allocateDeviceSystems();
-    
-
     std::vector<reel> resultsQ;
     resultsQ.resize(n_dofs*numberOfSimulationToPerform);
 
@@ -304,16 +348,6 @@
 
 
   std::vector<reel> __GpuDriver::_getTrajectory(uint saveSteps_){
-    // Assemble the excitation parallelized system  
-    optimizeIntraStrmParallelisme();
-    displaySimuInfos();
-    
-    // Allocate the memory on the GPU
-    allocateDeviceStatesVector();
-    allocateDeviceSystems();
-
-
-
     // Reserve the size of the trajectories vector on the CPU
     h_trajectories.clear();
     size_t reservedTrajSize = (n_dofs*numberOfSimulationToPerform*(interpolationNumberOfPoints+1)*numsteps)/saveSteps_;
@@ -349,14 +383,6 @@
 
 
   /* std::vector<reel> __GpuDriver::_getGradient(){
-    // Assemble the excitation parallelized system  
-    optimizeIntraStrmParallelisme();
-    displaySimuInfos();
-    
-    // Allocate the memory on the GPU
-    allocateDeviceStatesVector();
-    allocateDeviceSystems();
-
     numSetpoints  = std::sqrt(totalNumsteps);
     chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
     lastChunkSize = chunkSize - (numSetpoints*chunkSize)%totalNumsteps;
@@ -472,18 +498,13 @@
     CHECK_CUSPARSE( cusparseCreateDnVec(&d_m4_desc, n_dofs, d_m4, CUDA_R_32F) )
   }
 
-
-
   void __GpuDriver::allocateDeviceSystems(){
-    // Allocate the matrices and vectors on the GPU
-    B->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
-    K->AllocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
-    Gamma->AllocateOnGPU();
-    Lambda->AllocateOnGPU();
-    ForcePattern->AllocateOnGPU();
+    B->allocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
+    K->allocateOnGPU(h_cuSPARSE, d_mi_desc, d_Q_desc);
+    Gamma->allocateOnGPU();
+    Lambda->allocateOnGPU();
+    ForcePattern->allocateOnGPU();
   }
-
-
 
   void __GpuDriver::resetStatesVectors(){
     // Reset Q1 and Q2 to initials conditions
@@ -497,8 +518,6 @@
     CHECK_CUDA( cudaMemset(d_m3, 0, n_dofs*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_m4, 0, n_dofs*sizeof(reel)) )
   }
-
-
 
   void __GpuDriver::forwardRungeKutta(uint tStart_, 
                                       uint tEnd_,
@@ -720,62 +739,7 @@
 
 
 
-  void __GpuDriver::displaySimuInfos(){
-    std::cout << "dCompute: " << dCompute << std::endl;
-    std::cout << "dSystem: " << dSystem << std::endl;
-    std::cout << "dSolver: " << dSolver << std::endl;
-    
-
-    if(dCompute){
-      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
-      std::cout << "  This system is composed of " << intraStrmParallelism << " parallelized simulations of " << n_dofs/intraStrmParallelism << " DOF each." << std::endl;
-      std::cout << "  The total number of excitation files is " << numberOfExcitations;
-      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
-      if(numsteps < lengthOfeachExcitation){
-        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
-      }
-    }
-    
-    if(dSystem){
-      std::cout << "Here is the assembled system" << std::endl;
-      std::cout << "B:" << std::endl << *B << std::endl;
-      std::cout << "K:" << std::endl << *K << std::endl;
-      std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
-      std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
-      std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
-      std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
-
-      std::cout << "InterpolationMatrix:" << std::endl;
-      if(!interpolationMatrix.empty()){
-        for(uint i=0; i<interpolationNumberOfPoints; ++i){
-          for(uint j=0; j<interpolationWindowSize; ++j){
-            std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
-          }
-          std::cout << std::endl;
-        }
-      }
-      else{
-        std::cout << "  No interpolation matrix has been provided" << std::endl;
-      }
-      std::cout << std::endl;
-
-      std::cout << "Modulation buffer:" <<  std::endl;
-      if(!modulationBuffer.empty()){
-        printVector(modulationBuffer);
-      }
-      else{
-        std::cout << "  No modulation buffer has been provided" << std::endl << std::endl;
-      }
-    }
-
-    if(dSolver){
-      std::cout << "Solver info:" << std::endl;
-      std::cout << "  Number of steps to perform: " << numsteps << std::endl;
-      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
-      std::cout << "  Duration length: " << duration << "s" << std::endl;
-      std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
-    }
-  }
+  
 
 
 
@@ -936,11 +900,11 @@
     }
 
     // Extend each system by the number of intra-stream parallelization wanted
-    std::array<uint, 6> dofChecking = {B->ExtendTheSystem(intraStrmParallelism-1), 
-                                       K->ExtendTheSystem(intraStrmParallelism-1), 
-                                       Gamma->ExtendTheSystem(intraStrmParallelism-1), 
-                                       Lambda->ExtendTheSystem(intraStrmParallelism-1), 
-                                       ForcePattern->ExtendTheSystem(intraStrmParallelism-1),
+    std::array<uint, 6> dofChecking = {B->extendTheSystem(intraStrmParallelism-1), 
+                                       K->extendTheSystem(intraStrmParallelism-1), 
+                                       Gamma->extendTheSystem(intraStrmParallelism-1), 
+                                       Lambda->extendTheSystem(intraStrmParallelism-1), 
+                                       ForcePattern->extendTheSystem(intraStrmParallelism-1),
                                        extendTheVector(QinitCond, intraStrmParallelism-1)};
 
     // Checking that each system is of the same size

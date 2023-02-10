@@ -95,13 +95,16 @@ class PASIf(__GpuDriver):
         
         self.systemSet = True
 
-        # Load the system in the GPU
+        # Load the system on the CPP side
         self._setB(self.vecSystemB)
         self._setK(self.vecSystemK)
         self._setGamma(self.vecSystemGamma)
         self._setLambda(self.vecSystemLambda)
         self._setForcePattern(self.vecSystemForcePattern)
         self._setInitialConditions(self.vecSystemInitialConditions)
+        
+        # Load the system on the GPU
+        self._allocateOnDevice()
         
     def setJacobian(self,
                     vecM                : list[ list[list] ],
@@ -134,7 +137,7 @@ class PASIf(__GpuDriver):
         # Assemble the system and the jacobian in a single representation
         self.__assembleSystemAndJacobian()
         
-        # Load the system in the GPU
+        # Load the system in the CPP side
         self._setB(self.vecJacobB)
         self._setK(self.vecJacobK)
         self._setGamma(self.vecJacobGamma)
@@ -142,6 +145,9 @@ class PASIf(__GpuDriver):
         """ self._setPsi(self.vecJacobPsi) """
         self._setForcePattern(self.vecJacobForcePattern)
         self._setInitialConditions(self.vecJacobInitialConditions)
+        
+        # Load the system on the GPU
+        self._allocateOnDevice()
  
     def setInterpolationMatrix(self, 
                                interpolationMatrix_: list[ list ]):
@@ -173,6 +179,8 @@ class PASIf(__GpuDriver):
     def getAmplitudes(self):
         if self.systemSet == False:
             raise ValueError("The system must be set before computing the amplitudes.")
+        else:
+            self._displaySimuInfos()
         
         return self._getAmplitudes()
 
@@ -180,14 +188,18 @@ class PASIf(__GpuDriver):
                       saveSteps: int = 1):
         if self.systemSet == False:
             raise ValueError("The system must be set before computing the trajectory.")
+        else:
+            self._displaySimuInfos()
         
         self.saveSteps = saveSteps
         trajectory = self._getTrajectory(saveSteps)
     
+        # re-arrange the computed trajectory in a plotable way.
         numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/self.saveSteps)
         unwrappedTrajectory = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalSystemSize + 1)])
     
         for t in range(numOfSavedSteps):
+            # first row always contain time
             unwrappedTrajectory[0][t] = t*self.saveSteps/(self.sampleRate*(self.interpolSize+1))
             for i in range(self.globalSystemSize):
                 unwrappedTrajectory[i+1][t] = trajectory[t*self.globalSystemSize + i]
@@ -197,6 +209,8 @@ class PASIf(__GpuDriver):
     """ def getGradient(self):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
+        else:
+            self._displaySimuInfos()
         
         return self._getGradient() """
 

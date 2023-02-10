@@ -28,23 +28,21 @@ class __GpuDriver{
 
   int  _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
                            uint sampleRate_);
-
   void _setB(std::vector< matrix > & B_); 
   void _setK(std::vector< matrix > & K_);
   void _setGamma(std::vector< tensor3d > & Gamma_);
   void _setLambda(std::vector< tensor4d > & Lambda_);
   void _setForcePattern(std::vector< std::vector<reel> > & ForcePattern_);
   void _setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_);
-                   
   void _setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,
                                uint interpolationWindowSize_);
-
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
-                  
+
+  void _allocateOnDevice();
+  void _displaySimuInfos();
+
   std::vector<reel> _getAmplitudes();
-
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-
   /* std::vector<reel> _getGradient(); */
 
  private:
@@ -82,9 +80,6 @@ class __GpuDriver{
   // GPU work distribution functions
   void optimizeIntraStrmParallelisme();
 
-  // Display functions
-  void displaySimuInfos();
-
   // Memory cleaning functions
   void clearDeviceStatesVector();
   void clearB();
@@ -95,7 +90,6 @@ class __GpuDriver{
   void clearInitialConditions();
   void clearInterpolationMatrix();
   void clearModulationBuffer();
-
 
 
 

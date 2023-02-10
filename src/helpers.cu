@@ -91,7 +91,7 @@
    * 
    * @param n 
    */
-    uint COOMatrix::ExtendTheSystem(uint nTimes){
+    uint COOMatrix::extendTheSystem(uint nTimes){
       if(nTimes == 0){
         return n;
       }
@@ -112,13 +112,12 @@
 
 
   /**
-   * @brief Construct a new COOMatrix::AllocateOnGPU object
+   * @brief Construct a new COOMatrix::allocateOnGPU object
    * 
    */
-    void COOMatrix::AllocateOnGPU(cusparseHandle_t & handle, 
+    void COOMatrix::allocateOnGPU(cusparseHandle_t & handle, 
                                   cusparseDnVecDescr_t & vecX, 
                                   cusparseDnVecDescr_t & vecY){
-
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
@@ -248,7 +247,7 @@
    * 
    * @param nTimes 
    */
-    uint COOTensor3D::ExtendTheSystem(uint nTimes){
+    uint COOTensor3D::extendTheSystem(uint nTimes){
       if(nTimes == 0){
         return n;
       }
@@ -268,10 +267,10 @@
     }
 
   /**
-   * @brief Construct a new COOTensor3D::AllocateOnGPU object
+   * @brief Construct a new COOTensor3D::allocateOnGPU object
    * 
    */
-    void COOTensor3D::AllocateOnGPU(){
+    void COOTensor3D::allocateOnGPU(){
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
@@ -404,7 +403,7 @@
    * 
    * @param nTimes 
    */
-    uint COOTensor4D::ExtendTheSystem(uint nTimes){
+    uint COOTensor4D::extendTheSystem(uint nTimes){
       if(nTimes == 0){
         return n;
       }
@@ -427,10 +426,10 @@
 
 
   /**
-   * @brief Construct a new COOTensor3D::AllocateOnGPU object
+   * @brief Construct a new COOTensor3D::allocateOnGPU object
    * 
    */
-    void COOTensor4D::AllocateOnGPU(){
+    void COOTensor4D::allocateOnGPU(){
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
@@ -541,7 +540,7 @@
       }
     }
 
-  uint COOVector::ExtendTheSystem(uint nTimes){
+  uint COOVector::extendTheSystem(uint nTimes){
     if(nTimes == 0){
       return n;
     }
@@ -560,7 +559,7 @@
 
 
 
-  void COOVector::AllocateOnGPU(){
+  void COOVector::allocateOnGPU(){
     // Allocate memory on the device
     CHECK_CUDA( cudaMalloc((void**)&d_indice, nzz*sizeof(uint)) );
     CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );

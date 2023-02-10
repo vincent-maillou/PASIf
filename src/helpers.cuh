@@ -75,11 +75,12 @@
     COOMatrix(std::vector< matrix > & denseMatrix);
     ~COOMatrix();
 
-    uint ExtendTheSystem(uint nTimes);
-    void AllocateOnGPU(cusparseHandle_t & handle, 
-                       cusparseDnVecDescr_t & vecX, 
-                       cusparseDnVecDescr_t & vecY);
+    uint   extendTheSystem(uint nTimes);
+    void   allocateOnGPU(cusparseHandle_t     & handle, 
+                         cusparseDnVecDescr_t & vecX, 
+                         cusparseDnVecDescr_t & vecY);
     size_t memFootprint();
+
     
     std::ostream& print(std::ostream& out) const;
 
@@ -119,8 +120,8 @@
     COOTensor3D(std::vector< tensor3d > & denseTensor);
     ~COOTensor3D();
 
-    uint ExtendTheSystem(uint nTimes);
-    void AllocateOnGPU();
+    uint   extendTheSystem(uint nTimes);
+    void   allocateOnGPU();
     size_t memFootprint();
 
     std::ostream& print(std::ostream& out) const;
@@ -154,8 +155,8 @@
     COOTensor4D(std::vector< tensor4d > & denseTensor);
     ~COOTensor4D();
 
-    uint ExtendTheSystem(uint nTimes);
-    void AllocateOnGPU();
+    uint   extendTheSystem(uint nTimes);
+    void   allocateOnGPU();
     size_t memFootprint();
 
     std::ostream& print(std::ostream& out) const;
@@ -191,8 +192,8 @@
     COOVector(std::vector< std::vector<reel> > & denseVector);
     ~COOVector();
 
-    uint ExtendTheSystem(uint nTimes);
-    void AllocateOnGPU();
+    uint   extendTheSystem(uint nTimes);
+    void   allocateOnGPU();
     size_t memFootprint();
 
     std::ostream& print(std::ostream& out) const;

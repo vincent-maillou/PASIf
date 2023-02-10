@@ -48,16 +48,16 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("ForcePattern_"))
     .def("_setInitialConditions", &__GpuDriver::_setInitialConditions,
       py::arg("InitialConditions_"))
-
     .def("_setInterpolationMatrix", &__GpuDriver::_setInterpolationMatrix,
       py::arg("interpolationMatrix_"),
       py::arg("interpolationWindowSize_"))
-
     .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
       py::arg("modulationBuffer_"))
 
-    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
+    .def("_allocateOnDevice", &__GpuDriver::_allocateOnDevice)
+    .def("_displaySimuInfos", &__GpuDriver::_displaySimuInfos)
 
+    .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
       py::arg("saveSteps_") = 1)
       
