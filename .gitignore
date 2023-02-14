@@ -1,4 +1,5 @@
 # Regarding the dataset, used for debug now
+*.png
 makeVideo.py
 *.avi
 fig/*

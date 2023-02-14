@@ -2,12 +2,6 @@
 and the C++/CUDA side. Mainly pre-processing is done here 
 as well as wrapping somes functions in a more Pythonic way. """
 
-
-
-# Import modules
-import numpy as np
-import copy as cp
-
 # Ensure that the code has been compiled withe the
 # latest version of the CUDA module. Lunch make.
 import os
@@ -19,6 +13,21 @@ sys.path.append('./build')
 
 from PASIfgpu import __GpuDriver
 
+# Standard libraries
+import numpy as np
+import copy as cp
+from dataclasses import dataclass
+
+
+
+@dataclass
+class cooTensor:
+    # Describe any dimension tensor in COO format
+    dimensions: int
+    val       : list[float]
+    # Indices are stored sequentially in the following order:
+    # pt1_dim1, pt1_dim2, ..., pt1_dimN, pt2_dim1, pt2_dim2, ..., pt2_dimN, ...
+    indices   : list[int]
 
 
 class PASIf(__GpuDriver):

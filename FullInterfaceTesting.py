@@ -18,9 +18,11 @@ excitationSet.append(excitation)
 
 sampleRate = 16000
 
+displayCompute = True
+displaySystem  = True
+displaySolver  = True
 
-# pasif = PASIf(excitationSet, sampleRate, 0, True, True, False)
-pasif = PASIf(excitationSet, sampleRate, 0)
+pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displaySolver)
 
 # pasif.setExcitations(excitationSet, sampleRate)
 
@@ -170,7 +172,7 @@ start = time.time()
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
 end = time.time()
 
-print("setSystemsper() overall time: ", end - start)
+print("setSystems() overall time: ", end - start)
 
 
 # Interpolation matrix
@@ -194,23 +196,23 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 # Start python timer
 
-""" start   = time.time()
+start   = time.time()
 results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-print("Amplitudes: ", results) """
+print("Amplitudes: ", results)
 
 
 
 
-start      = time.time()
+""" start      = time.time()
 trajectory = pasif.getTrajectory(saveSteps = 1)
 end        = time.time()
 
 print("getTrajectories() overall time: ", end - start)
-""" plt.plot(trajectory[0], trajectory[1])
-plt.show() """
+plt.plot(trajectory[0], trajectory[1])
+plt.show()
 
 
 
@@ -232,7 +234,7 @@ end        = time.time()
 print("getGradient() overall time: ", end - start)
 
 plt.plot(gradient[0], gradient[1], 'x')
-plt.show()
+plt.show() """
 
 
 
