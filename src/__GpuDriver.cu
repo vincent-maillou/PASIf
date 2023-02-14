@@ -30,6 +30,8 @@
                              bool dSolver_) : 
         // Simulation
         n_dofs(0),
+        adjointBreakpoint(0),
+
         numsteps(numsteps_),
         totalNumsteps(numsteps),
 
@@ -118,6 +120,7 @@
       clearInterpolationMatrix();
       clearModulationBuffer();
       clearDeviceStatesVector();
+      clearTrajectories();
 
       if(streams != nullptr){
         for(uint i = 0; i < nStreams; i++){
@@ -376,40 +379,97 @@
 
     // Copy the results of the performed simulation from the GPU to the CPU
     CHECK_CUDA( cudaMemcpy(h_trajectories.data(), d_trajectories, h_trajectories.size()*sizeof(reel), cudaMemcpyDeviceToHost) )
+    
+    clearTrajectories();
 
     return h_trajectories;
   }
 
 
 
-  /* std::vector<reel> __GpuDriver::_getGradient(){
+  std::vector<reel> __GpuDriver::_getGradient(uint globalAdjointSize_, uint save){
+
     numSetpoints  = std::sqrt(totalNumsteps);
     chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
     lastChunkSize = chunkSize - (numSetpoints*chunkSize)%totalNumsteps;
 
 
     // 1. Compute the setPoints (chunks first step)
-    size_t reservedTrajSize = (numSetpoints+chunkSize)*n_dofs;
+    h_trajectories.clear();
+
+    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs;
+    h_trajectories.resize(reservedTrajSize);
+
     CHECK_CUDA( cudaMalloc((void**)&d_trajectories, reservedTrajSize*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_trajectories, 0, reservedTrajSize*sizeof(reel)) )
 
+    // Compute the setpoints
     forwardRungeKutta(0, numsteps, 0, chunkSize);
 
-    std::cout << "numsteps: " << numsteps << std::endl;
+    /* std::cout << "numsteps: " << numsteps << std::endl;
     std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
     std::cout << "numSetpoints: " << numSetpoints << std::endl;
     std::cout << "chunkSize: " << chunkSize << std::endl;
     std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
-    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl;
+    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl << std::endl; */
 
+    size_t startStep = 0;
+    size_t endStep   = 0;
+    for(size_t setpoint(numSetpoints); setpoint>0; --setpoint){
+      startStep = (setpoint-1)*chunkSize;
+      if(setpoint == numSetpoints){
+        endStep = totalNumsteps;
+      }
+      else{
+        endStep = startStep+chunkSize;
+      }
+
+      if(setpoint == save){
+        break;
+      }
+
+      // Copy the stored setpoint to the state vector
+      CHECK_CUBLAS( cublasScopy(h_cublas,
+                                n_dofs, 
+                                d_trajectories + (setpoint-1)*n_dofs, 
+                                1, 
+                                d_Q, 
+                                1) )
+
+      // Compute the chunk
+      forwardRungeKutta(startStep, endStep, 0, 1, setpoint-1);
+
+      /* std::cout << "setpoint: " << setpoint << " / ";
+      std::cout << "startStep: " << startStep << " / ";
+      std::cout << "endStep: " << endStep << std::endl; */
+    }
+
+
+
+
+    /* CHECK_CUBLAS( cublasScopy(h_cublas,
+                              n_dofs, 
+                              d_trajectories + ((numSetpoints-currentSetpoint)*chunkSize)*n_dofs, 
+                              1, 
+                              d_Q, 
+                              1) )
+    forwardRungeKutta(startSteps, endSteps, 0, 1); */
 
     // 2. Compute the entire trajectory of the current chunk
+    /* for(size_t setPoints(numSetpoints); setPoints>0; --setPoints){
+      forwardRungeKutta(0, numsteps, 0, 1);
+    } */
     
       // 3. Compute the gradient of the current chunk
 
       // Repeat 2. and 3. running backward for all the chunks
 
-  } */
+    CHECK_CUDA( cudaMemcpy(h_trajectories.data(), d_trajectories, h_trajectories.size()*sizeof(reel), cudaMemcpyDeviceToHost) )
+
+    clearTrajectories();
+
+    return h_trajectories;
+  }
   
 
 
@@ -522,7 +582,8 @@
   void __GpuDriver::forwardRungeKutta(uint tStart_, 
                                       uint tEnd_,
                                       uint k,
-                                      uint saveSteps){
+                                      uint saveSteps,
+                                      uint saveOffset){
                           
     uint   m(0); // Modulation index
     size_t trajSaveIndex(0);
@@ -539,7 +600,7 @@
                                     n_dofs, 
                                     d_Q, 
                                     1, 
-                                    d_trajectories + trajSaveIndex*n_dofs, 
+                                    d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
                                     1) )
           // std::cout << "trajSaveIndex = " << trajSaveIndex << std::endl;                          
           ++trajSaveIndex;
@@ -775,12 +836,14 @@
       CHECK_CUDA( cudaFree(d_m4) )
       d_m4 = nullptr;
     }
+   }
 
+  void __GpuDriver::clearTrajectories(){
     if(d_trajectories != nullptr){
       CHECK_CUDA( cudaFree(d_trajectories) )
       d_trajectories = nullptr;
     }
-   }
+  }
 
   void __GpuDriver::clearB(){
     if(B != nullptr){

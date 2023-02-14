@@ -60,6 +60,7 @@ PYBIND11_MODULE(PASIfgpu, m) {
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
       py::arg("saveSteps_") = 1)
-      
-    /* .def("_getGradient", &__GpuDriver::_getGradient) */;
+    .def("_getGradient", &__GpuDriver::_getGradient,
+      py::arg("globalAdjointSize_"),
+      py::arg("save"));
 }

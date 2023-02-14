@@ -6,6 +6,7 @@ as well as wrapping somes functions in a more Pythonic way. """
 
 # Import modules
 import numpy as np
+import copy as cp
 
 # Ensure that the code has been compiled withe the
 # latest version of the CUDA module. Lunch make.
@@ -80,19 +81,32 @@ class PASIf(__GpuDriver):
                    vecForcePattern     : list[ list ],
                    vecInitialConditions: list[ list ]):
         # Check if the system is valid
-        self.__checkSystemInput(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialConditions)
-
-        # Pre-process the system
-        self.__systemPreprocessing(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern)
-
-        # Store localy the setted system to later define the jacobian
-        self.vecSystemB                   = vecB
-        self.vecSystemK                   = vecK
-        self.vecSystemGamma               = vecGamma
-        self.vecSystemLambda              = vecLambda
-        self.vecSystemForcePattern        = vecForcePattern
-        self.vecSystemInitialConditions   = vecInitialConditions
+        self.globalSystemSize = 0
+        self.__checkSystemInput(vecM, 
+                                vecB, 
+                                vecK, 
+                                vecGamma, 
+                                vecLambda, 
+                                vecForcePattern, 
+                                vecInitialConditions)
         
+        # Store localy the setted system to later define the jacobian
+        self.vecSystemM                   = cp.deepcopy(vecM)
+        self.vecSystemB                   = cp.deepcopy(vecB)
+        self.vecSystemK                   = cp.deepcopy(vecK)
+        self.vecSystemGamma               = cp.deepcopy(vecGamma)
+        self.vecSystemLambda              = cp.deepcopy(vecLambda)
+        self.vecSystemForcePattern        = cp.deepcopy(vecForcePattern)
+        self.vecSystemInitialConditions   = cp.deepcopy(vecInitialConditions)
+        
+        # Pre-process the system
+        self.__systemPreprocessing(self.vecSystemM, 
+                                   self.vecSystemB, 
+                                   self.vecSystemK, 
+                                   self.vecSystemGamma, 
+                                   self.vecSystemLambda, 
+                                   self.vecSystemForcePattern)
+
         self.systemSet = True
 
         # Load the system on the CPP side
@@ -112,37 +126,52 @@ class PASIf(__GpuDriver):
                     vecK                : list[ list[list] ],
                     vecGamma            : list[ list[list[list]] ],
                     vecLambda           : list[ list[list[list[list]]] ],
-                    vecPsi              : list[ list[list[list[list[list]]]] ],
                     vecForcePattern     : list[ list ],
-                    vecInitialConditions: list[ list ]): 
+                    vecInitialConditions: list[ list ],
+                    vecPsi              : list[ list[list[list[list[list]]]] ]): 
         if self.systemSet == False:
             raise ValueError("The system must be set before the jacobian")
           
         # Check if the system is valid
-        self.__checkSystemInput(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialConditions, vecPsi)
+        self.globalAdjointSize = 0  
+        self.__checkSystemInput(vecM, 
+                                vecB, 
+                                vecK, 
+                                vecGamma, 
+                                vecLambda, 
+                                vecForcePattern, 
+                                vecInitialConditions, 
+                                vecPsi)
+
+        self.vecJacobM                  = cp.deepcopy(vecM)
+        self.vecJacobB                  = cp.deepcopy(vecB)
+        self.vecJacobK                  = cp.deepcopy(vecK)
+        self.vecJacobGamma              = cp.deepcopy(vecGamma)
+        self.vecJacobLambda             = cp.deepcopy(vecLambda)
+        self.vecJacobPsi                = cp.deepcopy(vecPsi)
+        self.vecJacobForcePattern       = cp.deepcopy(vecForcePattern)
+        self.vecJacobInitialConditions  = cp.deepcopy(vecInitialConditions)
 
         # Pre-process the system
-        self.__systemPreprocessing(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecPsi)
-        
-        self.vecJacobB                  = vecB
-        self.vecJacobK                  = vecK
-        self.vecJacobGamma              = vecGamma
-        self.vecJacobLambda             = vecLambda
-        self.vecJacobPsi                = vecPsi
-        self.vecJacobForcePattern       = vecForcePattern
-        self.vecJacobInitialConditions  = vecInitialConditions
+        self.__systemPreprocessing(self.vecJacobM, 
+                                   self.vecJacobB, 
+                                   self.vecJacobK, 
+                                   self.vecJacobGamma, 
+                                   self.vecJacobLambda, 
+                                   self.vecJacobForcePattern, 
+                                   self.vecJacobPsi)
         
         self.jacobianSet = True
         
         # Assemble the system and the jacobian in a single representation
-        self.__assembleSystemAndJacobian()
+        #self.__assembleSystemAndJacobian()
         
         # Load the system in the CPP side
         self._setB(self.vecJacobB)
         self._setK(self.vecJacobK)
         self._setGamma(self.vecJacobGamma)
         self._setLambda(self.vecJacobLambda)
-        """ self._setPsi(self.vecJacobPsi) """
+        #self._setPsi(self.vecJacobPsi)
         self._setForcePattern(self.vecJacobForcePattern)
         self._setInitialConditions(self.vecJacobInitialConditions)
         
@@ -206,16 +235,36 @@ class PASIf(__GpuDriver):
     
         return unwrappedTrajectory
     
-    """ def getGradient(self):
+    def getGradient(self, save = 0):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
         else:
             self._displaySimuInfos()
         
-        return self._getGradient() """
-
-
+        gradient = self._getGradient(self.globalAdjointSize, save)
+        
+        
+        
+        chunkSize = 280
+        numSetpoints = 279
+        
+        # re-arrange the computed trajectory in a plotable way.
+        #numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/chunkSize)
+        numOfSavedSteps = numSetpoints + chunkSize - 2 
+        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalAdjointSize + 1)])
     
+        for t in range(numOfSavedSteps):
+            # first row always contain time
+            unwrappedGradient[0][t] = t*numSetpoints/(self.sampleRate*(self.interpolSize+1))
+            for i in range(self.globalAdjointSize):
+                unwrappedGradient[i+1][t] = gradient[t*self.globalAdjointSize + i]
+    
+        return unwrappedGradient
+        
+        return gradient
+
+
+
     ############################################################# 
     #                      Private methods
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -229,24 +278,24 @@ class PASIf(__GpuDriver):
                            vecInitialConditions: list[ list ],
                            vecPsi              : list[ list[list[list[list[list]]]] ] = None):
         # Check the number of system in all of the inputs vectors
-        if vecPsi == None:
+        if type(vecPsi) != np.ndarray:
             # Case of System setting
             if len(vecM) != len(vecB) or len(vecM) != len(vecK) or len(vecM) != len(vecGamma) or len(vecM) != len(vecLambda) or len(vecM) != len(vecForcePattern) or len(vecM) != len(vecInitialConditions):
                 raise ValueError("The number of Systems in the input vectors must be the same.")
         else:
             # Case of Jacobian setting, also check the size of the Jacobian against the size of the System
-            if len(self.vecSystemM) != len(vecM) or len(self.vecSystemM) != len(vecB) or len(self.vecSystemM) != len(vecK) or len(self.vecSystemM) != len(vecGamma) or len(self.vecSystemM) != len(vecLambda) or len(self.vecSystemM) != len(vecForcePattern) or len(self.vecSystemM) != len(vecInitialConditions):
+            if len(self.vecSystemM) != len(vecM) or len(self.vecSystemM) != len(vecB) or len(self.vecSystemM) != len(vecK) or len(self.vecSystemM) != len(vecGamma) or len(self.vecSystemM) != len(vecLambda) or len(self.vecSystemM) != len(vecForcePattern) or len(self.vecSystemM) != len(vecInitialConditions) or len(self.vecSystemM) != len(vecPsi):
                 raise ValueError("The number of Jacobian in the input vectors must be the same and match the number of setted Systems.")
 
         # Check that the matrix of each system are of the same size
-        if vecPsi == None:
+        if type(vecPsi) != np.ndarray:
             for i in range(len(vecM)):
                 if len(vecM[i]) != len(vecB[i]) or len(vecM[i]) != len(vecK[i]) or len(vecM[i]) != len(vecGamma[i]) or len(vecM[i]) != len(vecLambda[i]) or len(vecM[i]) != len(vecForcePattern[i]) or len(vecM[i]) != len(vecInitialConditions[i]):
                     raise ValueError("The dimension of each System must be the same.")
                 self.globalSystemSize += len(vecM[i])
         else:
             for i in range(len(vecM)):
-                if len(vecM[i]) != len(vecB[i]) or len(vecM[i]) != len(vecK[i]) or len(vecM[i]) != len(vecGamma[i]) or len(vecM[i]) != len(vecLambda[i]) or len(vecM[i]) != len(vecForcePattern[i]) or len(vecM[i]) != len(vecInitialConditions[i] or len(vecM[i]) != len(vecPsi[i])):
+                if len(vecM[i]) != len(vecB[i]) or len(vecM[i]) != len(vecK[i]) or len(vecM[i]) != len(vecGamma[i]) or len(vecM[i]) != len(vecLambda[i]) or len(vecM[i]) != len(vecForcePattern[i]) or len(vecM[i]) != len(vecInitialConditions[i]) or len(vecM[i]) != len(vecPsi[i]):
                     raise ValueError("The dimension of each Jacobian must be the same.")
                 self.globalAdjointSize += len(vecM[i])   
     
@@ -261,15 +310,15 @@ class PASIf(__GpuDriver):
         # Invert the M matrix and then pre-multiply the others
         for i in range(len(vecM)):
             vecM[i] = np.linalg.inv(vecM[i])
-            vecM[i] = vecM[i]
             vecB[i] = -1 * np.matmul(vecM[i], vecB[i])
             vecK[i] = -1 * np.matmul(vecM[i], vecK[i])
-            vecGamma[i] = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
+            vecGamma[i]  = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
             vecLambda[i] = -1 * np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
             vecForcePattern[i] = np.diag(vecM[i]) * vecForcePattern[i]
             
-            if vecPsi != None:
+            if type(vecPsi) == np.ndarray:
                 vecPsi[i] = -1 * np.einsum('ij, jklmn -> iklmn', vecM[i], vecPsi[i])
+
                 
     def __assembleSystemAndJacobian(self):
         for i in range(len(self.vecJacobM)):

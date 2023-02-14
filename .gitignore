@@ -1,4 +1,7 @@
 # Regarding the dataset, used for debug now
+makeVideo.py
+*.avi
+fig/*
 temp/*
 data/*
 *nsys-rep

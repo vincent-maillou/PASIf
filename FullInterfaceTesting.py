@@ -1,6 +1,9 @@
 from PASIf import *
 
 import numpy as np
+import time
+import matplotlib.pyplot as plt
+
 
 
 # Generate the excitation set
@@ -16,12 +19,13 @@ excitationSet.append(excitation)
 sampleRate = 16000
 
 
-pasif = PASIf(excitationSet, sampleRate, 0, True, True, False)
+# pasif = PASIf(excitationSet, sampleRate, 0, True, True, False)
+pasif = PASIf(excitationSet, sampleRate, 0)
 
 # pasif.setExcitations(excitationSet, sampleRate)
 
 
-M = [[1.0, 0.0, 0.0],
+M = [[1, 0.0, 0.0],
       [0.0, 10, 0.0],
       [0.0, 0.0, 1.0]]
 
@@ -80,9 +84,7 @@ vecInitialCondition = np.array(n*[InitialCondition])
 
 
 
-# Start python timer
-import time
-start = time.time()
+
 
 ### THIS PART WILL BE IN THE CUDA ENV AS PREPROCESSING ###
 
@@ -164,9 +166,11 @@ extendedVecLambda = np.array(extendedVecLambda)
 extendedForcePattern = np.array(extendedForcePattern)
 extendedInitialCondition = np.array(extendedInitialCondition)
 
-
+start = time.time()
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
+end = time.time()
 
+print("setSystemsper() overall time: ", end - start)
 
 
 # Interpolation matrix
@@ -188,27 +192,68 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 #pasif.setModulationBuffer(modulationBuffer)
 
+# Start python timer
 
+""" start   = time.time()
 results = pasif.getAmplitudes()
+end     = time.time()
 
-end = time.time()
 print("setMatrix() + getAmplitude() overall time: ", end - start)
+print("Amplitudes: ", results) """
 
 
 
-print("Amplitudes: ", results)
 
-start = time.time()
+start      = time.time()
 trajectory = pasif.getTrajectory(saveSteps = 1)
-end = time.time()
+end        = time.time()
+
 print("getTrajectories() overall time: ", end - start)
+""" plt.plot(trajectory[0], trajectory[1])
+plt.show() """
 
 
-# Plot the trajectory
-import matplotlib.pyplot as plt
-      
-plt.plot(trajectory[0], trajectory[1])
+
+
+# Initialize the Psi 5 dimmensional tensor and fill it with 0
+Psi = np.zeros((sysDim2, sysDim2, sysDim2, sysDim2, sysDim2))
+extendedVecPsi = np.array(n*[Psi])
+
+start      = time.time()
+pasif.setJacobian(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition, extendedVecPsi)
+end        = time.time()
+
+print("setJacobian() overall time: ", end - start)
+
+start      = time.time()
+gradient = pasif.getGradient()
+end        = time.time()
+
+print("getGradient() overall time: ", end - start)
+
+plt.plot(gradient[0], gradient[1], 'x')
 plt.show()
 
 
-# gradient = pasif.getGradient()
+
+""" for save in range(279):
+      gradient = pasif.getGradient(279-save)
+      pasif.setJacobian(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition, extendedVecPsi)
+      
+
+      fig, axs = plt.subplots(2, constrained_layout=True)
+      fig.suptitle('Chunk computation process', fontsize=16)
+      axs[0].set_title('Complete Trajectory')
+      axs[0].plot(trajectory[0], trajectory[1])
+      axs[0].set_xlabel('time (s)')
+      axs[0].set_ylabel('amplitude')
+
+      axs[1].set_title('Reverse forward chunk computation')
+      axs[1].plot(gradient[1])
+      axs[1].set_xlabel(f"current setpoint: {save}")
+      axs[1].set_ylabel('amplitude')
+
+      i = 0
+      fig.savefig(f"fig/plt_{save}.png") """
+
+

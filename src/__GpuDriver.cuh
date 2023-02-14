@@ -43,7 +43,7 @@ class __GpuDriver{
 
   std::vector<reel> _getAmplitudes();
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-  /* std::vector<reel> _getGradient(); */
+  std::vector<reel> _getGradient(uint globalAdjointSize_, uint save);
 
  private:
   // Initialization functions
@@ -57,7 +57,8 @@ class __GpuDriver{
   void forwardRungeKutta(uint tStart_, 
                          uint tEnd_,
                          uint k,
-                         uint saveSteps = 1);
+                         uint saveSteps  = 1,
+                         uint saveOffset = 0);
 
   void rkStep(uint k, 
               uint t,
@@ -82,6 +83,7 @@ class __GpuDriver{
 
   // Memory cleaning functions
   void clearDeviceStatesVector();
+  void clearTrajectories();
   void clearB();
   void clearK();
   void clearGamma();
@@ -100,6 +102,8 @@ class __GpuDriver{
   uint lengthOfeachExcitation;
 
   uint n_dofs;
+  uint adjointBreakpoint; // Divider point between the forward system and the adjoint system
+
   uint numsteps; 
   uint totalNumsteps; // Take into acount the interpolated steps
 
