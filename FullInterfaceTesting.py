@@ -168,6 +168,30 @@ extendedVecLambda = np.array(extendedVecLambda)
 extendedForcePattern = np.array(extendedForcePattern)
 extendedInitialCondition = np.array(extendedInitialCondition)
 
+
+
+
+""" cooM = cooTensor(dimensions_ = [6, 6])
+cooM.val     = [1, 1, 1, 1, 10, 1]
+cooM.indices = [0,0 , 1,1 , 2,2 , 3,3 , 4,4 , 5,5]
+
+cooB = cooTensor(dimensions_ = [6, 6])
+cooB.val     = [-1, -1, -1, 1, 10]
+cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
+
+cooK = cooTensor(dimensions_ = [6, 6])
+cooK.val     = [6, 10]
+cooK.indices = [3,0 , 4,1]
+
+cooGamma = cooTensor(dimensions_ = [6, 6, 6])
+cooGamma.val = [10, 10, 1]
+cooGamma     = [3,0,1 , 4,0,0 , 5,1,1]
+
+cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
+cooLambda.val     = [40000]
+cooLambda.indices = [4,1,1,1] """
+
+
 start = time.time()
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
 end = time.time()
@@ -196,12 +220,12 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 # Start python timer
 
-start   = time.time()
+""" start   = time.time()
 results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-print("Amplitudes: ", results)
+print("Amplitudes: ", results) """
 
 
 

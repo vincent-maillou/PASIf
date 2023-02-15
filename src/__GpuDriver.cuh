@@ -28,12 +28,25 @@ class __GpuDriver{
 
   int  _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
                            uint sampleRate_);
-  void _setB(std::vector< matrix > & B_); 
-  void _setK(std::vector< matrix > & K_);
-  void _setGamma(std::vector< tensor3d > & Gamma_);
-  void _setLambda(std::vector< tensor4d > & Lambda_);
-  void _setForcePattern(std::vector< std::vector<reel> > & ForcePattern_);
-  void _setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_);
+  // Load B as a 2D matrix loaded from a COO format
+  void _setB(std::vector<uint> dimensions_,
+             std::vector<reel> values_,
+             std::vector<uint> indices_); 
+  // Load K as a 2D matrix loaded from a COO format
+  void _setK(std::vector<uint> dimensions_,
+             std::vector<reel> values_,
+             std::vector<uint> indices_);
+  // Load Gamma as a 3D tensor loaded from a COO format
+  void _setGamma(std::vector<uint> dimensions_,
+                 std::vector<reel> values_,
+                 std::vector<uint> indices_);
+  // Load Lambda as a 4D tensor loaded from a COO format
+  void _setLambda(std::vector<uint> dimensions_,
+                  std::vector<reel> values_,
+                  std::vector<uint> indices_);
+  // Load ForcePattern and InitialConditions as vectors
+  void _setForcePattern(std::vector<reel> & forcePattern_);
+  void _setInitialConditions(std::vector<reel> & initialConditions_);
   void _setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,
                                uint interpolationWindowSize_);
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
@@ -43,7 +56,8 @@ class __GpuDriver{
 
   std::vector<reel> _getAmplitudes();
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-  std::vector<reel> _getGradient(uint globalAdjointSize_, uint save);
+  std::vector<reel> _getGradient(uint globalAdjointSize_,
+                                 uint save);
 
  private:
   // Initialization functions

@@ -180,48 +180,59 @@
 
 
 
-  void __GpuDriver::_setB(std::vector< matrix > & B_){
+  void __GpuDriver::_setB(std::vector<uint> dimensions_,
+                          std::vector<reel> values_,
+                          std::vector<uint> indices_){
     clearB();
 
-    B = new COOMatrix(B_);
+    B = new COOMatrix(dimensions_,
+                      values_,
+                      indices_);  
   }
 
-  void __GpuDriver::_setK(std::vector< matrix > & K_){
+  void __GpuDriver::_setK(std::vector<uint> dimensions_,
+                          std::vector<reel> values_,
+                          std::vector<uint> indices_){
     clearK();
 
-    K = new COOMatrix(K_);
+    K = new COOMatrix(dimensions_,
+                      values_,
+                      indices_);
   }
 
-  void __GpuDriver::_setGamma(std::vector< tensor3d > & Gamma_){
+  void __GpuDriver::_setGamma(std::vector<uint> dimensions_,
+                              std::vector<reel> values_,
+                              std::vector<uint> indices_){
     clearGamma();
 
-    Gamma = new COOTensor3D(Gamma_);
+    Gamma = new COOTensor3D(dimensions_,
+                            values_,
+                            indices_);
   }
 
-  void __GpuDriver::_setLambda(std::vector< tensor4d > & Lambda_){
+  void __GpuDriver::_setLambda(std::vector<uint> dimensions_,
+                               std::vector<reel> values_,
+                               std::vector<uint> indices_){
     clearLambda();
 
-    Lambda = new COOTensor4D(Lambda_);
+    Lambda = new COOTensor4D(dimensions_,
+                             values_,
+                             indices_);
   }
 
-  void __GpuDriver::_setForcePattern(std::vector< std::vector<reel> > & ForcePattern_){
+  void __GpuDriver::_setForcePattern(std::vector<reel> & forcePattern_){
     clearForcePattern();
 
-    ForcePattern = new COOVector(ForcePattern_);
+    ForcePattern = new COOVector(forcePattern_);
   }
 
-  void __GpuDriver::_setInitialConditions(std::vector< std::vector<reel> > & InitialConditions_){
+  void __GpuDriver::_setInitialConditions(std::vector<reel> & initialConditions_){
     clearInitialConditions();
 
     // Initialize the number of DOF at the original size of the system
-    n_dofs = InitialConditions_[0].size();
+    n_dofs = initialConditions_.size();
 
-    // Allocate the QinitCond vector with the set of initials conditions
-    for(size_t k(0); k<InitialConditions_.size(); k++){
-      for(size_t i(0); i<InitialConditions_[k].size(); i++){
-        QinitCond.push_back(InitialConditions_[k][i]);
-      }
-    }
+    QinitCond = initialConditions_;
   }
 
   void __GpuDriver::_setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,

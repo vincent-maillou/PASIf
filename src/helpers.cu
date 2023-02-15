@@ -23,7 +23,9 @@
   * @param denseMatrix 
   * @param scaleMatrix 
   */
-    COOMatrix::COOMatrix(std::vector< matrix > & denseMatrix) :
+    COOMatrix::COOMatrix(std::vector<uint> dimensions_,
+                         std::vector<reel> values_,
+                         std::vector<uint> indices_) :
         n(0),
         alpha(1),
         beta(1){
@@ -38,23 +40,30 @@
       d_alpha = nullptr;
       d_beta = nullptr;
 
-      // Fill the COO matrix with the values of the vector of dense matrix
-      for(size_t k(0); k<denseMatrix.size(); ++k){
-
-        for(size_t i(0); i<denseMatrix[k].size(); ++i){
-          for(size_t j(0); j<denseMatrix[k][i].size(); ++j){
-            if(std::abs(denseMatrix[k][i][j]) > reel_eps){
-              row.push_back(i+n);
-              col.push_back(j+n);
-              val.push_back(denseMatrix[k][i][j]);
-            }
-          }
-        }
-        n += denseMatrix[k].size();
-
+      // Higher dimension = Number of DOFs
+      //   - Square matrix supposed
+      n   = dimensions_[0]; 
+      nzz = values_.size();
+      for(size_t i(0); i<nzz; ++i){
+        val.push_back(values_[i]);
+        row.push_back(indices_[2*i]);
+        col.push_back(indices_[2*i+1]);
       }
-      nzz = val.size();
 
+      /* std::cout << "val" << std::endl;
+      for(size_t i(0); i<val.size(); ++i){
+        std::cout << val[i] << std::endl;
+      }
+
+      std::cout << "row" << std::endl;
+      for(size_t i(0); i<row.size(); ++i){
+        std::cout << row[i] << std::endl;
+      }
+
+      std::cout << "col" << std::endl;
+      for(size_t i(0); i<col.size(); ++i){
+        std::cout << col[i] << std::endl;
+      } */
     }
 
 
@@ -193,34 +202,23 @@
   * @param denseTensor 
   * @param scaleMatrix 
   */
-    COOTensor3D::COOTensor3D(std::vector< tensor3d > & denseTensor) : n(0){
+    COOTensor3D::COOTensor3D(std::vector<uint> dimensions_,
+                             std::vector<reel> values_,
+                             std::vector<uint> indices_) : n(0){
       // Set device pointer to nullprt
-      d_val = nullptr;
-      d_row = nullptr;
-      d_col = nullptr;
+      d_val   = nullptr;
+      d_row   = nullptr;
+      d_col   = nullptr;
       d_slice = nullptr;
 
-
-      // Fill the COO Tensor with the values of the vector of dense tensor
-      for(size_t l(0); l<denseTensor.size(); ++l){
-
-        for(size_t k(0); k<denseTensor[l].size(); ++k){
-          for(size_t i(0); i<denseTensor[l][k].size(); ++i){
-            for(size_t j(0); j<denseTensor[l][k][i].size(); ++j){
-              if(std::abs(denseTensor[l][k][i][j]) > reel_eps){
-                row.push_back(i+n);
-                col.push_back(j+n);
-                slice.push_back(k+n);
-                val.push_back(denseTensor[l][k][i][j]);
-              }
-            }
-          }
-        }
-        n += denseTensor[l].size();
-      
+      n   = dimensions_[0];
+      nzz = values_.size();
+      for(size_t i(0); i<nzz; ++i){
+        val.push_back(values_[i]);
+        row.push_back(indices_[3*i]);
+        col.push_back(indices_[3*i+1]);
+        slice.push_back(indices_[3*i+2]);
       }
-      nzz = val.size();
-
     }
 
   /**
@@ -338,41 +336,27 @@
     * @param denseTensor 
     * @param scaleMatrix 
     */
-    COOTensor4D::COOTensor4D(std::vector< tensor4d > & denseTensor) : n(0){
+    COOTensor4D::COOTensor4D(std::vector<uint> dimensions_,
+                             std::vector<reel> values_,
+                             std::vector<uint> indices_) : n(0){
       // Set device pointer to nullprt
-      d_val = nullptr;
-      d_row = nullptr;
-      d_col = nullptr;
-      d_slice = nullptr;
+      d_val        = nullptr;
+      d_row        = nullptr;
+      d_col        = nullptr;
+      d_slice      = nullptr;
       d_hyperslice = nullptr;
 
 
-      // Fill the COO Tensor with the values of the vector of the 4D dense tensor
-      for(size_t l(0); l<denseTensor.size(); ++l){
-
-        for(size_t hs(0); hs<denseTensor[l].size(); ++hs){
-          for(size_t s(0); s<denseTensor[l][hs].size(); ++s){
-            for(size_t i(0); i<denseTensor[l][hs][s].size(); ++i){
-              for(size_t j(0); j<denseTensor[l][hs][s][i].size(); ++j){
-                if(std::abs(denseTensor[l][hs][s][i][j]) > reel_eps){
-                  row.push_back(i+n);
-                  col.push_back(j+n);
-                  slice.push_back(s+n);
-                  hyperslice.push_back(hs+n);
-                  val.push_back(denseTensor[l][hs][s][i][j]);
-                }
-              }
-            }
-          }
-        }
-        n += denseTensor[l].size();
-      
+      n   = dimensions_[0];
+      nzz = values_.size();
+      for(size_t i(0); i<nzz; ++i){
+        val.push_back(values_[i]);
+        row.push_back(indices_[4*i]);
+        col.push_back(indices_[4*i+1]);
+        slice.push_back(indices_[4*i+2]);
+        hyperslice.push_back(indices_[4*i+3]);
       }
-      nzz = val.size();
-
     }
-
-
 
   /**
   * @brief Destroy the COOTensor3D::COOTensor3D object
@@ -395,8 +379,6 @@
         CHECK_CUDA( cudaFree(d_hyperslice) );
       }
     }
-
-
 
   /**
    * @brief Extend the COO Tensor by appending n times the same tensor
@@ -423,8 +405,6 @@
       return n;
     }
 
-
-
   /**
    * @brief Construct a new COOTensor3D::allocateOnGPU object
    * 
@@ -445,8 +425,6 @@
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
     }
 
-
-
     size_t COOTensor4D::memFootprint(){
       // Return the number of bytes needed to store this element on the GPU
       size_t memFootprint;
@@ -455,8 +433,6 @@
 
       return memFootprint;
     }
-
-
 
     std::ostream& COOTensor4D::print(std::ostream& out) const{
       if(nzz == 0){
@@ -507,22 +483,18 @@
     * 
     * @param denseVector 
     */  
-    COOVector::COOVector(std::vector< std::vector<reel> > & denseVector) : n(0) {
+    COOVector::COOVector(std::vector<reel> & denseVector_) : n(0) {
       d_val = nullptr;
       d_indice = nullptr;
 
-      for(size_t i(0); i<denseVector.size(); ++i){
-        for(size_t j(0); j<denseVector[i].size(); ++j){
-          if(std::abs(denseVector[i][j]) > reel_eps){
-            indice.push_back(j+n);
-            val.push_back(denseVector[i][j]);
-          }
+      n = denseVector_.size();
+      for(size_t i(0); i<denseVector_.size(); ++i){
+        if(std::abs(denseVector_[i]) > reel_eps){
+          indice.push_back(i);
+          val.push_back(denseVector_[i]);
         }
-        n += denseVector[i].size();
-
       }
       nzz = val.size();
-
     }
 
 
@@ -557,8 +529,6 @@
     return n;
   }
 
-
-
   void COOVector::allocateOnGPU(){
     // Allocate memory on the device
     CHECK_CUDA( cudaMalloc((void**)&d_indice, nzz*sizeof(uint)) );
@@ -573,8 +543,6 @@
                                         CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
   }
 
-
-
   size_t COOVector::memFootprint(){
     // Return the number of bytes needed to store this element on the GPU
     size_t memFootprint;
@@ -583,8 +551,6 @@
 
     return memFootprint;
   }
-
-
 
   std::ostream& COOVector::print(std::ostream& out) const{
     if(nzz == 0){
@@ -621,8 +587,6 @@
     return out;
   }
 
-
-
   std::ostream& operator<<(std::ostream& out, COOVector const& vector_){
     return vector_.print(out);
   }
@@ -644,13 +608,9 @@
     return out;
   }
 
-
-
   void printVector(std::vector<reel> & vec){
     std::cout << vec << std::endl;
   }
-
-
 
   template <typename T>
   std::ostream& operator<<(std::ostream& out, std::vector<T> const& vec){
@@ -660,8 +620,6 @@
     out << std::endl;
     return out;
   }      
-
-
 
   uint extendTheVector(std::vector<reel> & vec, uint nTimes){
     uint n(vec.size());

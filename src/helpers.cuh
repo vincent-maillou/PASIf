@@ -72,7 +72,9 @@
   
   struct COOMatrix{
     COOMatrix() {};
-    COOMatrix(std::vector< matrix > & denseMatrix);
+    COOMatrix(std::vector<uint> dimensions_,
+              std::vector<reel> values_,
+              std::vector<uint> indices_);
     ~COOMatrix();
 
     uint   extendTheSystem(uint nTimes);
@@ -117,7 +119,9 @@
 
   struct COOTensor3D{
     COOTensor3D() {};
-    COOTensor3D(std::vector< tensor3d > & denseTensor);
+    COOTensor3D(std::vector<uint> dimensions_,
+                std::vector<reel> values_,
+                std::vector<uint> indices_);
     ~COOTensor3D();
 
     uint   extendTheSystem(uint nTimes);
@@ -152,7 +156,9 @@
 
   struct COOTensor4D{
     COOTensor4D() {};
-    COOTensor4D(std::vector< tensor4d > & denseTensor);
+    COOTensor4D(std::vector<uint> dimensions_,
+                std::vector<reel> values_,
+                std::vector<uint> indices_);
     ~COOTensor4D();
 
     uint   extendTheSystem(uint nTimes);
@@ -189,7 +195,7 @@
   
   struct COOVector{
     COOVector() {};
-    COOVector(std::vector< std::vector<reel> > & denseVector);
+    COOVector(std::vector<reel> & denseVector_);
     ~COOVector();
 
     uint   extendTheSystem(uint nTimes);
