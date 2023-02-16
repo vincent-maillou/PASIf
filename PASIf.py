@@ -2,6 +2,8 @@
 and the C++/CUDA side. Mainly pre-processing is done here 
 as well as wrapping somes functions in a more Pythonic way. """
 
+from __future__  import annotations
+
 # Ensure that the code has been compiled withe the
 # latest version of the CUDA module. Lunch make.
 import os
@@ -20,13 +22,50 @@ from dataclasses import dataclass
 from typing      import Union
 
 
-
 @dataclass
 class cooTensor:
     def __init__(self, dimensions_: list[int] = [2, 2]):
         self.dimensions = dimensions_
         self.val        = []
         self.indices    = []
+        
+    def __str__(self) -> str:
+        # Print the sparse tensor
+        tensorString = "\n"
+        currentValue = 0
+        if len(self.dimensions) == 2:
+            for i in range(self.dimensions[0]):
+                for j in range(self.dimensions[1]):
+                    if currentValue < len(self.val) and self.indices[2*currentValue] == i and self.indices[2*currentValue+1] == j:
+                        tensorString += str(self.val[currentValue]) + " "
+                        currentValue += 1
+                    else:
+                        tensorString += "_" + " "
+                tensorString += "\n "
+        elif len(self.dimensions) == 3:
+            for k in range(self.dimensions[0]):
+                for i in range(self.dimensions[1]):
+                    for j in range(self.dimensions[2]):
+                        if currentValue < len(self.val) and self.indices[3*currentValue] == i and self.indices[3*currentValue+1] == j and self.indices[3*currentValue+2] == k:
+                            tensorString += str(self.val[currentValue]) + " "
+                            currentValue += 1
+                        else:
+                            tensorString += "_" + " "
+                    tensorString += "\n "
+                tensorString += "\n "
+        else:
+            # Print the tensor in a sparse format
+            for i in range(len(self.val)):
+                tensorString += "val: "
+                tensorString += str(self.val[i]) + " "
+            tensorString += "\n"
+            for i in range(len(self.dimensions)):
+                for j in range(len(self.val)):
+                    tensorString += "dim" + str(i+1) + ": "
+                    tensorString += str(self.indices[j*len(self.dimensions)+i]) + " "
+                tensorString += "\n"
+        return tensorString
+        
         
     # Describe any dimension tensor in COO format
     #   - List the size of each dimension of the tensor. 
@@ -37,6 +76,61 @@ class cooTensor:
     #   - Indices are stored sequentially in the following order (0-indexing):
     #       -> pt1_dim1, pt1_dim2, ..., pt1_dimN, pt2_dim1, pt2_dim2, ..., pt2_dimN, ...
     indices   : list[int]
+    
+    
+    def concatenateTensor(self, tensor_: cooTensor):
+        #                   ----- TODO -----
+        if(self.dimensions != tensor_.dimensions):
+            raise Exception("The number of dimensions of the two tensors are not the same")
+
+        # Concatenate the values of the two tensors
+        self.val = self.val + tensor_.val
+        
+        # Concatenate the indices and extend the indices of the second tensor
+        for i in range(len(tensor_.indices)):
+            self.indices.append(tensor_.indices[i] + self.dimensions[i%len(self.dimensions)])
+            
+        # Update the dimensions of the tensor
+        for i in range(len(self.dimensions)):
+            self.dimensions[i] += tensor_.dimensions[i]    
+        
+    def multiplyBySparseMatrix(self, matrix_: cooTensor):
+        # Check input tensor dimensions
+        if len(matrix_.dimensions) != 2:
+            raise Exception("The input tensor must be a 2D matrix")
+        if matrix_.dimensions[0] != self.dimensions[0] or matrix_.dimensions[1] != self.dimensions[1]:
+            raise Exception("The input matrix dimensions must match the row/col dimensions of the tensor")
+        
+        # Multiply the COO tensor by a sparse matrix
+        
+        # Here I could extract the sub-matrix of the tensor in a SCIPY sparse matrix format 
+        # and then do the multiplication using scipy.sparse.coo_matrix.dot(matrix_)
+        # I then need to insert the resulting matrix in the tensor.
+        
+        test = []
+        
+    """ for i in range(len(vecM)):
+    vecM[i] = np.linalg.inv(vecM[i])
+    vecB[i] = -1 * np.matmul(vecM[i], vecB[i])
+    vecK[i] = -1 * np.matmul(vecM[i], vecK[i])
+    vecGamma[i]  = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
+    vecLambda[i] = -1 * np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
+    vecForcePattern[i] = np.diag(vecM[i]) * vecForcePattern[i]
+    
+    if type(vecPsi) == np.ndarray:
+        vecPsi[i] = -1 * np.einsum('ij, jklmn -> iklmn', vecM[i], vecPsi[i]) """    
+        
+        
+    def getIndicesDim(self, dim_: int) -> list[int]:
+        # Unfold the indices list of the tensor and return the indices  
+        # of the dimension dim_ in a list format.
+        unfoldedIndices = []
+        
+        nDim = len(self.dimensions)
+        for i in range(len(self.indices)):
+            unfoldedIndices.append(dim_ + self.indices[i]*nDim)
+        
+        return unfoldedIndices
     
     def isSquare(self) -> bool:
         for i in range(len(self.dimensions)):
@@ -119,7 +213,6 @@ class PASIf(__GpuDriver):
         if(len(vecM) == 0 or len(vecB) == 0 or len(vecK) == 0 or len(vecGamma) == 0 or len(vecLambda) == 0 or len(vecForcePattern) == 0 or len(vecInitialConditions) == 0):
             raise ValueError("At least one of the input system is empty.")
         
-        
         # Check and convert the input system to COO format if needed,
         # then check the validity of the system.
         cooInputVecM      : list[cooTensor] = []
@@ -175,7 +268,7 @@ class PASIf(__GpuDriver):
                                 vecInitialConditions)
         
         
-        # Unfold the input systems into a single coo descriptor
+        # Unfold each of the input vectors of COO systems into a single COO system
         self.__unfoldSystems(cooInputVecM        , self.system_cooM,
                              cooInputVecB        , self.system_vecB,
                              cooInputVecK        , self.system_vecK,
@@ -193,6 +286,16 @@ class PASIf(__GpuDriver):
                                    self.system_cooLambda,
                                    self.system_forcePattern)
         self.systemSet = True
+        
+        print("cooB: ", self.system_cooB)
+        print("cooK: ", self.system_cooK)
+        print("cooGamma: ", self.system_cooGamma)
+        print("cooLambda: ", self.system_cooLambda)
+        print("forcePattern: ", self.system_forcePattern)
+        
+        
+        
+        
         
         # WORK IN PROGRESS ------------------------------------------------------------
         cooB = cooTensor(dimensions_ = [6, 6])
@@ -388,6 +491,95 @@ class PASIf(__GpuDriver):
     ############################################################# 
     #                      Private methods
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    def __convertToCoo(self, vecInputDenseTensor : list) -> list[cooTensor]:
+        cooOutputVecTensor : list[cooTensor] = []
+        
+        if type(vecInputDenseTensor) != list:
+            raise ValueError("The input vector must be a list of dense tensors.")
+        
+        # Transform the 2D dense matrix into a 2D COO tensor
+        if type(vecInputDenseTensor[0]) == matrix:
+            for dsys in range(len(vecInputDenseTensor)):
+                dimx = vecInputDenseTensor[dsys].shape[0]
+                dimy = vecInputDenseTensor[dsys].shape[1]
+                
+                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy]))   
+                
+                for x in range(dimx):
+                    for y in range(dimy):
+                        if vecInputDenseTensor[dsys][x][y] != 0:
+                            cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y])
+                            cooOutputVecTensor[dsys].indices.append(x)
+                            cooOutputVecTensor[dsys].indices.append(y)
+        
+        # Transform the 3D dense tensor into a 3D COO tensor
+        elif type(vecInputDenseTensor[0]) == tensor3d:
+            for dsys in range(len(vecInputDenseTensor)):
+                dimx = vecInputDenseTensor[dsys].shape[0]
+                dimy = vecInputDenseTensor[dsys].shape[1]
+                dimz = vecInputDenseTensor[dsys].shape[2]
+                
+                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz]))   
+                
+                for x in range(dimx):
+                    for y in range(dimy):
+                        for z in range(dimz):
+                            if vecInputDenseTensor[dsys][x][y][z] != 0:
+                                cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z])
+                                cooOutputVecTensor[dsys].indices.append(x)
+                                cooOutputVecTensor[dsys].indices.append(y)
+                                cooOutputVecTensor[dsys].indices.append(z)
+        
+        # Transform the 4D dense tensor into a 4D COO tensor
+        elif type(vecInputDenseTensor[0]) == tensor4d:
+            for dsys in range(len(vecInputDenseTensor)):
+                dimx = vecInputDenseTensor[dsys].shape[0]
+                dimy = vecInputDenseTensor[dsys].shape[1]
+                dimz = vecInputDenseTensor[dsys].shape[2]
+                dimh = vecInputDenseTensor[dsys].shape[3]
+                
+                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz, dimh]))   
+                
+                for x in range(dimx):
+                    for y in range(dimy):
+                        for z in range(dimz):
+                            for h in range(dimh):
+                                if vecInputDenseTensor[dsys][x][y][z][h] != 0:
+                                    cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z][h])
+                                    cooOutputVecTensor[dsys].indices.append(x)
+                                    cooOutputVecTensor[dsys].indices.append(y)
+                                    cooOutputVecTensor[dsys].indices.append(z)
+                                    cooOutputVecTensor[dsys].indices.append(h)
+        
+        # Transform the 5D dense tensor into a 5D COO tensor
+        elif type(vecInputDenseTensor[0]) == tensor5d:
+            for dsys in range(len(vecInputDenseTensor)):
+                dimx = vecInputDenseTensor[dsys].shape[0]
+                dimy = vecInputDenseTensor[dsys].shape[1]
+                dimz = vecInputDenseTensor[dsys].shape[2]
+                dimh = vecInputDenseTensor[dsys].shape[3]
+                diml = vecInputDenseTensor[dsys].shape[4]
+                
+                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz, dimh, diml]))   
+                
+                for x in range(dimx):
+                    for y in range(dimy):
+                        for z in range(dimz):
+                            for h in range(dimh):
+                                for l in range(diml):
+                                    if vecInputDenseTensor[dsys][x][y][z][h] != 0:
+                                        cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z][h][l])
+                                        cooOutputVecTensor[dsys].indices.append(x)
+                                        cooOutputVecTensor[dsys].indices.append(y)
+                                        cooOutputVecTensor[dsys].indices.append(z)
+                                        cooOutputVecTensor[dsys].indices.append(h)
+                                        cooOutputVecTensor[dsys].indices.append(l)
+        else:
+            raise ValueError("The input vector must be a list of dense tensors.")
+        
+        return cooOutputVecTensor
+    
+    
     def __checkSystemInput(self,
                            cooInputVecM         : list[cooTensor], 
                            cooInputVecB         : list[cooTensor], 
@@ -451,7 +643,6 @@ class PASIf(__GpuDriver):
                     raise ValueError("The dimension of each Jacobian must be the same.")
                 self.globalAdjointSize += len(cooInputVecM[i])   
 
-
     
     def __unfoldSystems(self,
                         input_cooVecM              : list[cooTensor]       , output_cooM              : cooTensor,
@@ -463,22 +654,39 @@ class PASIf(__GpuDriver):
                         input_vecInitialConditions : list[vector]          , output_initialConditions : vector,
                         input_cooVecPsi            : list[cooTensor] = None, output_cooPsi            : cooTensor = None):
         
-        
-        
-        """ self.system_cooM                 : cooTensor # 2D tensor
-        self.system_cooB                 : cooTensor # 2D tensor
-        self.system_cooK                 : cooTensor # 2D tensor
-        self.system_cooGamma             : cooTensor # 3D tensor    
-        self.system_cooLambda            : cooTensor # 4D tensor
-        self.system_forcePattern         : vector 
-        self.system_initialConditions    : vector """
-    
-    
-    
-    
-    
-    
-    
+        if len(input_cooVecM) == 1:
+            output_cooM              = cp.deepcopy(input_cooVecM[0])
+            output_cooB              = cp.deepcopy(input_cooVecB[0])
+            output_cooK              = cp.deepcopy(input_cooVecK[0])
+            output_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
+            output_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
+            output_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
+            output_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
+            if input_cooVecPsi is not None and output_cooPsi is not None:
+                output_cooPsi        = cp.deepcopy(input_cooVecPsi[0])
+            return
+        else:
+            for i in range(1, len(input_cooVecM)):
+                input_cooVecM[0].concatenateTensor(input_cooVecM[i])
+                input_cooVecB[0].concatenateTensor(input_cooVecB[i])
+                input_cooVecK[0].concatenateTensor(input_cooVecK[i])
+                input_cooVecGamma[0].concatenateTensor(input_cooVecGamma[i])
+                input_cooVecLambda[0].concatenateTensor(input_cooVecLambda[i])
+                input_vecForcePattern[0]      += input_vecForcePattern[i]
+                input_vecInitialConditions[0] += input_vecInitialConditions[i]
+                if input_cooVecPsi is not None and output_cooPsi is not None:
+                    input_cooVecPsi[0].concatenateTensor(input_cooVecPsi[i])
+                    
+            output_cooM              = cp.deepcopy(input_cooVecM[0])
+            output_cooB              = cp.deepcopy(input_cooVecB[0])
+            output_cooK              = cp.deepcopy(input_cooVecK[0])
+            output_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
+            output_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
+            output_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
+            output_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
+            if input_cooVecPsi is not None and output_cooPsi is not None:
+                output_cooPsi        = cp.deepcopy(input_cooVecPsi[0])        
+            return
     
     
     def __systemPreprocessing(self,
@@ -490,33 +698,24 @@ class PASIf(__GpuDriver):
                               forcePattern   : vector,
                               cooPsi         : cooTensor = None):
         
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.linalg import inv
         
+        scipyM = coo_matrix((cooM.data, (cooM.getIndicesDim(0), cooM.getIndicesDim(1))),
+                            shape=(cooM.dimensions[0], cooM.dimensions[1]))
         
+        scipyMinv = inv(scipyM)
         
+        cooB.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        cooK.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        cooGamma.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        cooLambda.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        for i in range(len(forcePattern)):
+            forcePattern[i] *= scipyMinv.diagonal()[i]
         
-        print("vecM[0]: ", vecM[0])
-        print("vecB[0]: ", vecB[0])
-        print("vecK[0]: ", vecK[0])
-        print("vecGamma[0]: ", vecGamma[0])
-        print("vecLambda[0]: ", vecLambda[0])
-        print("vecForcePattern[0]: ", vecForcePattern[0])
-        
-        # Invert the M matrix and then pre-multiply the others
-        for i in range(len(vecM)):
-            vecM[i] = np.linalg.inv(vecM[i])
-            vecB[i] = -1 * np.matmul(vecM[i], vecB[i])
-            vecK[i] = -1 * np.matmul(vecM[i], vecK[i])
-            vecGamma[i]  = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
-            vecLambda[i] = -1 * np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
-            vecForcePattern[i] = np.diag(vecM[i]) * vecForcePattern[i]
-            
-            if type(vecPsi) == np.ndarray:
-                vecPsi[i] = -1 * np.einsum('ij, jklmn -> iklmn', vecM[i], vecPsi[i])
-                
-                
-                
-                
-                
+        if cooPsi is not None:
+            cooPsi.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+
                 
                 
                 

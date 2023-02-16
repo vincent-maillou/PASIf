@@ -192,20 +192,43 @@ cooLambda.val     = [40000]
 cooLambda.indices = [4,1,1,1] """
 
 
-start = time.time()
+cooB = cooTensor(dimensions_ = [6, 6])
+cooB.val     = [1, 1, 1, -1, -1]
+cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
+
+cooK = cooTensor(dimensions_ = [6, 6])
+cooK.val     = [-6, -1]
+cooK.indices = [3,0 , 4,1]
+
+cooGamma = cooTensor(dimensions_ = [6, 6, 6])
+cooGamma.val      = [10, 1, 1]
+cooGamma.indices  = [0,1,3 , 0,0,4 , 1,1,5]
+
+cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
+cooLambda.val     = [-4000]
+cooLambda.indices = [1,1,1,4]
+
+print("cooB: ", cooB)
+print("cooK: ", cooK)
+print("cooGamma: ", cooGamma)
+print("cooLambda: ", cooLambda)
+
+
+
+""" start = time.time()
 pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
 end = time.time()
 
-print("setSystems() overall time: ", end - start)
+print("setSystems() overall time: ", end - start) """
 
 
 # Interpolation matrix
 """ intMat = np.array([[2/10, 4/10, 3/10, 1/10], 
                    [1/10, 3/10, 4/10, 2/10]]) """
 
-intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
+""" intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 
-# pasif.setInterpolationMatrix(intMat)
+pasif.setInterpolationMatrix(intMat) """
 
 # Modulation buffer
 modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
