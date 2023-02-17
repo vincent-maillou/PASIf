@@ -171,7 +171,7 @@ extendedInitialCondition = np.array(extendedInitialCondition)
 
 
 
-""" cooM = cooTensor(dimensions_ = [6, 6])
+cooM = cooTensor(dimensions_ = [6, 6])
 cooM.val     = [1, 1, 1, 1, 10, 1]
 cooM.indices = [0,0 , 1,1 , 2,2 , 3,3 , 4,4 , 5,5]
 
@@ -184,15 +184,15 @@ cooK.val     = [6, 10]
 cooK.indices = [3,0 , 4,1]
 
 cooGamma = cooTensor(dimensions_ = [6, 6, 6])
-cooGamma.val = [10, 10, 1]
-cooGamma     = [3,0,1 , 4,0,0 , 5,1,1]
+cooGamma.val     = [20, 10, 1]
+cooGamma.indices = [0,1,3 , 0,0,4 , 1,1,5]
 
 cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
 cooLambda.val     = [40000]
-cooLambda.indices = [4,1,1,1] """
+cooLambda.indices = [1,1,1,4]
 
 
-cooB = cooTensor(dimensions_ = [6, 6])
+""" cooB = cooTensor(dimensions_ = [6, 6])
 cooB.val     = [1, 1, 1, -1, -1]
 cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
 
@@ -206,20 +206,38 @@ cooGamma.indices  = [0,1,3 , 0,0,4 , 1,1,5]
 
 cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
 cooLambda.val     = [-4000]
-cooLambda.indices = [1,1,1,4]
+cooLambda.indices = [1,1,1,4] """
 
+forcePattern = [1, 0, 0, 0, 0, 0]
+initialCondition = [0, 0, 0, 0, 0, 0]
+
+""" print("cooM: ", cooM)
 print("cooB: ", cooB)
 print("cooK: ", cooK)
 print("cooGamma: ", cooGamma)
-print("cooLambda: ", cooLambda)
+print("cooLambda: ", cooLambda) """
 
+n = 1
+cooVecM = [cooM]
+cooVecM *= n
+cooVecB = [cooB]
+cooVecB *= n
+cooVecK = [cooK]
+cooVecK *= n
+cooVecGamma = [cooGamma]
+cooVecGamma *= n
+cooVecLambda = [cooLambda]
+cooVecLambda *= n
+vecForcePattern = [forcePattern]
+vecForcePattern *= n
+vecInitialCondition = [initialCondition]
+vecInitialCondition *= n
 
-
-""" start = time.time()
-pasif.setSystems(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition)
+start = time.time()
+pasif.setSystems(cooVecM, cooVecB, cooVecK, cooVecGamma, cooVecLambda, vecForcePattern, vecInitialCondition)
 end = time.time()
 
-print("setSystems() overall time: ", end - start) """
+print("setSystems() overall time: ", end - start)
 
 
 # Interpolation matrix

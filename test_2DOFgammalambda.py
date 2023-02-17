@@ -12,8 +12,8 @@ import time
 
 system = spr.MechanicalSystem()
 m = 2
-b= 2
-k= 6
+b = 2
+k = 6
 force = 1
 
 filelength = 78001

@@ -18,8 +18,10 @@ from PASIfgpu import __GpuDriver
 # Standard libraries
 import numpy as np
 import copy  as cp
-from dataclasses import dataclass
-from typing      import Union
+from   dataclasses import dataclass
+from   typing      import Union
+from scipy.sparse        import coo_matrix
+from scipy.sparse.linalg import inv
 
 
 @dataclass
@@ -34,6 +36,7 @@ class cooTensor:
         tensorString = "\n"
         currentValue = 0
         if len(self.dimensions) == 2:
+            # Explicit print for 2D tensors
             for i in range(self.dimensions[0]):
                 for j in range(self.dimensions[1]):
                     if currentValue < len(self.val) and self.indices[2*currentValue] == i and self.indices[2*currentValue+1] == j:
@@ -43,6 +46,7 @@ class cooTensor:
                         tensorString += "_" + " "
                 tensorString += "\n "
         elif len(self.dimensions) == 3:
+            # Explicit print for 3D tensors
             for k in range(self.dimensions[0]):
                 for i in range(self.dimensions[1]):
                     for j in range(self.dimensions[2]):
@@ -54,7 +58,7 @@ class cooTensor:
                     tensorString += "\n "
                 tensorString += "\n "
         else:
-            # Print the tensor in a sparse format
+            # Else print the tensor in COO format
             for i in range(len(self.val)):
                 tensorString += "val: "
                 tensorString += str(self.val[i]) + " "
@@ -94,31 +98,27 @@ class cooTensor:
         for i in range(len(self.dimensions)):
             self.dimensions[i] += tensor_.dimensions[i]    
         
-    def multiplyBySparseMatrix(self, matrix_: cooTensor):
+    def multiplyBySparseMatrix(self, matrix_: coo_matrix):
         # Check input tensor dimensions
-        if len(matrix_.dimensions) != 2:
-            raise Exception("The input tensor must be a 2D matrix")
-        if matrix_.dimensions[0] != self.dimensions[0] or matrix_.dimensions[1] != self.dimensions[1]:
+        if matrix_.shape[0] != matrix_.shape[1]:
+            raise Exception("The input matrix must be square")
+        if matrix_.shape[0] != self.dimensions[0] or matrix_.shape[1] != self.dimensions[1]:
             raise Exception("The input matrix dimensions must match the row/col dimensions of the tensor")
         
-        # Multiply the COO tensor by a sparse matrix
+        # Trivial for 2D Tensor
+        if len(self.dimensions) == 2:
+            # Use the scipy sparse matrix multiplication
+            scipySelfDescription = coo_matrix((self.val, (self.getIndicesDim(0), self.getIndicesDim(1))), 
+                                              shape=(self.dimensions[0], self.dimensions[1]))
+            scipySelfDescription = scipySelfDescription.dot(matrix_)
+            
+            # Copy the data back to the generic tensor
+            self.val     = scipySelfDescription.data
+            
+            for i in range(len(self.val)):
+                self.indices.append(scipySelfDescription.getrow(i))
+                self.indices.append(scipySelfDescription.getcol(i))  
         
-        # Here I could extract the sub-matrix of the tensor in a SCIPY sparse matrix format 
-        # and then do the multiplication using scipy.sparse.coo_matrix.dot(matrix_)
-        # I then need to insert the resulting matrix in the tensor.
-        
-        test = []
-        
-    """ for i in range(len(vecM)):
-    vecM[i] = np.linalg.inv(vecM[i])
-    vecB[i] = -1 * np.matmul(vecM[i], vecB[i])
-    vecK[i] = -1 * np.matmul(vecM[i], vecK[i])
-    vecGamma[i]  = np.einsum('ij, jkl -> ikl', vecM[i], vecGamma[i])
-    vecLambda[i] = -1 * np.einsum('ij, jklm -> iklm', vecM[i], vecLambda[i])
-    vecForcePattern[i] = np.diag(vecM[i]) * vecForcePattern[i]
-    
-    if type(vecPsi) == np.ndarray:
-        vecPsi[i] = -1 * np.einsum('ij, jklmn -> iklmn', vecM[i], vecPsi[i]) """    
         
         
     def getIndicesDim(self, dim_: int) -> list[int]:
@@ -127,8 +127,8 @@ class cooTensor:
         unfoldedIndices = []
         
         nDim = len(self.dimensions)
-        for i in range(len(self.indices)):
-            unfoldedIndices.append(dim_ + self.indices[i]*nDim)
+        for i in range(len(self.val)):
+            unfoldedIndices.append(self.indices[dim_+i*nDim])
         
         return unfoldedIndices
     
@@ -177,23 +177,23 @@ class PASIf(__GpuDriver):
         
         self.systemSet       : bool = False
         self.numberOfSystems : int  = 0
-        self.system_cooM                 : cooTensor # 2D tensor
-        self.system_cooB                 : cooTensor # 2D tensor
-        self.system_cooK                 : cooTensor # 2D tensor
-        self.system_cooGamma             : cooTensor # 3D tensor    
-        self.system_cooLambda            : cooTensor # 4D tensor
-        self.system_forcePattern         : vector 
-        self.system_initialConditions    : vector
+        self.system_cooM                : cooTensor # 2D tensor
+        self.system_cooB                : cooTensor # 2D tensor
+        self.system_cooK                : cooTensor # 2D tensor
+        self.system_cooGamma            : cooTensor # 3D tensor    
+        self.system_cooLambda           : cooTensor # 4D tensor
+        self.system_forcePattern        : vector 
+        self.system_initialConditions   : vector
         
         self.jacobianSet : bool = False
-        self.jacobian_cooM                 : cooTensor # 2D tensor
-        self.jacobian_cooB                 : cooTensor # 2D tensor
-        self.jacobian_cooK                 : cooTensor # 2D tensor
-        self.jacobian_cooGamma             : cooTensor # 3D tensor    
-        self.jacobian_cooLambda            : cooTensor # 4D tensor
-        self.jacobian_cooPsi               : cooTensor # 5D tensor   
-        self.jacobian_forcePattern         : vector 
-        self.jacobian_initialConditions    : vector
+        self.jacobian_cooM              : cooTensor # 2D tensor
+        self.jacobian_cooB              : cooTensor # 2D tensor
+        self.jacobian_cooK              : cooTensor # 2D tensor
+        self.jacobian_cooGamma          : cooTensor # 3D tensor    
+        self.jacobian_cooLambda         : cooTensor # 4D tensor
+        self.jacobian_cooPsi            : cooTensor # 5D tensor
+        self.jacobian_forcePattern      : vector 
+        self.jacobian_initialConditions : vector
 
     def setExcitations(self, 
                        excitationSet: list[vector], 
@@ -267,24 +267,33 @@ class PASIf(__GpuDriver):
                                 vecForcePattern, 
                                 vecInitialConditions)
         
+        """ print("cooM: ", cooInputVecM[0])
+        print("cooB: ", cooInputVecB[0])
+        print("cooK: ", cooInputVecK[0])
+        print("cooGamma: ", cooInputVecGamma[0])
+        print("cooLambda: ", cooInputVecLambda[0])
+        print("forcePattern: ", vecForcePattern[0]) """
+        
+        
         
         # Unfold each of the input vectors of COO systems into a single COO system
-        self.__unfoldSystems(cooInputVecM        , self.system_cooM,
-                             cooInputVecB        , self.system_vecB,
-                             cooInputVecK        , self.system_vecK,
-                             cooInputVecGamma    , self.system_cooGamma, 
-                             cooInputVecLambda   , self.system_cooLambda,
-                             vecForcePattern     , self.system_forcePattern,
-                             vecInitialConditions, self.system_initialConditions)
+        self.__unfoldSystems(cooInputVecM,
+                             cooInputVecB,
+                             cooInputVecK,
+                             cooInputVecGamma,
+                             cooInputVecLambda,
+                             vecForcePattern,
+                             vecInitialConditions)
         
+        """ print("cooM: ", self.system_cooM)
+        print("cooB: ", self.system_cooB)
+        print("cooK: ", self.system_cooK)
+        print("cooGamma: ", self.system_cooGamma)
+        print("cooLambda: ", self.system_cooLambda)
+        print("forcePattern: ", self.system_forcePattern) """
         
         # Pre-process the system (ie. multiply per -1*M^-1)
-        self.__systemPreprocessing(self.system_cooM,
-                                   self.system_cooB,
-                                   self.system_cooK,
-                                   self.system_cooGamma, 
-                                   self.system_cooLambda,
-                                   self.system_forcePattern)
+        self.__systemPreprocessing()
         self.systemSet = True
         
         print("cooB: ", self.system_cooB)
@@ -298,7 +307,7 @@ class PASIf(__GpuDriver):
         
         
         # WORK IN PROGRESS ------------------------------------------------------------
-        cooB = cooTensor(dimensions_ = [6, 6])
+        """ cooB = cooTensor(dimensions_ = [6, 6])
         cooB.val     = [1, 1, 1, -1, -1]
         cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
 
@@ -322,7 +331,7 @@ class PASIf(__GpuDriver):
         unfoldedInitialConditions = []
         for i in range(len(self.vecSystemInitialConditions)):
             for j in range(len(self.vecSystemInitialConditions[i])):
-                unfoldedInitialConditions.append(self.vecSystemInitialConditions[i][j])
+                unfoldedInitialConditions.append(self.vecSystemInitialConditions[i][j]) """
         # WORK IN PROGRESS ------------------------------------------------------------
         
         """ self._setB(cooB.dimensions, 
@@ -614,7 +623,7 @@ class PASIf(__GpuDriver):
                    cooInputVecM[i].dimensions[0]   != len(vecForcePattern[i])            or
                    cooInputVecM[i].dimensions[0]   != len(vecInitialConditions[i])):
                     raise ValueError("The dimension of each System must be the same.")
-                self.globalSystemSize += len(cooInputVecM[i])    
+                self.globalSystemSize += cooInputVecM[i].dimensions[0]   
             self.numberOfSystems = len(cooInputVecM) 
         
         else:
@@ -643,29 +652,17 @@ class PASIf(__GpuDriver):
                     raise ValueError("The dimension of each Jacobian must be the same.")
                 self.globalAdjointSize += len(cooInputVecM[i])   
 
-    
+
     def __unfoldSystems(self,
-                        input_cooVecM              : list[cooTensor]       , output_cooM              : cooTensor,
-                        input_cooVecB              : list[cooTensor]       , output_cooB              : cooTensor,
-                        input_cooVecK              : list[cooTensor]       , output_cooK              : cooTensor,
-                        input_cooVecGamma          : list[cooTensor]       , output_cooGamma          : cooTensor,
-                        input_cooVecLambda         : list[cooTensor]       , output_cooLambda         : cooTensor,
-                        input_vecForcePattern      : list[vector]          , output_forcePattern      : vector,
-                        input_vecInitialConditions : list[vector]          , output_initialConditions : vector,
-                        input_cooVecPsi            : list[cooTensor] = None, output_cooPsi            : cooTensor = None):
+                        input_cooVecM              : list[cooTensor],
+                        input_cooVecB              : list[cooTensor],
+                        input_cooVecK              : list[cooTensor],
+                        input_cooVecGamma          : list[cooTensor],
+                        input_cooVecLambda         : list[cooTensor],
+                        input_vecForcePattern      : list[vector],
+                        input_vecInitialConditions : list[vector]):
         
-        if len(input_cooVecM) == 1:
-            output_cooM              = cp.deepcopy(input_cooVecM[0])
-            output_cooB              = cp.deepcopy(input_cooVecB[0])
-            output_cooK              = cp.deepcopy(input_cooVecK[0])
-            output_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
-            output_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
-            output_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
-            output_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
-            if input_cooVecPsi is not None and output_cooPsi is not None:
-                output_cooPsi        = cp.deepcopy(input_cooVecPsi[0])
-            return
-        else:
+        if len(input_cooVecM) > 1:
             for i in range(1, len(input_cooVecM)):
                 input_cooVecM[0].concatenateTensor(input_cooVecM[i])
                 input_cooVecB[0].concatenateTensor(input_cooVecB[i])
@@ -674,47 +671,64 @@ class PASIf(__GpuDriver):
                 input_cooVecLambda[0].concatenateTensor(input_cooVecLambda[i])
                 input_vecForcePattern[0]      += input_vecForcePattern[i]
                 input_vecInitialConditions[0] += input_vecInitialConditions[i]
-                if input_cooVecPsi is not None and output_cooPsi is not None:
-                    input_cooVecPsi[0].concatenateTensor(input_cooVecPsi[i])
-                    
-            output_cooM              = cp.deepcopy(input_cooVecM[0])
-            output_cooB              = cp.deepcopy(input_cooVecB[0])
-            output_cooK              = cp.deepcopy(input_cooVecK[0])
-            output_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
-            output_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
-            output_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
-            output_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
-            if input_cooVecPsi is not None and output_cooPsi is not None:
-                output_cooPsi        = cp.deepcopy(input_cooVecPsi[0])        
-            return
+        
+        self.system_cooM              = cp.deepcopy(input_cooVecM[0])
+        self.system_cooB              = cp.deepcopy(input_cooVecB[0])
+        self.system_cooK              = cp.deepcopy(input_cooVecK[0])
+        self.system_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
+        self.system_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
+        self.system_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
+        self.system_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
+        
+        
+    def __unfoldJacobians(self,
+                          input_cooVecM              : list[cooTensor],
+                          input_cooVecB              : list[cooTensor],
+                          input_cooVecK              : list[cooTensor],
+                          input_cooVecGamma          : list[cooTensor],
+                          input_cooVecLambda         : list[cooTensor],
+                          input_cooVecPsi            : list[cooTensor],
+                          input_vecForcePattern      : list[vector],
+                          input_vecInitialConditions : list[vector]):
+        
+        if len(input_cooVecM) > 1:
+            for i in range(1, len(input_cooVecM)):
+                input_cooVecM[0].concatenateTensor(input_cooVecM[i])
+                input_cooVecB[0].concatenateTensor(input_cooVecB[i])
+                input_cooVecK[0].concatenateTensor(input_cooVecK[i])
+                input_cooVecGamma[0].concatenateTensor(input_cooVecGamma[i])
+                input_cooVecLambda[0].concatenateTensor(input_cooVecLambda[i])
+                input_cooVecPsi[0].concatenateTensor(input_cooVecPsi[i])
+                input_vecForcePattern[0]      += input_vecForcePattern[i]
+                input_vecInitialConditions[0] += input_vecInitialConditions[i]
+        
+        self.jacobian_cooM              = cp.deepcopy(input_cooVecM[0])
+        self.jacobian_cooB              = cp.deepcopy(input_cooVecB[0])
+        self.jacobian_cooK              = cp.deepcopy(input_cooVecK[0])
+        self.jacobian_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
+        self.jacobian_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
+        self.jacobian_cooPsi            = cp.deepcopy(input_cooVecPsi[0])
+        self.jacobian_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
+        self.jacobian_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
     
     
-    def __systemPreprocessing(self,
-                              cooM           : cooTensor,
-                              cooB           : cooTensor,
-                              cooK           : cooTensor,
-                              cooGamma       : cooTensor,
-                              cooLambda      : cooTensor,
-                              forcePattern   : vector,
-                              cooPsi         : cooTensor = None):
+    def __systemPreprocessing(self):
         
-        from scipy.sparse import coo_matrix
-        from scipy.sparse.linalg import inv
+        scipyM = coo_matrix((self.system_cooM.val, (self.system_cooM.getIndicesDim(0), self.system_cooM.getIndicesDim(1))),
+                             shape=(self.system_cooM.dimensions[0], self.system_cooM.dimensions[1]))
         
-        scipyM = coo_matrix((cooM.data, (cooM.getIndicesDim(0), cooM.getIndicesDim(1))),
-                            shape=(cooM.dimensions[0], cooM.dimensions[1]))
+        scipyM = scipyM.tocsc()
+        scipyMinv = -1*inv(scipyM)
+        scipyMinv = scipyMinv.tocoo()
         
-        scipyMinv = inv(scipyM)
+        print(scipyMinv)
         
-        cooB.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
-        cooK.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
-        cooGamma.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
-        cooLambda.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
-        for i in range(len(forcePattern)):
-            forcePattern[i] *= scipyMinv.diagonal()[i]
-        
-        if cooPsi is not None:
-            cooPsi.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        self.system_cooB.multiplyBySparseMatrix(scipyMinv)
+        self.system_cooK.multiplyBySparseMatrix(scipyMinv)
+        """ self.system_cooGamma.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
+        self.system_cooLambda.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col) """
+        for i in range(len(self.system_forcePattern)):
+            self.system_forcePattern[i] *= scipyMinv.diagonal()[i]
 
                 
                 
