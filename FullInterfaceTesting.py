@@ -127,7 +127,7 @@ jac_Gamma.indices      = [0, 2, 0, 4, 1, 2, 5, 1, 0]
 vecJac_Gamma : list[coo_tensor] = [jac_Gamma] * n """
 
 
-M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 1., 1., 1., 1.], [0]), shape=(8, 8)) 
+M    : dia_matrix       = dia_matrix(([2., 2., 2., 2., 2., 2., 2., 2.], [0]), shape=(8, 8)) 
 vecM : list[dia_matrix] = [M] * n
 
 from scipy.sparse import coo_matrix
@@ -147,7 +147,7 @@ Lambda.val          = [1]
 Lambda.indices      = [1,1,1,1]
 vecLambda : list[coo_tensor] = [Lambda] * n
 
-forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+forcePattern    : np.ndarray = np.array([0., 0., 0., 0., 0., 0., 0., 0.])
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
 initialCondition    : np.ndarray = np.array([0, 0, 0, 0, 0, 0, 0, 0])
@@ -155,8 +155,8 @@ vecInitialCondition : list[np.ndarray] = [initialCondition] * n
 
 Psi : coo_tensor = coo_tensor(dimensions_ = [8, 8, 8, 8, 8])
 Psi.val          = [1]
-Psi.indices      = [1,1,1,1]
-vecPsi : list[coo_tensor] = [Lambda] * n
+Psi.indices      = [1,1,1,1,1]
+vecPsi : list[coo_tensor] = [Psi] * n
 
 
 start      = time.time()

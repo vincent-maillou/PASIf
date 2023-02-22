@@ -310,11 +310,17 @@ class PASIf(__GpuDriver):
                                vecInitialConditions,
                                vecPsi)
 
+        self.__jacobianPreprocessing()  
+        
+        # Stick the System and jacobian together to form the full system 
+        # that will be parsed to the GPU.
+        self.__assembleSystemAndJacobian()      
 
 
-        print("jacob M: \n", self.jacobian_M)
-        print("jacob B: \n", self.jacobian_B)
-        print("jacob K: \n", self.jacobian_K)
+
+        print("jacob M: \n", self.jacobian_M.todense())
+        print("jacob B: \n", self.jacobian_B.todense())
+        print("jacob K: \n", self.jacobian_K.todense())
         print("jacob Gamma: \n", self.jacobian_Gamma)
         print("jacob Lambda: \n", self.jacobian_Lambda)
         print("jacob forcePattern: \n", self.jacobian_forcePattern)
@@ -486,7 +492,7 @@ class PASIf(__GpuDriver):
             assert inputVecInitialConditions[i].shape[0] == ndofs, "The initial conditions vector must have the same size as the matrix M."
             
             if inputVecPsi is not None:
-                assert inputVecPsi[i].dimensions[0]    == ndofs, "The Psi tensor must have the same size as the matrix M."
+                assert inputVecPsi[i].dimensions[0] == ndofs, "The Psi tensor must have the same size as the matrix M."
                 assert inputVecPsi[i].dimensions[0] == inputVecPsi[i].dimensions[1] == inputVecPsi[i].dimensions[2] == inputVecPsi[i].dimensions[3]  == inputVecPsi[i].dimensions[4], "The Psi tensor must be squared."
 
 
@@ -603,11 +609,6 @@ class PASIf(__GpuDriver):
         self.jacobian_Psi               = cp.deepcopy(inputVecPsi[0])
         self.jacobian_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
         self.jacobian_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
-        
-        
-        
-        
-        
     
     def __systemPreprocessing(self):
         
@@ -631,48 +632,40 @@ class PASIf(__GpuDriver):
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
         
         self.jacobian_forcePattern *= -1*self.jacobian_M.data
-        
-
-                
-                
-                
                 
     def __assembleSystemAndJacobian(self):
-        # Work in progress
-        """ for i in range(len(self.vecJacobM)):
-            localSystemSize  = len(self.vecSystemM[i])
-            localAdjointSize = len(self.vecJacobM[i])
-            
-            sysDim0 = np.zeros((localAdjointSize, localSystemSize))
-            
-            # Assemble the 2D matrix
-            self.vecJacobB[i] = np.block([[self.vecSystemB[i]   , sysDim0],
-                                          [np.transpose(sysDim0), self.vecJacobB[i]]])
-            self.vecJacobK[i] = np.block([[self.vecSystemK[i]   , sysDim0],
-                                          [np.transpose(sysDim0), self.vecJacobK[i]]])
-            
-            # Assemble the 3D tensor
-            sysDim = localSystemSize + localAdjointSize
-            sysDim20 = np.zeros((sysDim, sysDim))
-            
-            tempGamma = []
-            for j in range(sysDim):
-                tempGamma.append(np.block([[self.vecSystemGamma[i][j], sysDim0],
-                                           [sysDim0                  , sysDim0]]))
-            for j in range(sysDim):
-                tempGamma.append(np.block([[sysDim0, sysDim0],
-                                           [sysDim0, self.vecJacobGamma[i][j]]]))
-            
-            # Assemble the 4D tensor
-            
-            
-            # Assemble the 5D tensor
-            
-            
-            # Assemble the Force Pattern
-            self.vecJacobForcePattern[i]      = np.concatenate((self.vecSystemForcePattern[i], self.vecJacobForcePattern[i]))
-            
-            # Assemble the Initial Conditions
-            self.vecJacobInitialConditions[i] = np.concatenate((self.vecSystemInitialConditions[i], self.vecJacobInitialConditions[i])) """
-            
+        
+        self.jacobian_B.resize((self.system_B.shape[0]+self.jacobian_B.shape[0], 
+                                self.system_B.shape[1]+self.jacobian_B.shape[1]))
+        dataJacB : np.ndarray = self.jacobian_B.data
+        rowJacB  : np.ndarray = self.jacobian_B.row
+        colJacB  : np.ndarray = self.jacobian_B.col
+        
+        for i in range(len(rowJacB)):
+            rowJacB[i] += self.system_B.shape[0]
+            colJacB[i] += self.system_B.shape[0]
+        
+        dataJacB = np.concatenate((self.system_B.data, dataJacB))
+        rowJacB  = np.concatenate((self.system_B.row,  rowJacB))
+        colJacB  = np.concatenate((self.system_B.col,  colJacB))
+        
+        self.jacobian_B = coo_matrix((dataJacB, (rowJacB, colJacB)), shape = (self.jacobian_B.shape[0], self.jacobian_B.shape[1]))
+        
+        
+        self.jacobian_K.resize((self.system_K.shape[0]+self.jacobian_K.shape[0], 
+                                self.system_K.shape[1]+self.jacobian_K.shape[1]))
+        dataJacK : np.ndarray = self.jacobian_K.data
+        rowJacK  : np.ndarray = self.jacobian_K.row
+        colJacK  : np.ndarray = self.jacobian_K.col
+        
+        for i in range(len(rowJacK)):
+            rowJacK[i] += self.system_K.shape[0]
+            colJacK[i] += self.system_K.shape[0]
+        
+        dataJacK = np.concatenate((self.system_K.data, dataJacK))
+        rowJacK  = np.concatenate((self.system_K.row,  rowJacK))
+        colJacK  = np.concatenate((self.system_K.col,  colJacK))
+        
+        self.jacobian_K = coo_matrix((dataJacK, (rowJacK, colJacK)), shape = (self.jacobian_K.shape[0], self.jacobian_K.shape[1]))
+        
             
