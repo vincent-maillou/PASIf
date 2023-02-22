@@ -155,9 +155,6 @@ print(f'Total getTrajectory() time: {stop-start} s')
 
 
 
-
-
-
 #   ----- Plotting -----   #
 
 fig, axs = plt.subplots(3, constrained_layout=True)

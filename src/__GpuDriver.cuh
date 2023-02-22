@@ -29,13 +29,15 @@ class __GpuDriver{
   int  _loadExcitationsSet(std::vector< std::vector<double> > excitationSet_,
                            uint sampleRate_);
   // Load B as a 2D matrix loaded from a COO format
-  void _setB(std::vector<uint> dimensions_,
-             std::vector<reel> values_,
-             std::vector<uint> indices_); 
+  void _setB(std::vector<reel> values_,
+             std::vector<uint> row_,
+             std::vector<uint> col_,
+             uint n_); 
   // Load K as a 2D matrix loaded from a COO format
-  void _setK(std::vector<uint> dimensions_,
-             std::vector<reel> values_,
-             std::vector<uint> indices_);
+  void _setK(std::vector<reel> values_,
+             std::vector<uint> row_,
+             std::vector<uint> col_,
+             uint n_);
   // Load Gamma as a 3D tensor loaded from a COO format
   void _setGamma(std::vector<uint> dimensions_,
                  std::vector<reel> values_,

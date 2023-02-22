@@ -37,13 +37,15 @@ PYBIND11_MODULE(PASIfgpu, m) {
 
     // Setters for the system definition
     .def("_setB", &__GpuDriver::_setB,
-      py::arg("dimensions_"),
       py::arg("values_"),
-      py::arg("indices_"))
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
     .def("_setK", &__GpuDriver::_setK,
-      py::arg("dimensions_"),
       py::arg("values_"),
-      py::arg("indices_"))
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
     .def("_setGamma", &__GpuDriver::_setGamma,
       py::arg("dimensions_"),
       py::arg("values_"),

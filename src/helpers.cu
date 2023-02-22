@@ -23,9 +23,10 @@
   * @param denseMatrix 
   * @param scaleMatrix 
   */
-    COOMatrix::COOMatrix(std::vector<uint> dimensions_,
-                         std::vector<reel> values_,
-                         std::vector<uint> indices_) :
+    COOMatrix::COOMatrix(std::vector<reel> values_,
+                         std::vector<uint> row_,
+                         std::vector<uint> col_,
+                         uint n_):
         n(0),
         alpha(1),
         beta(1){
@@ -42,12 +43,12 @@
 
       // Higher dimension = Number of DOFs
       //   - Square matrix supposed
-      n   = dimensions_[0]; 
+      n   = n_; 
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
-        row.push_back(indices_[2*i]);
-        col.push_back(indices_[2*i+1]);
+        row.push_back(row_[i]);
+        col.push_back(col_[i]);
       }
 
       /* std::cout << "val" << std::endl;

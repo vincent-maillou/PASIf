@@ -180,24 +180,28 @@
 
 
 
-  void __GpuDriver::_setB(std::vector<uint> dimensions_,
-                          std::vector<reel> values_,
-                          std::vector<uint> indices_){
+  void __GpuDriver::_setB(std::vector<reel> values_,
+                          std::vector<uint> row_,
+                          std::vector<uint> col_,
+                          uint n_){
     clearB();
 
-    B = new COOMatrix(dimensions_,
-                      values_,
-                      indices_);  
+    B = new COOMatrix(values_,
+                      row_,
+                      col_,
+                      n_);
   }
 
-  void __GpuDriver::_setK(std::vector<uint> dimensions_,
-                          std::vector<reel> values_,
-                          std::vector<uint> indices_){
+  void __GpuDriver::_setK(std::vector<reel> values_,
+                          std::vector<uint> row_,
+                          std::vector<uint> col_,
+                          uint n_){
     clearK();
 
-    K = new COOMatrix(dimensions_,
-                      values_,
-                      indices_);
+    K = new COOMatrix(values_,
+                      row_,
+                      col_,
+                      n_);
   }
 
   void __GpuDriver::_setGamma(std::vector<uint> dimensions_,

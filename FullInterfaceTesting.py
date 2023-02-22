@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # Generate the excitation set
 excitationSet = []
-excitation = np.ones(78001)
+excitation : np.ndarray = np.ones(78001)
 # Fill the excitation vector with a ramp
 """ excitation = []
 for i in range(78001):
@@ -27,214 +27,47 @@ pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displ
 # pasif.setExcitations(excitationSet, sampleRate)
 
 
-M = [[1, 0.0, 0.0],
-      [0.0, 10, 0.0],
-      [0.0, 0.0, 1.0]]
-
-B = [[1.0, 0.0, 0.0],
-      [0.0, 10.0, 0.0],
-      [0.0, 0.0, 0.0]]
-
-K = [[6.0, 0.0, 0.0],
-      [0.0, 10.0, 0.0],
-      [0.0, 0.0, 0.0]]
-
-Gamma = [[[0.0, 10.0, 0.0],
-           [0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0]], [[10, 0.0, 0.0],
-                              [0.0, 0.0, 0.0],
-                              [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                                                 [0.0, 1, 0.0],
-                                                 [0.0, 0.0, 0.0]]]
-
-Lambda = [[[[0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                              [0.0, 0.0, 0.0],
-                              [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                                                 [0.0, 0.0, 0.0],
-                                                 [0.0, 0.0, 0.0]]],
-           [[[0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0],
-           [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                              [0.0, 40000.0, 0.0],
-                              [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                                                 [0.0, 0.0, 0.0],
-                                                 [0.0, 0.0, 0.0]]],
-           [[[0.0, 0.0, 0.0],
-             [0.0, 0.0, 0.0],
-             [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                                [0.0, 0.0, 0.0],
-                                [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0],
-                                                   [0.0, 0.0, 0.0],
-                                                   [0.0, 0.0, 0.0]]]]
-
-ForcePattern = [0.5, 0.0, 0.0]
-
-InitialCondition = [0.0, 0.0, 0.0]
-
-#n=8*1000*2
-n=1
-
-vecM = np.array(n*[M])
-vecB = np.array(n*[B])
-vecK = np.array(n*[K])
-vecGamma = np.array(n*[Gamma])
-vecLambda = np.array(n*[Lambda])
-vecForcePattern = np.array(n*[ForcePattern])
-vecInitialCondition = np.array(n*[InitialCondition])
-
-
-
-
-
-### THIS PART WILL BE IN THE CUDA ENV AS PREPROCESSING ###
-
-# Make the second-order ode reduction.
-# To do so we incorporate an identity matrix in the B matrix.
-# We then extend the K, Gamma, Lambda and vectors to the new size
-
-extendedVecM = []
-extendedVecB = []
-extendedVecK = []
-extendedVecGamma = []
-extendedVecLambda = []
-extendedForcePattern = []
-extendedInitialCondition = []
-
-numberOfSystems = len(vecM)
-
-for i in range(numberOfSystems):
-      sysDim = vecM[i].shape[0]
-      sysDimI = np.eye(sysDim)
-      sysDim0 = np.zeros((sysDim, sysDim))
-
-      #Extending M, B, K
-      extendedVecM.append(np.block([[sysDimI, sysDim0],
-                                    [sysDim0, vecM[i]]]))
-
-      extendedVecB.append(np.block([[sysDim0, -1*sysDimI],
-                                    [sysDim0,    vecB[i]]]))
-
-      extendedVecK.append(np.block([[sysDim0, sysDim0],
-                                    [vecK[i], sysDim0]]))
-
-      # Extending Gamma 3D Tensor
-      sysDim2 = 2*sysDim
-      tempGamma = []
-      zerosDim2 = np.zeros((sysDim2, sysDim2))
-
-      for j in range(sysDim):
-            tempGamma.append(zerosDim2)
-      for j in range(sysDim):
-            tempGamma.append(np.block([[vecGamma[i][j], sysDim0],
-                                       [sysDim0,        sysDim0]]))
-
-      tempGamma = np.array(tempGamma)
-      extendedVecGamma.append(tempGamma)
-
-      # Extending Lambda 4D Tensor
-      tempLambda = []
-      for j in range(sysDim):
-            tempLambda2 = []
-            for k in range(sysDim):
-                  tempLambda2.append(zerosDim2)
-            tempLambda2 = np.array(tempLambda2)
-            tempLambda.append(tempLambda2)
-
-      for j in range(sysDim):
-            tempLambda2 = []
-            for k in range(sysDim):
-                  tempLambda2.append(np.block([[vecLambda[i][j][k], sysDim0],
-                                               [sysDim0,            sysDim0]]))
-            tempLambda2 = np.array(tempLambda2)
-            tempLambda.append(tempLambda2)
-
-      tempLambda = np.array(tempLambda)
-      extendedVecLambda.append(tempLambda)
-
-      # Extending Force Pattern
-      extendedForcePattern.append(np.concatenate((np.zeros(sysDim), vecForcePattern[i])))
-
-      # Extending Initial Condition 
-      extendedInitialCondition.append(np.concatenate((vecInitialCondition[i], np.zeros(sysDim))))
-
-
-extendedVecM = np.array(extendedVecM)
-extendedVecB = np.array(extendedVecB)
-extendedVecK = np.array(extendedVecK)
-extendedVecGamma = np.array(extendedVecGamma)
-extendedVecLambda = np.array(extendedVecLambda)
-extendedForcePattern = np.array(extendedForcePattern)
-extendedInitialCondition = np.array(extendedInitialCondition)
-
-
-
-
-cooM = cooTensor(dimensions_ = [6, 6])
-cooM.val     = [1, 1, 1, 1, 10, 1]
-cooM.indices = [0,0 , 1,1 , 2,2 , 3,3 , 4,4 , 5,5]
-
-cooB = cooTensor(dimensions_ = [6, 6])
-cooB.val     = [-1, -1, -1, 1, 10]
-cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
-
-cooK = cooTensor(dimensions_ = [6, 6])
-cooK.val     = [6, 10]
-cooK.indices = [3,0 , 4,1]
-
-cooGamma = cooTensor(dimensions_ = [6, 6, 6])
-cooGamma.val     = [20, 10, 1]
-cooGamma.indices = [0,1,3 , 0,0,4 , 1,1,5]
-
-cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
-cooLambda.val     = [40000]
-cooLambda.indices = [1,1,1,4]
-
-
-""" cooB = cooTensor(dimensions_ = [6, 6])
-cooB.val     = [1, 1, 1, -1, -1]
-cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
-
-cooK = cooTensor(dimensions_ = [6, 6])
-cooK.val     = [-6, -1]
-cooK.indices = [3,0 , 4,1]
-
-cooGamma = cooTensor(dimensions_ = [6, 6, 6])
-cooGamma.val      = [10, 1, 1]
-cooGamma.indices  = [0,1,3 , 0,0,4 , 1,1,5]
-
-cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
-cooLambda.val     = [-4000]
-cooLambda.indices = [1,1,1,4] """
-
-forcePattern = [1, 0, 0, 0, 0, 0]
-initialCondition = [0, 0, 0, 0, 0, 0]
-
-""" print("cooM: ", cooM)
-print("cooB: ", cooB)
-print("cooK: ", cooK)
-print("cooGamma: ", cooGamma)
-print("cooLambda: ", cooLambda) """
-
 n = 1
-cooVecM = [cooM]
-cooVecM *= n
-cooVecB = [cooB]
-cooVecB *= n
-cooVecK = [cooK]
-cooVecK *= n
-cooVecGamma = [cooGamma]
-cooVecGamma *= n
-cooVecLambda = [cooLambda]
-cooVecLambda *= n
-vecForcePattern = [forcePattern]
-vecForcePattern *= n
-vecInitialCondition = [initialCondition]
-vecInitialCondition *= n
+
+from scipy.sparse import dia_matrix
+M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 10., 1.], [0]), shape=(6, 6)) 
+vecM : list[dia_matrix] = [M] * n
+
+from scipy.sparse import coo_matrix
+B    : coo_matrix       = coo_matrix(([-1, -1, -1, 1, 10], ([0, 1, 2, 3, 4], [3, 4, 5, 3, 4])), shape=(6, 6))
+vecB : list[coo_matrix] = [B] * n
+
+K    : coo_matrix       = coo_matrix(([6, 10], ([3, 4], [0, 1])), shape=(6, 6))
+vecK : list[coo_matrix] = [K] * n
+
+Gamma : coo_tensor = coo_tensor(dimensions_ = [6, 6, 6])
+Gamma.val          = [-10, -10, -1]
+Gamma.indices      = [0,1,3 , 0,0,4 , 1,1,5]
+vecGamma : list[coo_tensor] = [Gamma] * n
+
+Lambda : coo_tensor = coo_tensor(dimensions_ = [6, 6, 6, 6])
+Lambda.val          = [40000]
+Lambda.indices      = [1,1,1,4]
+vecLambda : list[coo_tensor] = [Lambda] * n
+
+forcePattern    : np.ndarray = np.array([0, 0, 0, 0.5, 0, 0])
+vecForcePattern : list[np.ndarray] = [forcePattern] * n
+
+initialCondition    : np.ndarray = np.array([0, 0, 0, 0, 0, 0])
+vecInitialCondition : list[np.ndarray] = [initialCondition] * n
+
+
+""" print("M: \n", M.todense())
+print("B: \n", B.todense())
+print("K: \n", K.todense())
+print("Gamma: ", Gamma)
+print("Lambda: ", Lambda)
+print("Force Pattern: ", forcePattern)
+print("Initial Condition: ", initialCondition) """
+
 
 start = time.time()
-pasif.setSystems(cooVecM, cooVecB, cooVecK, cooVecGamma, cooVecLambda, vecForcePattern, vecInitialCondition)
+pasif.setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
 end = time.time()
 
 print("setSystems() overall time: ", end - start)
@@ -244,9 +77,9 @@ print("setSystems() overall time: ", end - start)
 """ intMat = np.array([[2/10, 4/10, 3/10, 1/10], 
                    [1/10, 3/10, 4/10, 2/10]]) """
 
-""" intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
+intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 
-pasif.setInterpolationMatrix(intMat) """
+# pasif.setInterpolationMatrix(intMat)
 
 # Modulation buffer
 modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
@@ -261,12 +94,12 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 # Start python timer
 
-""" start   = time.time()
+start   = time.time()
 results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-print("Amplitudes: ", results) """
+print("Amplitudes: ", results)
 
 
 
@@ -277,13 +110,26 @@ end        = time.time()
 
 print("getTrajectories() overall time: ", end - start)
 plt.plot(trajectory[0], trajectory[1])
-plt.show()
+plt.show() """
 
 
+""" jac_M : dia_matrix = dia_matrix(([1., 1., 1., 1., 1., 1.], [0]), shape=(6, 6))
+vecJacM : list[dia_matrix] = [jac_M] * n
+
+jac_B : coo_matrix = coo_matrix(([1], ([2], [0])), shape=(6, 6))
+vecJacB : list[coo_matrix] = [jac_B] * n
+
+jac_K : coo_matrix = coo_matrix(([-6, -2], ([0, 2], [1, 1])), shape=(6, 6))
+vecJacK : list[coo_matrix] = [jac_K] * n
+
+jac_Gamma : coo_tensor = coo_tensor(dimensions_ = [6, 6, 4])
+jac_Gamma.val          = [2, -1, -1]
+jac_Gamma.indices      = [0, 2, 0, 4, 1, 2, 5, 1, 0]
+vecJac_Gamma : list[coo_tensor] = [jac_Gamma] * n """
 
 
 # Initialize the Psi 5 dimmensional tensor and fill it with 0
-Psi = np.zeros((sysDim2, sysDim2, sysDim2, sysDim2, sysDim2))
+""" Psi = np.zeros((sysDim2, sysDim2, sysDim2, sysDim2, sysDim2))
 extendedVecPsi = np.array(n*[Psi])
 
 start      = time.time()

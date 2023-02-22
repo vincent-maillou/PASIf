@@ -21,11 +21,12 @@ import copy  as cp
 from   dataclasses import dataclass
 from   typing      import Union
 from scipy.sparse        import coo_matrix
+from scipy.sparse        import dia_matrix
 from scipy.sparse.linalg import inv
 
 
 @dataclass
-class cooTensor:
+class coo_tensor:
     def __init__(self, dimensions_: list[int] = [2, 2]):
         self.dimensions = dimensions_
         self.val        = []
@@ -35,17 +36,7 @@ class cooTensor:
         # Print the sparse tensor
         tensorString = "\n"
         currentValue = 0
-        if len(self.dimensions) == 2:
-            # Explicit print for 2D tensors
-            for i in range(self.dimensions[0]):
-                for j in range(self.dimensions[1]):
-                    if currentValue < len(self.val) and self.indices[2*currentValue] == i and self.indices[2*currentValue+1] == j:
-                        tensorString += str(self.val[currentValue]) + " "
-                        currentValue += 1
-                    else:
-                        tensorString += "_" + " "
-                tensorString += "\n "
-        elif len(self.dimensions) == 3:
+        if len(self.dimensions) == 3:
             # Explicit print for 3D tensors
             for k in range(self.dimensions[0]):
                 for i in range(self.dimensions[1]):
@@ -82,7 +73,7 @@ class cooTensor:
     indices   : list[int]
     
     
-    def concatenateTensor(self, tensor_: cooTensor):
+    def concatenateTensor(self, tensor_ : coo_tensor):
         #                   ----- TODO -----
         if(self.dimensions != tensor_.dimensions):
             raise Exception("The number of dimensions of the two tensors are not the same")
@@ -98,28 +89,17 @@ class cooTensor:
         for i in range(len(self.dimensions)):
             self.dimensions[i] += tensor_.dimensions[i]    
         
-    def multiplyBySparseMatrix(self, matrix_: coo_matrix):
+    def multiplyByDiagMatrix(self, diagMatrix_: list):
         # Check input tensor dimensions
-        if matrix_.shape[0] != matrix_.shape[1]:
-            raise Exception("The input matrix must be square")
-        if matrix_.shape[0] != self.dimensions[0] or matrix_.shape[1] != self.dimensions[1]:
+        if len(diagMatrix_) != self.dimensions[0] or len(diagMatrix_) != self.dimensions[1]:
             raise Exception("The input matrix dimensions must match the row/col dimensions of the tensor")
         
-        # Trivial for 2D Tensor
         if len(self.dimensions) == 2:
-            # Use the scipy sparse matrix multiplication
-            scipySelfDescription = coo_matrix((self.val, (self.getIndicesDim(0), self.getIndicesDim(1))), 
-                                              shape=(self.dimensions[0], self.dimensions[1]))
-            scipySelfDescription = scipySelfDescription.dot(matrix_)
-            
-            # Copy the data back to the generic tensor
-            self.val     = scipySelfDescription.data
-            
             for i in range(len(self.val)):
-                self.indices.append(scipySelfDescription.getrow(i))
-                self.indices.append(scipySelfDescription.getcol(i))  
-        
-        
+                self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)]]
+        else:
+            for i in range(len(self.val)):
+                self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)+len(self.dimensions)-1]]
         
     def getIndicesDim(self, dim_: int) -> list[int]:
         # Unfold the indices list of the tensor and return the indices  
@@ -137,21 +117,26 @@ class cooTensor:
             if(self.dimensions[i] != self.dimensions[0]):
                 return False
         return True
-
-
-
-# Type aliases for dense representation of parameters tensors
-vector   = list[float]
-matrix   = list[vector]
-tensor3d = list[matrix]
-tensor4d = list[tensor3d]
-tensor5d = list[tensor4d]
+    
+    def extendDimmensions(self, extension_: int):
+        # Extend the dimensions of the tensor by extension_
+        for i in range(len(self.dimensions)):
+            self.dimensions[i] += extension_
+            
+    def offsetDimmension(self,
+                          targetDim_ : int,
+                          offset_    : int):
+        for i in range(len(self.indices)):
+            if i % len(self.dimensions) == targetDim_:
+                self.indices[i] += offset_
+            
+        
 
 
 
 class PASIf(__GpuDriver):
     def __init__(self, 
-                 excitationSet: list[vector], 
+                 excitationSet: list[np.ndarray], 
                  sampleRate   : int, 
                  numsteps_    : int  = 0, 
                  dCompute_    : bool = False,
@@ -177,190 +162,113 @@ class PASIf(__GpuDriver):
         
         self.systemSet       : bool = False
         self.numberOfSystems : int  = 0
-        self.system_cooM                : cooTensor # 2D tensor
-        self.system_cooB                : cooTensor # 2D tensor
-        self.system_cooK                : cooTensor # 2D tensor
-        self.system_cooGamma            : cooTensor # 3D tensor    
-        self.system_cooLambda           : cooTensor # 4D tensor
-        self.system_forcePattern        : vector 
-        self.system_initialConditions   : vector
+        self.system_M                 : dia_matrix 
+        self.system_B                 : coo_matrix 
+        self.system_K                 : coo_matrix 
+        self.system_Gamma             : coo_tensor # 3D tensor    
+        self.system_Lambda            : coo_tensor # 4D tensor
+        self.system_forcePattern      : np.ndarray 
+        self.system_initialConditions : np.ndarray
         
         self.jacobianSet : bool = False
-        self.jacobian_cooM              : cooTensor # 2D tensor
-        self.jacobian_cooB              : cooTensor # 2D tensor
-        self.jacobian_cooK              : cooTensor # 2D tensor
-        self.jacobian_cooGamma          : cooTensor # 3D tensor    
-        self.jacobian_cooLambda         : cooTensor # 4D tensor
-        self.jacobian_cooPsi            : cooTensor # 5D tensor
-        self.jacobian_forcePattern      : vector 
-        self.jacobian_initialConditions : vector
+        self.jacobian_M                 : dia_matrix 
+        self.jacobian_B                 : coo_matrix 
+        self.jacobian_K                 : coo_matrix 
+        self.jacobian_Gamma             : coo_tensor # 3D tensor    
+        self.jacobian_Lambda            : coo_tensor # 4D tensor
+        self.jacobian_Psi               : coo_tensor # 5D tensor
+        self.jacobian_forcePattern      : np.ndarray 
+        self.jacobian_initialConditions : np.ndarray
 
     def setExcitations(self, 
-                       excitationSet: list[vector], 
+                       excitationSet: list[np.ndarray], 
                        sampleRate   : int):
         self.sampleRate = sampleRate
         self._loadExcitationsSet(excitationSet, self.sampleRate)
   
     def setSystems(self,
-                   vecM                : Union[list[matrix],   list[cooTensor]],
-                   vecB                : Union[list[matrix],   list[cooTensor]],
-                   vecK                : Union[list[matrix],   list[cooTensor]],
-                   vecGamma            : Union[list[tensor3d], list[cooTensor]],
-                   vecLambda           : Union[list[tensor4d], list[cooTensor]],
-                   vecForcePattern     : list[vector],
-                   vecInitialConditions: list[vector]):
-        # Check non-empty input
-        if(len(vecM) == 0 or len(vecB) == 0 or len(vecK) == 0 or len(vecGamma) == 0 or len(vecLambda) == 0 or len(vecForcePattern) == 0 or len(vecInitialConditions) == 0):
-            raise ValueError("At least one of the input system is empty.")
+                   vecM                : list[dia_matrix],
+                   vecB                : list[coo_matrix],
+                   vecK                : list[coo_matrix],
+                   vecGamma            : list[coo_tensor],
+                   vecLambda           : list[coo_tensor],
+                   vecForcePattern     : list[np.ndarray],
+                   vecInitialConditions: list[np.ndarray]):
         
-        # Check and convert the input system to COO format if needed,
-        # then check the validity of the system.
-        cooInputVecM      : list[cooTensor] = []
-        cooInputVecB      : list[cooTensor] = []
-        cooInputVecK      : list[cooTensor] = []
-        cooInputVecGamma  : list[cooTensor] = []
-        cooInputVecLambda : list[cooTensor] = []
-        
-        if(type(vecM[0]) == matrix):
-            cooInputVecM = self.__convertToCoo(vecM)
-        elif(type(vecM[0]) == cooTensor):
-            cooInputVecM = vecM
-        else:
-            raise TypeError("Input system M is not a list of matrices or a list of COO tensors.")    
-        
-        if(type(vecB[0]) == matrix):
-            cooInputVecB = self.__convertToCoo(vecB)
-        elif(type(vecB[0]) == cooTensor):
-            cooInputVecB = vecB
-        else:
-            raise TypeError("Input system B is not a list of matrices or a list of COO tensors.")    
-            
-        if(type(vecK[0]) == matrix):
-            cooInputVecK = self.__convertToCoo(vecK)
-        elif(type(vecK[0]) == cooTensor):
-            cooInputVecK = vecK
-        else:
-            raise TypeError("Input system K is not a list of matrices or a list of COO tensors.")    
-            
-        if(type(vecGamma[0]) == tensor3d):
-            cooInputVecGamma = self.__convertToCoo(vecGamma)
-        elif(type(vecGamma[0]) == cooTensor):
-            cooInputVecGamma = vecGamma
-        else:
-            raise TypeError("Input system Gamma is not a list of matrices or a list of COO tensors.")    
-            
-        if(type(vecLambda[0]) == tensor4d):
-            cooInputVecLambda = self.__convertToCoo(vecLambda)
-        elif(type(vecLambda[0]) == cooTensor):
-            cooInputVecLambda = vecLambda
-        else:
-            raise TypeError("Input system Lambda is not a list of matrices or a list of COO tensors.")    
-                
+        assert len(vecM) > 0
+        assert len(vecM) == len(vecB) == len(vecK) == len(vecGamma) == len(vecLambda) == len(vecForcePattern) == len(vecInitialConditions), "The number of Systems in the input vectors must be the same."
+        assert (type(vecM[0]) == dia_matrix and 
+                type(vecB[0]) == coo_matrix and 
+                type(vecK[0]) == coo_matrix and 
+                type(vecGamma[0])  == coo_tensor and 
+                type(vecLambda[0]) == coo_tensor and 
+                type(vecForcePattern[0])      == np.ndarray and 
+                type(vecInitialConditions[0]) == np.ndarray), "Inputs vectors types error."
         
         # Check the validity of the input system (ie. size consistency)
         self.globalSystemSize = 0
-        self.__checkSystemInput(cooInputVecM, 
-                                cooInputVecB, 
-                                cooInputVecK, 
-                                cooInputVecGamma, 
-                                cooInputVecLambda, 
-                                vecForcePattern, 
-                                vecInitialConditions)
-        
-        """ print("cooM: ", cooInputVecM[0])
-        print("cooB: ", cooInputVecB[0])
-        print("cooK: ", cooInputVecK[0])
-        print("cooGamma: ", cooInputVecGamma[0])
-        print("cooLambda: ", cooInputVecLambda[0])
-        print("forcePattern: ", vecForcePattern[0]) """
-        
-        
+        self.__checkInputs(vecM, 
+                           vecB, 
+                           vecK, 
+                           vecGamma, 
+                           vecLambda, 
+                           vecForcePattern, 
+                           vecInitialConditions)
+
         
         # Unfold each of the input vectors of COO systems into a single COO system
-        self.__unfoldSystems(cooInputVecM,
-                             cooInputVecB,
-                             cooInputVecK,
-                             cooInputVecGamma,
-                             cooInputVecLambda,
+        self.__unfoldSystems(vecM,
+                             vecB,
+                             vecK,
+                             vecGamma,
+                             vecLambda,
                              vecForcePattern,
                              vecInitialConditions)
         
-        """ print("cooM: ", self.system_cooM)
-        print("cooB: ", self.system_cooB)
-        print("cooK: ", self.system_cooK)
-        print("cooGamma: ", self.system_cooGamma)
-        print("cooLambda: ", self.system_cooLambda)
-        print("forcePattern: ", self.system_forcePattern) """
         
         # Pre-process the system (ie. multiply per -1*M^-1)
         self.__systemPreprocessing()
+
+
+        # Convert the Column-major COO system to Row-major COO system
+        dataB = [x for _, x in sorted(zip(self.system_B.row, self.system_B.data))]
+        rowB  = [x for x, _ in sorted(zip(self.system_B.row, self.system_B.col))]
+        colB  = [x for _, x in sorted(zip(self.system_B.row, self.system_B.col))]
+        
+        dataK = [x for _, x in sorted(zip(self.system_K.row, self.system_K.data))]
+        rowK  = [x for x, _ in sorted(zip(self.system_K.row, self.system_K.col))]
+        colK  = [x for _, x in sorted(zip(self.system_K.row, self.system_K.col))]
+        
+        self._setB(dataB, 
+                   rowB, 
+                   colB,
+                   self.system_B.shape[0])
+        self._setK(dataK, 
+                   rowK, 
+                   colK,
+                   self.system_K.shape[0])
+        self._setGamma(self.system_Gamma.dimensions, 
+                       self.system_Gamma.val, 
+                       self.system_Gamma.indices)
+        self._setLambda(self.system_Lambda.dimensions,
+                        self.system_Lambda.val,
+                        self.system_Lambda.indices)
+        self._setForcePattern(self.system_forcePattern)
+        self._setInitialConditions(self.system_initialConditions)
         self.systemSet = True
         
-        print("cooB: ", self.system_cooB)
-        print("cooK: ", self.system_cooK)
-        print("cooGamma: ", self.system_cooGamma)
-        print("cooLambda: ", self.system_cooLambda)
-        print("forcePattern: ", self.system_forcePattern)
-        
-        
-        
-        
-        
-        # WORK IN PROGRESS ------------------------------------------------------------
-        """ cooB = cooTensor(dimensions_ = [6, 6])
-        cooB.val     = [1, 1, 1, -1, -1]
-        cooB.indices = [0,3 , 1,4 , 2,5 , 3,3 , 4,4]
-
-        cooK = cooTensor(dimensions_ = [6, 6])
-        cooK.val     = [-6, -1]
-        cooK.indices = [3,0 , 4,1]
-        
-        cooGamma = cooTensor(dimensions_ = [6, 6, 6])
-        cooGamma.val      = [10, 1, 1]
-        cooGamma.indices  = [0,1,3 , 0,0,4 , 1,1,5]
-
-        cooLambda = cooTensor(dimensions_ = [6, 6, 6, 6])
-        cooLambda.val     = [-4000]
-        cooLambda.indices = [1,1,1,4]
-        
-        unfoldedForcePattern = []
-        for i in range(len(self.vecSystemForcePattern)):
-            for j in range(len(self.vecSystemForcePattern[i])):
-                unfoldedForcePattern.append(self.vecSystemForcePattern[i][j])
-        
-        unfoldedInitialConditions = []
-        for i in range(len(self.vecSystemInitialConditions)):
-            for j in range(len(self.vecSystemInitialConditions[i])):
-                unfoldedInitialConditions.append(self.vecSystemInitialConditions[i][j]) """
-        # WORK IN PROGRESS ------------------------------------------------------------
-        
-        """ self._setB(cooB.dimensions, 
-                   cooB.val, 
-                   cooB.indices)
-        self._setK(cooK.dimensions, 
-                   cooK.val, 
-                   cooK.indices)
-        self._setGamma(cooGamma.dimensions, 
-                       cooGamma.val, 
-                       cooGamma.indices)
-        self._setLambda(cooLambda.dimensions,
-                        cooLambda.val,
-                        cooLambda.indices)
-        self._setForcePattern(unfoldedForcePattern)
-        self._setInitialConditions(unfoldedInitialConditions)
-        
         # Load the system on the GPU
-        self._allocateOnDevice() """
+        self._allocateOnDevice()
         
     def setJacobian(self,
-                    vecM                : list[matrix],
-                    vecB                : list[matrix],
-                    vecK                : list[matrix],
-                    vecGamma            : list[tensor3d],
-                    vecLambda           : list[tensor4d],
-                    vecForcePattern     : list[vector],
-                    vecInitialConditions: list[vector],
-                    vecPsi              : list[tensor5d]): 
+                    vecM                : list[dia_matrix],
+                    vecB                : list[coo_matrix],
+                    vecK                : list[coo_matrix],
+                    vecGamma            : list[coo_tensor],
+                    vecLambda           : list[coo_tensor],
+                    vecForcePattern     : list[np.ndarray],
+                    vecInitialConditions: list[np.ndarray],
+                    vecPsi              : list[coo_tensor]): 
         if self.systemSet == False:
             raise ValueError("The system must be set before the jacobian")
           
@@ -500,194 +408,102 @@ class PASIf(__GpuDriver):
     ############################################################# 
     #                      Private methods
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    def __convertToCoo(self, vecInputDenseTensor : list) -> list[cooTensor]:
-        cooOutputVecTensor : list[cooTensor] = []
+    def __checkInputs(self,
+                      inputVecM                 : list[dia_matrix], 
+                      inputVecB                 : list[coo_matrix], 
+                      inputVecK                 : list[coo_matrix], 
+                      inputVecGamma             : list[coo_tensor], 
+                      inputVecLambda            : list[coo_tensor], 
+                      inputVecForcePattern      : list[np.ndarray],
+                      inputVecInitialConditions : list[np.ndarray],
+                      inputVecPsi               : list[coo_tensor] = None):
         
-        if type(vecInputDenseTensor) != list:
-            raise ValueError("The input vector must be a list of dense tensors.")
-        
-        # Transform the 2D dense matrix into a 2D COO tensor
-        if type(vecInputDenseTensor[0]) == matrix:
-            for dsys in range(len(vecInputDenseTensor)):
-                dimx = vecInputDenseTensor[dsys].shape[0]
-                dimy = vecInputDenseTensor[dsys].shape[1]
-                
-                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy]))   
-                
-                for x in range(dimx):
-                    for y in range(dimy):
-                        if vecInputDenseTensor[dsys][x][y] != 0:
-                            cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y])
-                            cooOutputVecTensor[dsys].indices.append(x)
-                            cooOutputVecTensor[dsys].indices.append(y)
-        
-        # Transform the 3D dense tensor into a 3D COO tensor
-        elif type(vecInputDenseTensor[0]) == tensor3d:
-            for dsys in range(len(vecInputDenseTensor)):
-                dimx = vecInputDenseTensor[dsys].shape[0]
-                dimy = vecInputDenseTensor[dsys].shape[1]
-                dimz = vecInputDenseTensor[dsys].shape[2]
-                
-                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz]))   
-                
-                for x in range(dimx):
-                    for y in range(dimy):
-                        for z in range(dimz):
-                            if vecInputDenseTensor[dsys][x][y][z] != 0:
-                                cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z])
-                                cooOutputVecTensor[dsys].indices.append(x)
-                                cooOutputVecTensor[dsys].indices.append(y)
-                                cooOutputVecTensor[dsys].indices.append(z)
-        
-        # Transform the 4D dense tensor into a 4D COO tensor
-        elif type(vecInputDenseTensor[0]) == tensor4d:
-            for dsys in range(len(vecInputDenseTensor)):
-                dimx = vecInputDenseTensor[dsys].shape[0]
-                dimy = vecInputDenseTensor[dsys].shape[1]
-                dimz = vecInputDenseTensor[dsys].shape[2]
-                dimh = vecInputDenseTensor[dsys].shape[3]
-                
-                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz, dimh]))   
-                
-                for x in range(dimx):
-                    for y in range(dimy):
-                        for z in range(dimz):
-                            for h in range(dimh):
-                                if vecInputDenseTensor[dsys][x][y][z][h] != 0:
-                                    cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z][h])
-                                    cooOutputVecTensor[dsys].indices.append(x)
-                                    cooOutputVecTensor[dsys].indices.append(y)
-                                    cooOutputVecTensor[dsys].indices.append(z)
-                                    cooOutputVecTensor[dsys].indices.append(h)
-        
-        # Transform the 5D dense tensor into a 5D COO tensor
-        elif type(vecInputDenseTensor[0]) == tensor5d:
-            for dsys in range(len(vecInputDenseTensor)):
-                dimx = vecInputDenseTensor[dsys].shape[0]
-                dimy = vecInputDenseTensor[dsys].shape[1]
-                dimz = vecInputDenseTensor[dsys].shape[2]
-                dimh = vecInputDenseTensor[dsys].shape[3]
-                diml = vecInputDenseTensor[dsys].shape[4]
-                
-                cooOutputVecTensor.append(cooTensor(dimensions_ = [dimx, dimy, dimz, dimh, diml]))   
-                
-                for x in range(dimx):
-                    for y in range(dimy):
-                        for z in range(dimz):
-                            for h in range(dimh):
-                                for l in range(diml):
-                                    if vecInputDenseTensor[dsys][x][y][z][h] != 0:
-                                        cooOutputVecTensor[dsys].values.append(vecInputDenseTensor[dsys][x][y][z][h][l])
-                                        cooOutputVecTensor[dsys].indices.append(x)
-                                        cooOutputVecTensor[dsys].indices.append(y)
-                                        cooOutputVecTensor[dsys].indices.append(z)
-                                        cooOutputVecTensor[dsys].indices.append(h)
-                                        cooOutputVecTensor[dsys].indices.append(l)
-        else:
-            raise ValueError("The input vector must be a list of dense tensors.")
-        
-        return cooOutputVecTensor
-    
-    
-    def __checkSystemInput(self,
-                           cooInputVecM         : list[cooTensor], 
-                           cooInputVecB         : list[cooTensor], 
-                           cooInputVecK         : list[cooTensor], 
-                           cooInputVecGamma     : list[cooTensor], 
-                           cooInputVecLambda    : list[cooTensor], 
-                           vecForcePattern      : list[vector],
-                           vecInitialConditions : list[vector],
-                           cooInputVecPsi       : list[cooTensor] = None):
         # Case of System setting
-        if type(cooInputVecPsi) != list:
-            # Check the number of System in all of the inputs vectors
-            if(len(cooInputVecM) != len(cooInputVecB)      or  
-               len(cooInputVecM) != len(cooInputVecK)      or 
-               len(cooInputVecM) != len(cooInputVecGamma)  or 
-               len(cooInputVecM) != len(cooInputVecLambda) or 
-               len(cooInputVecM) != len(vecForcePattern)   or 
-               len(cooInputVecM) != len(vecInitialConditions)):
-                raise ValueError("The number of Systems in the input vectors must be the same.")
-
-            # Check that the matrix of each System are squared and of the same size
-            for i in range(len(cooInputVecM)):
-                if(cooInputVecM[i].isSquare()      == False or
-                   cooInputVecB[i].isSquare()      == False or
-                   cooInputVecK[i].isSquare()      == False or
-                   cooInputVecGamma[i].isSquare()  == False or
-                   cooInputVecLambda[i].isSquare() == False or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecB[i].dimensions[0]      or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecK[i].dimensions[0]      or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecGamma[i].dimensions[0]  or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecLambda[i].dimensions[0] or
-                   cooInputVecM[i].dimensions[0]   != len(vecForcePattern[i])            or
-                   cooInputVecM[i].dimensions[0]   != len(vecInitialConditions[i])):
-                    raise ValueError("The dimension of each System must be the same.")
-                self.globalSystemSize += cooInputVecM[i].dimensions[0]   
-            self.numberOfSystems = len(cooInputVecM) 
-        
-        else:
-            # Check the number of Jacobian in all of the inputs vectors and against the number of setted Systems
-            if(len(self.numberOfSystems) != len(cooInputVecM)      or  
-               len(self.numberOfSystems) != len(cooInputVecB)      or 
-               len(self.numberOfSystems) != len(cooInputVecK)      or 
-               len(self.numberOfSystems) != len(cooInputVecGamma)  or 
-               len(self.numberOfSystems) != len(cooInputVecLambda) or 
-               len(self.numberOfSystems) != len(vecForcePattern)   or 
-               len(self.numberOfSystems) != len(vecInitialConditions)):
-                raise ValueError("The number of Jacobian in the input vectors must be the same and match the number of setted Systems.")
-
-            # Check that the matrix of each System are squared and of the same size
-            for i in range(len(cooInputVecM)):
-                if(cooInputVecM[i].isSquare()      == False or
-                   cooInputVecB[i].isSquare()      == False or
-                   cooInputVecK[i].isSquare()      == False or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecB[i].dimensions[0]      or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecK[i].dimensions[0]      or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecGamma[i].dimensions[0]  or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecLambda[i].dimensions[0] or
-                   cooInputVecM[i].dimensions[0]   != cooInputVecPsi[i].dimensions[0]    or
-                   cooInputVecM[i].dimensions[0]   != len(vecForcePattern[i])            or
-                   cooInputVecM[i].dimensions[0]   != len(vecInitialConditions[i])):
-                    raise ValueError("The dimension of each Jacobian must be the same.")
-                self.globalAdjointSize += len(cooInputVecM[i])   
+        for i in range(len(inputVecM)):
+            ndofs = inputVecM[i].shape[0]
+            
+            assert inputVecM[i].shape[0] == inputVecM[i].shape[1], "The matrix M must be squared."
+            assert inputVecB[i].shape[0] == inputVecB[i].shape[1], "The matrix B must be squared."
+            assert inputVecK[i].shape[0] == inputVecK[i].shape[1], "The matrix K must be squared."
+            assert inputVecGamma[i].dimensions[0]  == inputVecGamma[i].dimensions[1]  == inputVecGamma[i].dimensions[2], "The Gamma tensor must be squared."
+            assert inputVecLambda[i].dimensions[0] == inputVecLambda[i].dimensions[1] == inputVecLambda[i].dimensions[2] == inputVecLambda[i].dimensions[3], "The Lambda tensor must be squared."
+            
+            assert inputVecB[i].shape[0]                 == ndofs, "The matrix B must have the same size as the matrix M."
+            assert inputVecK[i].shape[0]                 == ndofs, "The matrix K must have the same size as the matrix M."
+            assert inputVecGamma[i].dimensions[0]        == ndofs, "The Gamma tensor must have the same size as the matrix M."
+            assert inputVecLambda[i].dimensions[0]       == ndofs, "The Lambda tensor must have the same size as the matrix M."
+            assert inputVecForcePattern[i].shape[0]      == ndofs, "The force pattern vector must have the same size as the matrix M."
+            assert inputVecInitialConditions[i].shape[0] == ndofs, "The initial conditions vector must have the same size as the matrix M."
+            
+            if inputVecPsi is not None:
+                assert inputVecPsi[i].dimensions[0]    == ndofs, "The Psi tensor must have the same size as the matrix M."
+                assert inputVecPsi[i].dimensions[0] == inputVecPsi[i].dimensions[1] == inputVecPsi[i].dimensions[2] == inputVecPsi[i].dimensions[3]  == inputVecPsi[i].dimensions[4], "The Psi tensor must be squared."
 
 
     def __unfoldSystems(self,
-                        input_cooVecM              : list[cooTensor],
-                        input_cooVecB              : list[cooTensor],
-                        input_cooVecK              : list[cooTensor],
-                        input_cooVecGamma          : list[cooTensor],
-                        input_cooVecLambda         : list[cooTensor],
-                        input_vecForcePattern      : list[vector],
-                        input_vecInitialConditions : list[vector]):
+                        inputVecM                 : list[dia_matrix], 
+                        inputVecB                 : list[coo_matrix], 
+                        inputVecK                 : list[coo_matrix], 
+                        inputVecGamma             : list[coo_tensor], 
+                        inputVecLambda            : list[coo_tensor], 
+                        inputVecForcePattern      : list[np.ndarray],
+                        inputVecInitialConditions : list[np.ndarray]):
         
-        if len(input_cooVecM) > 1:
-            for i in range(1, len(input_cooVecM)):
-                input_cooVecM[0].concatenateTensor(input_cooVecM[i])
-                input_cooVecB[0].concatenateTensor(input_cooVecB[i])
-                input_cooVecK[0].concatenateTensor(input_cooVecK[i])
-                input_cooVecGamma[0].concatenateTensor(input_cooVecGamma[i])
-                input_cooVecLambda[0].concatenateTensor(input_cooVecLambda[i])
-                input_vecForcePattern[0]      += input_vecForcePattern[i]
-                input_vecInitialConditions[0] += input_vecInitialConditions[i]
-        
-        self.system_cooM              = cp.deepcopy(input_cooVecM[0])
-        self.system_cooB              = cp.deepcopy(input_cooVecB[0])
-        self.system_cooK              = cp.deepcopy(input_cooVecK[0])
-        self.system_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
-        self.system_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
-        self.system_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
-        self.system_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
+        numberOfSystems = len(inputVecM)
+    
+        self.globalSystemSize = inputVecM[0].shape[0]
+
+        if numberOfSystems > 1:
+            diagM : np.ndarray = inputVecM[0].data
+            
+            valB  : np.ndarray = inputVecB[0].data
+            rowB  : np.ndarray = inputVecB[0].row
+            colB  : np.ndarray = inputVecB[0].col
+            
+            valK  : np.ndarray = inputVecK[0].data
+            rowK  : np.ndarray = inputVecK[0].row
+            colK  : np.ndarray = inputVecK[0].col
+            
+            for i in range(1, numberOfSystems):
+                diagM = np.concatenate((diagM, inputVecM[i].data)).flatten()
+                
+                valB = np.concatenate((valB, inputVecB[i].data))
+                rowB = np.concatenate((rowB, inputVecB[i].row + self.globalSystemSize))
+                colB = np.concatenate((colB, inputVecB[i].col + self.globalSystemSize))
+                
+                valK = np.concatenate((valK, inputVecK[i].data))
+                rowK = np.concatenate((rowK, inputVecK[i].row + self.globalSystemSize))
+                colK = np.concatenate((colK, inputVecK[i].col + self.globalSystemSize))
+                
+                inputVecGamma[0].concatenateTensor(inputVecGamma[i])
+                inputVecLambda[0].concatenateTensor(inputVecLambda[i])
+                inputVecForcePattern[0]      = np.concatenate((inputVecForcePattern[0], inputVecForcePattern[i]), axis = 0)
+                inputVecInitialConditions[0] = np.concatenate((inputVecInitialConditions[0], inputVecInitialConditions[i]), axis = 0)
+                
+                self.globalSystemSize += inputVecM[i].shape[0]
+            
+            self.system_M = dia_matrix((diagM, [0]),         shape = (self.globalSystemSize, self.globalSystemSize))
+            self.system_B = coo_matrix((valB, (rowB, colB)), shape = (self.globalSystemSize, self.globalSystemSize))
+            self.system_K = coo_matrix((valK, (rowK, colK)), shape = (self.globalSystemSize, self.globalSystemSize))
+            
+        else:
+            self.system_M = cp.deepcopy(inputVecM[0])
+            self.system_B = cp.deepcopy(inputVecB[0])
+            self.system_K = cp.deepcopy(inputVecK[0])
+            
+        self.system_Gamma             = cp.deepcopy(inputVecGamma[0])
+        self.system_Lambda            = cp.deepcopy(inputVecLambda[0])
+        self.system_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
+        self.system_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
         
         
     def __unfoldJacobians(self,
-                          input_cooVecM              : list[cooTensor],
-                          input_cooVecB              : list[cooTensor],
-                          input_cooVecK              : list[cooTensor],
-                          input_cooVecGamma          : list[cooTensor],
-                          input_cooVecLambda         : list[cooTensor],
-                          input_cooVecPsi            : list[cooTensor],
+                          input_cooVecM              : list[coo_tensor],
+                          input_cooVecB              : list[coo_tensor],
+                          input_cooVecK              : list[coo_tensor],
+                          input_cooVecGamma          : list[coo_tensor],
+                          input_cooVecLambda         : list[coo_tensor],
+                          input_cooVecPsi            : list[coo_tensor],
                           input_vecForcePattern      : list[vector],
                           input_vecInitialConditions : list[vector]):
         
@@ -714,21 +530,15 @@ class PASIf(__GpuDriver):
     
     def __systemPreprocessing(self):
         
-        scipyM = coo_matrix((self.system_cooM.val, (self.system_cooM.getIndicesDim(0), self.system_cooM.getIndicesDim(1))),
-                             shape=(self.system_cooM.dimensions[0], self.system_cooM.dimensions[1]))
+        self.system_M = -1*inv(self.system_M)
+        self.system_B = coo_matrix(self.system_M.dot(self.system_B))
+        self.system_K = coo_matrix(self.system_M.dot(self.system_K))
         
-        scipyM = scipyM.tocsc()
-        scipyMinv = -1*inv(scipyM)
-        scipyMinv = scipyMinv.tocoo()
+        self.system_Gamma.multiplyByDiagMatrix(self.system_M.data)
+        self.system_Lambda.multiplyByDiagMatrix(self.system_M.data)
         
-        print(scipyMinv)
+        self.system_forcePattern *= -1*self.system_M.data
         
-        self.system_cooB.multiplyBySparseMatrix(scipyMinv)
-        self.system_cooK.multiplyBySparseMatrix(scipyMinv)
-        """ self.system_cooGamma.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col)
-        self.system_cooLambda.multiplyBySparseMatrix(scipyMinv.data, scipyMinv.row, scipyMinv.col) """
-        for i in range(len(self.system_forcePattern)):
-            self.system_forcePattern[i] *= scipyMinv.diagonal()[i]
 
                 
                 

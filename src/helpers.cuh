@@ -72,9 +72,10 @@
   
   struct COOMatrix{
     COOMatrix() {};
-    COOMatrix(std::vector<uint> dimensions_,
-              std::vector<reel> values_,
-              std::vector<uint> indices_);
+    COOMatrix(std::vector<reel> values_,
+              std::vector<uint> row_,
+              std::vector<uint> col_,
+              uint n_);
     ~COOMatrix();
 
     uint   extendTheSystem(uint nTimes);
