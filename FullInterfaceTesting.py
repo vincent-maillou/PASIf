@@ -92,14 +92,13 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 
 #pasif.setModulationBuffer(modulationBuffer)
 
-# Start python timer
 
-start   = time.time()
+""" start   = time.time()
 results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-print("Amplitudes: ", results)
+print("Amplitudes: ", results) """
 
 
 
@@ -128,17 +127,45 @@ jac_Gamma.indices      = [0, 2, 0, 4, 1, 2, 5, 1, 0]
 vecJac_Gamma : list[coo_tensor] = [jac_Gamma] * n """
 
 
-# Initialize the Psi 5 dimmensional tensor and fill it with 0
-""" Psi = np.zeros((sysDim2, sysDim2, sysDim2, sysDim2, sysDim2))
-extendedVecPsi = np.array(n*[Psi])
+M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 1., 1., 1., 1.], [0]), shape=(8, 8)) 
+vecM : list[dia_matrix] = [M] * n
+
+from scipy.sparse import coo_matrix
+B    : coo_matrix       = coo_matrix(([-5, -5, -5, -5, -5, -5, -5, -5], ([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7])), shape=(8, 8))
+vecB : list[coo_matrix] = [B] * n
+
+K    : coo_matrix       = coo_matrix(([-6, -6, -6, -6, -6, -6, -6, -6], ([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7])), shape=(8, 8))
+vecK : list[coo_matrix] = [K] * n
+
+Gamma : coo_tensor = coo_tensor(dimensions_ = [8, 8, 8])
+Gamma.val          = [-7, -7, -7]
+Gamma.indices      = [0,0,4 , 1,1,5 , 2,2,6]
+vecGamma : list[coo_tensor] = [Gamma] * n
+
+Lambda : coo_tensor = coo_tensor(dimensions_ = [8, 8, 8, 8])
+Lambda.val          = [1]
+Lambda.indices      = [1,1,1,1]
+vecLambda : list[coo_tensor] = [Lambda] * n
+
+forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+vecForcePattern : list[np.ndarray] = [forcePattern] * n
+
+initialCondition    : np.ndarray = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+vecInitialCondition : list[np.ndarray] = [initialCondition] * n
+
+Psi : coo_tensor = coo_tensor(dimensions_ = [8, 8, 8, 8, 8])
+Psi.val          = [1]
+Psi.indices      = [1,1,1,1]
+vecPsi : list[coo_tensor] = [Lambda] * n
+
 
 start      = time.time()
-pasif.setJacobian(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition, extendedVecPsi)
+pasif.setJacobian(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition, vecPsi)
 end        = time.time()
 
 print("setJacobian() overall time: ", end - start)
 
-start      = time.time()
+""" start      = time.time()
 gradient = pasif.getGradient()
 end        = time.time()
 

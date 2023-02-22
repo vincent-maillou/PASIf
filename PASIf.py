@@ -126,6 +126,8 @@ class coo_tensor:
     def offsetDimmension(self,
                           targetDim_ : int,
                           offset_    : int):
+        # Add to the indices of the targetDim_ dimension the offset_ value
+        # - Used to offset a tensor in a specific dimension
         for i in range(len(self.indices)):
             if i % len(self.dimensions) == targetDim_:
                 self.indices[i] += offset_
@@ -162,23 +164,23 @@ class PASIf(__GpuDriver):
         
         self.systemSet       : bool = False
         self.numberOfSystems : int  = 0
-        self.system_M                 : dia_matrix 
-        self.system_B                 : coo_matrix 
-        self.system_K                 : coo_matrix 
-        self.system_Gamma             : coo_tensor # 3D tensor    
-        self.system_Lambda            : coo_tensor # 4D tensor
-        self.system_forcePattern      : np.ndarray 
-        self.system_initialConditions : np.ndarray
+        self.system_M                 : dia_matrix = None 
+        self.system_B                 : coo_matrix = None 
+        self.system_K                 : coo_matrix = None 
+        self.system_Gamma             : coo_tensor = None # 3D tensor    
+        self.system_Lambda            : coo_tensor = None # 4D tensor
+        self.system_forcePattern      : np.ndarray = None 
+        self.system_initialConditions : np.ndarray = None
         
         self.jacobianSet : bool = False
-        self.jacobian_M                 : dia_matrix 
-        self.jacobian_B                 : coo_matrix 
-        self.jacobian_K                 : coo_matrix 
-        self.jacobian_Gamma             : coo_tensor # 3D tensor    
-        self.jacobian_Lambda            : coo_tensor # 4D tensor
-        self.jacobian_Psi               : coo_tensor # 5D tensor
-        self.jacobian_forcePattern      : np.ndarray 
-        self.jacobian_initialConditions : np.ndarray
+        self.jacobian_M                 : dia_matrix = None
+        self.jacobian_B                 : coo_matrix = None 
+        self.jacobian_K                 : coo_matrix = None 
+        self.jacobian_Gamma             : coo_tensor = None # 3D tensor    
+        self.jacobian_Lambda            : coo_tensor = None # 4D tensor
+        self.jacobian_forcePattern      : np.ndarray = None 
+        self.jacobian_initialConditions : np.ndarray = None
+        self.jacobian_Psi               : coo_tensor = None # 5D tensor
 
     def setExcitations(self, 
                        excitationSet: list[np.ndarray], 
@@ -194,6 +196,8 @@ class PASIf(__GpuDriver):
                    vecLambda           : list[coo_tensor],
                    vecForcePattern     : list[np.ndarray],
                    vecInitialConditions: list[np.ndarray]):
+        
+        self.systemSet = False
         
         assert len(vecM) > 0
         assert len(vecM) == len(vecB) == len(vecK) == len(vecGamma) == len(vecLambda) == len(vecForcePattern) == len(vecInitialConditions), "The number of Systems in the input vectors must be the same."
@@ -269,8 +273,54 @@ class PASIf(__GpuDriver):
                     vecForcePattern     : list[np.ndarray],
                     vecInitialConditions: list[np.ndarray],
                     vecPsi              : list[coo_tensor]): 
+        
+        self.javoianSet = False
+        
         if self.systemSet == False:
             raise ValueError("The system must be set before the jacobian")
+          
+        assert len(vecM) > 0
+        assert len(vecM) == self.numberOfSystems, "The number of jacobian must be the same as the number of systems."
+        assert len(vecM) == len(vecB) == len(vecK) == len(vecGamma) == len(vecLambda) == len(vecForcePattern) == len(vecInitialConditions), "The number of Systems in the input vectors must be the same."
+        assert (type(vecM[0]) == dia_matrix and 
+                type(vecB[0]) == coo_matrix and 
+                type(vecK[0]) == coo_matrix and 
+                type(vecGamma[0])  == coo_tensor and 
+                type(vecLambda[0]) == coo_tensor and 
+                type(vecForcePattern[0])      == np.ndarray and 
+                type(vecInitialConditions[0]) == np.ndarray and
+                type(vecPsi[0]) == coo_tensor), "Inputs vectors types error."  
+
+
+        self.__checkInputs(vecM, 
+                           vecB, 
+                           vecK, 
+                           vecGamma, 
+                           vecLambda, 
+                           vecForcePattern, 
+                           vecInitialConditions,
+                           vecPsi)
+        
+        self.__unfoldJacobians(vecM, 
+                               vecB, 
+                               vecK, 
+                               vecGamma, 
+                               vecLambda, 
+                               vecForcePattern, 
+                               vecInitialConditions,
+                               vecPsi)
+
+
+
+        print("jacob M: \n", self.jacobian_M)
+        print("jacob B: \n", self.jacobian_B)
+        print("jacob K: \n", self.jacobian_K)
+        print("jacob Gamma: \n", self.jacobian_Gamma)
+        print("jacob Lambda: \n", self.jacobian_Lambda)
+        print("jacob forcePattern: \n", self.jacobian_forcePattern)
+        print("jacob initialConditions: \n", self.jacobian_initialConditions)
+        print("jacob psi: \n", self.jacobian_Psi)
+
           
         """ # Check if the system is valid
         self.globalAdjointSize = 0  
@@ -449,11 +499,11 @@ class PASIf(__GpuDriver):
                         inputVecForcePattern      : list[np.ndarray],
                         inputVecInitialConditions : list[np.ndarray]):
         
-        numberOfSystems = len(inputVecM)
+        self.numberOfSystems = len(inputVecM)
     
         self.globalSystemSize = inputVecM[0].shape[0]
 
-        if numberOfSystems > 1:
+        if self.numberOfSystems > 1:
             diagM : np.ndarray = inputVecM[0].data
             
             valB  : np.ndarray = inputVecB[0].data
@@ -464,7 +514,7 @@ class PASIf(__GpuDriver):
             rowK  : np.ndarray = inputVecK[0].row
             colK  : np.ndarray = inputVecK[0].col
             
-            for i in range(1, numberOfSystems):
+            for i in range(1, self.numberOfSystems):
                 diagM = np.concatenate((diagM, inputVecM[i].data)).flatten()
                 
                 valB = np.concatenate((valB, inputVecB[i].data))
@@ -498,35 +548,66 @@ class PASIf(__GpuDriver):
         
         
     def __unfoldJacobians(self,
-                          input_cooVecM              : list[coo_tensor],
-                          input_cooVecB              : list[coo_tensor],
-                          input_cooVecK              : list[coo_tensor],
-                          input_cooVecGamma          : list[coo_tensor],
-                          input_cooVecLambda         : list[coo_tensor],
-                          input_cooVecPsi            : list[coo_tensor],
-                          input_vecForcePattern      : list[vector],
-                          input_vecInitialConditions : list[vector]):
+                          inputVecM                 : list[dia_matrix], 
+                          inputVecB                 : list[coo_matrix], 
+                          inputVecK                 : list[coo_matrix], 
+                          inputVecGamma             : list[coo_tensor], 
+                          inputVecLambda            : list[coo_tensor], 
+                          inputVecForcePattern      : list[np.ndarray],
+                          inputVecInitialConditions : list[np.ndarray],
+                          inputVecPsi               : list[coo_tensor]):
         
-        if len(input_cooVecM) > 1:
-            for i in range(1, len(input_cooVecM)):
-                input_cooVecM[0].concatenateTensor(input_cooVecM[i])
-                input_cooVecB[0].concatenateTensor(input_cooVecB[i])
-                input_cooVecK[0].concatenateTensor(input_cooVecK[i])
-                input_cooVecGamma[0].concatenateTensor(input_cooVecGamma[i])
-                input_cooVecLambda[0].concatenateTensor(input_cooVecLambda[i])
-                input_cooVecPsi[0].concatenateTensor(input_cooVecPsi[i])
-                input_vecForcePattern[0]      += input_vecForcePattern[i]
-                input_vecInitialConditions[0] += input_vecInitialConditions[i]
+        self.globalAdjointSize = inputVecM[0].shape[0]
+
+        if self.numberOfSystems > 1:
+            diagM : np.ndarray = inputVecM[0].data
+            
+            valB  : np.ndarray = inputVecB[0].data
+            rowB  : np.ndarray = inputVecB[0].row
+            colB  : np.ndarray = inputVecB[0].col
+            
+            valK  : np.ndarray = inputVecK[0].data
+            rowK  : np.ndarray = inputVecK[0].row
+            colK  : np.ndarray = inputVecK[0].col
+            
+            for i in range(1, self.numberOfSystems):
+                diagM = np.concatenate((diagM, inputVecM[i].data)).flatten()
+                
+                valB = np.concatenate((valB, inputVecB[i].data))
+                rowB = np.concatenate((rowB, inputVecB[i].row + self.globalAdjointSize))
+                colB = np.concatenate((colB, inputVecB[i].col + self.globalAdjointSize))
+                
+                valK = np.concatenate((valK, inputVecK[i].data))
+                rowK = np.concatenate((rowK, inputVecK[i].row + self.globalAdjointSize))
+                colK = np.concatenate((colK, inputVecK[i].col + self.globalAdjointSize))
+                
+                inputVecGamma[0].concatenateTensor(inputVecGamma[i])
+                inputVecLambda[0].concatenateTensor(inputVecLambda[i])
+                inputVecPsi[0].concatenateTensor(inputVecPsi[i])
+                inputVecForcePattern[0]      = np.concatenate((inputVecForcePattern[0], inputVecForcePattern[i]), axis = 0)
+                inputVecInitialConditions[0] = np.concatenate((inputVecInitialConditions[0], inputVecInitialConditions[i]), axis = 0)
+                
+                self.globalAdjointSize += inputVecM[i].shape[0]
+            
+            self.jacobian_M = dia_matrix((diagM, [0]),         shape = (self.globalAdjointSize, self.globalAdjointSize))
+            self.jacobian_B = coo_matrix((valB, (rowB, colB)), shape = (self.globalAdjointSize, self.globalAdjointSize))
+            self.jacobian_K = coo_matrix((valK, (rowK, colK)), shape = (self.globalAdjointSize, self.globalAdjointSize))
+            
+        else:
+            self.jacobian_M = cp.deepcopy(inputVecM[0])
+            self.jacobian_B = cp.deepcopy(inputVecB[0])
+            self.jacobian_K = cp.deepcopy(inputVecK[0])
+            
+        self.jacobian_Gamma             = cp.deepcopy(inputVecGamma[0])
+        self.jacobian_Lambda            = cp.deepcopy(inputVecLambda[0])
+        self.jacobian_Psi               = cp.deepcopy(inputVecPsi[0])
+        self.jacobian_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
+        self.jacobian_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
         
-        self.jacobian_cooM              = cp.deepcopy(input_cooVecM[0])
-        self.jacobian_cooB              = cp.deepcopy(input_cooVecB[0])
-        self.jacobian_cooK              = cp.deepcopy(input_cooVecK[0])
-        self.jacobian_cooGamma          = cp.deepcopy(input_cooVecGamma[0])  
-        self.jacobian_cooLambda         = cp.deepcopy(input_cooVecLambda[0])
-        self.jacobian_cooPsi            = cp.deepcopy(input_cooVecPsi[0])
-        self.jacobian_forcePattern      = cp.deepcopy(input_vecForcePattern[0])
-        self.jacobian_initialConditions = cp.deepcopy(input_vecInitialConditions[0])
-    
+        
+        
+        
+        
     
     def __systemPreprocessing(self):
         
@@ -538,6 +619,18 @@ class PASIf(__GpuDriver):
         self.system_Lambda.multiplyByDiagMatrix(self.system_M.data)
         
         self.system_forcePattern *= -1*self.system_M.data
+        
+    def __jacobianPreprocessing(self):
+        
+        self.jacobian_M = -1*inv(self.jacobian_M)
+        self.jacobian_B = coo_matrix(self.jacobian_M.dot(self.jacobian_B))
+        self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))
+        
+        self.jacobian_Gamma.multiplyByDiagMatrix(self.jacobian_M.data)
+        self.jacobian_Lambda.multiplyByDiagMatrix(self.jacobian_M.data)
+        self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
+        
+        self.jacobian_forcePattern *= -1*self.jacobian_M.data
         
 
                 

@@ -44,12 +44,14 @@
       // Higher dimension = Number of DOFs
       //   - Square matrix supposed
       n   = n_; 
-      nzz = values_.size();
-      for(size_t i(0); i<nzz; ++i){
-        val.push_back(values_[i]);
-        row.push_back(row_[i]);
-        col.push_back(col_[i]);
+      for(size_t i(0); i<values_.size(); ++i){
+        if(std::abs(values_[i]) > reel_eps){
+          val.push_back(values_[i]);
+          row.push_back(row_[i]);
+          col.push_back(col_[i]);
+        }
       }
+      nzz = val.size();
 
       /* std::cout << "val" << std::endl;
       for(size_t i(0); i<val.size(); ++i){
