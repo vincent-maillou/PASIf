@@ -31,6 +31,7 @@
 #define tensor3d std::vector<std::vector<std::vector<reel>>>
 #define tensor4d std::vector<std::vector<std::vector<std::vector<reel>>>>
 
+enum problemType {forward, backward};
 
 
 /****************************************************

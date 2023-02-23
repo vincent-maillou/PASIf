@@ -243,26 +243,26 @@ class PASIf(__GpuDriver):
         rowK  = [x for x, _ in sorted(zip(self.system_K.row, self.system_K.col))]
         colK  = [x for _, x in sorted(zip(self.system_K.row, self.system_K.col))]
         
-        self._setB(dataB, 
-                   rowB, 
-                   colB,
-                   self.system_B.shape[0])
-        self._setK(dataK, 
-                   rowK, 
-                   colK,
-                   self.system_K.shape[0])
-        self._setGamma(self.system_Gamma.dimensions, 
-                       self.system_Gamma.val, 
-                       self.system_Gamma.indices)
-        self._setLambda(self.system_Lambda.dimensions,
-                        self.system_Lambda.val,
-                        self.system_Lambda.indices)
-        self._setForcePattern(self.system_forcePattern)
-        self._setInitialConditions(self.system_initialConditions)
+        self._setFwdB(dataB, 
+                      rowB, 
+                      colB,
+                      self.system_B.shape[0])
+        self._setFwdK(dataK, 
+                      rowK, 
+                      colK,
+                      self.system_K.shape[0])
+        self._setFwdGamma(self.system_Gamma.dimensions, 
+                          self.system_Gamma.val, 
+                          self.system_Gamma.indices)
+        self._setFwdLambda(self.system_Lambda.dimensions,
+                           self.system_Lambda.val,
+                           self.system_Lambda.indices)
+        self._setFwdForcePattern(self.system_forcePattern)
+        self._setFwdInitialConditions(self.system_initialConditions)
         self.systemSet = True
         
         # Load the system on the GPU
-        self._allocateOnDevice()
+        self._allocateSystemOnDevice()
         
     def setJacobian(self,
                     vecM                : list[dia_matrix],
@@ -274,7 +274,7 @@ class PASIf(__GpuDriver):
                     vecInitialConditions: list[np.ndarray],
                     vecPsi              : list[coo_tensor]): 
         
-        self.javoianSet        = False
+        self.jacobianSet       = False
         self.globalAdjointSize = 0
         
         if self.systemSet == False:

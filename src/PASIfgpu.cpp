@@ -31,42 +31,50 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("dSystem_")  = false,
       py::arg("dSolver_")  = false)
       
+
+    //            Forward system interface
+    .def("_setFwdB", &__GpuDriver::_setFwdB,
+      py::arg("values_"),
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
+    .def("_setFwdK", &__GpuDriver::_setFwdK,
+      py::arg("values_"),
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
+    .def("_setFwdGamma", &__GpuDriver::_setFwdGamma,
+      py::arg("dimensions_"),
+      py::arg("values_"),
+      py::arg("indices_"))
+    .def("_setFwdLambda", &__GpuDriver::_setFwdLambda,
+      py::arg("dimensions_"),
+      py::arg("values_"),
+      py::arg("indices_"))
+    .def("_setFwdForcePattern", &__GpuDriver::_setFwdForcePattern,
+      py::arg("forcePattern_"))
+    .def("_setFwdInitialConditions", &__GpuDriver::_setFwdInitialConditions,
+      py::arg("initialConditions_"))
+
+    .def("_allocateSystemOnDevice", &__GpuDriver::_allocateSystemOnDevice)
+
+
+    //            Backward system interface 
+
+
+    //            Compute options interface 
     .def("_loadExcitationsSet", &__GpuDriver::_loadExcitationsSet,
       py::arg("excitationSet_"),
       py::arg("sampleRate_"))
-
-    // Setters for the system definition
-    .def("_setB", &__GpuDriver::_setB,
-      py::arg("values_"),
-      py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
-    .def("_setK", &__GpuDriver::_setK,
-      py::arg("values_"),
-      py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
-    .def("_setGamma", &__GpuDriver::_setGamma,
-      py::arg("dimensions_"),
-      py::arg("values_"),
-      py::arg("indices_"))
-    .def("_setLambda", &__GpuDriver::_setLambda,
-      py::arg("dimensions_"),
-      py::arg("values_"),
-      py::arg("indices_"))
-    .def("_setForcePattern", &__GpuDriver::_setForcePattern,
-      py::arg("forcePattern_"))
-    .def("_setInitialConditions", &__GpuDriver::_setInitialConditions,
-      py::arg("initialConditions_"))
     .def("_setInterpolationMatrix", &__GpuDriver::_setInterpolationMatrix,
       py::arg("interpolationMatrix_"),
       py::arg("interpolationWindowSize_"))
     .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
       py::arg("modulationBuffer_"))
 
-    .def("_allocateOnDevice", &__GpuDriver::_allocateOnDevice)
     .def("_displaySimuInfos", &__GpuDriver::_displaySimuInfos)
 
+    //            Solvers interface
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
       py::arg("saveSteps_") = 1)
