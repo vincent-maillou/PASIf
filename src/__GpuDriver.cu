@@ -402,7 +402,7 @@
 
 
 
-  std::vector<reel> __GpuDriver::_getGradient(uint globalAdjointSize_, uint save){
+  std::vector<reel> __GpuDriver::_getGradient(uint adjointSize_, uint save){
 
     numSetpoints  = std::sqrt(totalNumsteps);
     chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
@@ -411,6 +411,8 @@
 
     // 1. Compute the setPoints (chunks first step)
     h_trajectories.clear();
+    
+    uint forwardSystemSize = n_dofs-adjointSize_;
 
     size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs;
     h_trajectories.resize(reservedTrajSize);

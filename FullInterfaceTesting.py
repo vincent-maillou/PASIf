@@ -165,14 +165,19 @@ end        = time.time()
 
 print("setJacobian() overall time: ", end - start)
 
-""" start      = time.time()
+start      = time.time()
 gradient = pasif.getGradient()
 end        = time.time()
 
 print("getGradient() overall time: ", end - start)
 
-plt.plot(gradient[0], gradient[1], 'x')
+""" plt.plot(gradient[0], gradient[1], 'r')
+plt.plot(gradient[0], gradient[2], 'b')
 plt.show() """
+
+for i in range(len(gradient)-1):
+    plt.plot(gradient[0], gradient[i+1])
+plt.show()
 
 
 

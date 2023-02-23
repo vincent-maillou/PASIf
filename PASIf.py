@@ -75,7 +75,7 @@ class coo_tensor:
     
     def concatenateTensor(self, tensor_ : coo_tensor):
         #                   ----- TODO -----
-        if(self.dimensions != tensor_.dimensions):
+        if(len(self.dimensions) != len(tensor_.dimensions)):
             raise Exception("The number of dimensions of the two tensors are not the same")
 
         # Concatenate the values of the two tensors
@@ -274,7 +274,8 @@ class PASIf(__GpuDriver):
                     vecInitialConditions: list[np.ndarray],
                     vecPsi              : list[coo_tensor]): 
         
-        self.javoianSet = False
+        self.javoianSet        = False
+        self.globalAdjointSize = 0
         
         if self.systemSet == False:
             raise ValueError("The system must be set before the jacobian")
@@ -310,72 +311,57 @@ class PASIf(__GpuDriver):
                                vecInitialConditions,
                                vecPsi)
 
-        self.__jacobianPreprocessing()  
+        self.__jacobianPreprocessing() 
+        self.jacobianSet = True 
         
         # Stick the System and jacobian together to form the full system 
         # that will be parsed to the GPU.
         self.__assembleSystemAndJacobian()      
 
-
-
-        print("jacob M: \n", self.jacobian_M.todense())
+        """ print("jacob M: \n", self.jacobian_M.todense())
         print("jacob B: \n", self.jacobian_B.todense())
         print("jacob K: \n", self.jacobian_K.todense())
         print("jacob Gamma: \n", self.jacobian_Gamma)
         print("jacob Lambda: \n", self.jacobian_Lambda)
         print("jacob forcePattern: \n", self.jacobian_forcePattern)
         print("jacob initialConditions: \n", self.jacobian_initialConditions)
-        print("jacob psi: \n", self.jacobian_Psi)
-
-          
-        """ # Check if the system is valid
-        self.globalAdjointSize = 0  
-        self.__checkSystemInput(vecM, 
-                                vecB, 
-                                vecK, 
-                                vecGamma, 
-                                vecLambda, 
-                                vecForcePattern, 
-                                vecInitialConditions, 
-                                vecPsi)
-
-        self.vecJacobM                  = cp.deepcopy(vecM)
-        self.vecJacobB                  = cp.deepcopy(vecB)
-        self.vecJacobK                  = cp.deepcopy(vecK)
-        self.vecJacobGamma              = cp.deepcopy(vecGamma)
-        self.vecJacobLambda             = cp.deepcopy(vecLambda)
-        self.vecJacobPsi                = cp.deepcopy(vecPsi)
-        self.vecJacobForcePattern       = cp.deepcopy(vecForcePattern)
-        self.vecJacobInitialConditions  = cp.deepcopy(vecInitialConditions)
-
-        # Pre-process the system
-        self.__systemPreprocessing(self.vecJacobM, 
-                                   self.vecJacobB, 
-                                   self.vecJacobK, 
-                                   self.vecJacobGamma, 
-                                   self.vecJacobLambda, 
-                                   self.vecJacobForcePattern, 
-                                   self.vecJacobPsi)
+        print("jacob psi: \n", self.jacobian_Psi) """
         
+        # Convert the Column-major COO system to Row-major COO system
+        dataB = [x for _, x in sorted(zip(self.jacobian_B.row, self.jacobian_B.data))]
+        rowB  = [x for x, _ in sorted(zip(self.jacobian_B.row, self.jacobian_B.col))]
+        colB  = [x for _, x in sorted(zip(self.jacobian_B.row, self.jacobian_B.col))]
+        
+        dataK = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.data))]
+        rowK  = [x for x, _ in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
+        colK  = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
+        
+        self._setB(dataB, 
+                   rowB, 
+                   colB,
+                   self.jacobian_B.shape[0])
+        self._setK(dataK, 
+                   rowK, 
+                   colK,
+                   self.jacobian_K.shape[0])
+        self._setGamma(self.jacobian_Gamma.dimensions, 
+                       self.jacobian_Gamma.val, 
+                       self.jacobian_Gamma.indices)
+        self._setLambda(self.jacobian_Lambda.dimensions,
+                        self.jacobian_Lambda.val,
+                        self.jacobian_Lambda.indices)
+        self._setForcePattern(self.jacobian_forcePattern)
+        self._setInitialConditions(self.jacobian_initialConditions)
+        """ self._setPsi(self.jacobian_Psi.dimensions,
+                     self.jacobian_Psi.val,
+                     self.jacobian_Psi.indices) """
         self.jacobianSet = True
         
-        # Assemble the system and the jacobian in a single representation
-        #self.__assembleSystemAndJacobian()
-        
-        # Load the system in the CPP side
-        self._setB(self.vecJacobB)
-        self._setK(self.vecJacobK)
-        self._setGamma(self.vecJacobGamma)
-        self._setLambda(self.vecJacobLambda)
-        #self._setPsi(self.vecJacobPsi)
-        self._setForcePattern(self.vecJacobForcePattern)
-        self._setInitialConditions(self.vecJacobInitialConditions)
-        
         # Load the system on the GPU
-        self._allocateOnDevice() """
+        self._allocateOnDevice()
  
     def setInterpolationMatrix(self, 
-                               interpolationMatrix_: list[vector]):
+                               interpolationMatrix_: list[np.ndarray]):
         # Verify that each row of the interpolation matrix are even and of the same size
         for i in range(len(interpolationMatrix_)):
             if(len(interpolationMatrix_[i])%2 != 0):
@@ -391,7 +377,7 @@ class PASIf(__GpuDriver):
         self._setInterpolationMatrix(self.interpolationMatrix, len(interpolationMatrix_[0]))
 
     def setModulationBuffer(self, 
-                            modulationBuffer_: vector):
+                            modulationBuffer_: np.ndarray):
         if(len(modulationBuffer_) == 0):
             raise ValueError("The modulation buffer must be non-empty.")
         elif(len(modulationBuffer_) > 32000):
@@ -447,13 +433,14 @@ class PASIf(__GpuDriver):
         # re-arrange the computed trajectory in a plotable way.
         #numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/chunkSize)
         numOfSavedSteps = numSetpoints + chunkSize - 2 
-        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalAdjointSize + 1)])
+        totalSize = self.globalSystemSize + self.globalAdjointSize
+        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(totalSize + 1)])
     
         for t in range(numOfSavedSteps):
             # first row always contain time
             unwrappedGradient[0][t] = t*numSetpoints/(self.sampleRate*(self.interpolSize+1))
-            for i in range(self.globalAdjointSize):
-                unwrappedGradient[i+1][t] = gradient[t*self.globalAdjointSize + i]
+            for i in range(totalSize):
+                unwrappedGradient[i+1][t] = gradient[t*totalSize + i]
     
         return unwrappedGradient
         
@@ -473,8 +460,10 @@ class PASIf(__GpuDriver):
                       inputVecForcePattern      : list[np.ndarray],
                       inputVecInitialConditions : list[np.ndarray],
                       inputVecPsi               : list[coo_tensor] = None):
+        """
+        Check for size consistency of the input matrices and vectors.
+        """
         
-        # Case of System setting
         for i in range(len(inputVecM)):
             ndofs = inputVecM[i].shape[0]
             
@@ -504,6 +493,11 @@ class PASIf(__GpuDriver):
                         inputVecLambda            : list[coo_tensor], 
                         inputVecForcePattern      : list[np.ndarray],
                         inputVecInitialConditions : list[np.ndarray]):
+        """
+        This method is used to unfold the systems parsed as a list of systems 
+        into a single system. The resulting system will be stored in the class
+        to be later concatenated with the adjoint system.
+        """
         
         self.numberOfSystems = len(inputVecM)
     
@@ -562,6 +556,11 @@ class PASIf(__GpuDriver):
                           inputVecForcePattern      : list[np.ndarray],
                           inputVecInitialConditions : list[np.ndarray],
                           inputVecPsi               : list[coo_tensor]):
+        """
+        This method is used to unfold the jacobians system parsed as a lists
+        into a single system. Each of the jacobians correspond to their respective 
+        system that has been stored previously.
+        """
         
         self.globalAdjointSize = inputVecM[0].shape[0]
 
@@ -634,6 +633,12 @@ class PASIf(__GpuDriver):
         self.jacobian_forcePattern *= -1*self.jacobian_M.data
                 
     def __assembleSystemAndJacobian(self):
+        """
+        Concatenate the system and jacobian matrices to form the final system
+        to be used during the getGradient() method. We do so because during 
+        the gradient calculation we need both the system to solve the forward 
+        problem and the jacobian to solve the adjoint problem.
+        """
         
         self.jacobian_B.resize((self.system_B.shape[0]+self.jacobian_B.shape[0], 
                                 self.system_B.shape[1]+self.jacobian_B.shape[1]))
@@ -667,5 +672,23 @@ class PASIf(__GpuDriver):
         colJacK  = np.concatenate((self.system_K.col,  colJacK))
         
         self.jacobian_K = coo_matrix((dataJacK, (rowJacK, colJacK)), shape = (self.jacobian_K.shape[0], self.jacobian_K.shape[1]))
+        
+        temporaryGamma = cp.deepcopy(self.system_Gamma)
+        temporaryGamma.concatenateTensor(self.jacobian_Gamma)
+        self.jacobian_Gamma = temporaryGamma
+        
+        temporaryLambda = cp.deepcopy(self.system_Lambda)
+        temporaryLambda.concatenateTensor(self.jacobian_Lambda)
+        self.jacobian_Lambda = temporaryLambda
+        
+        # We don't extend the Psi vector since it only makes sense to have it in the adjoint system
+        # But if it's later needed, it can be extended by doing the following:
+        # > zeroTensor = coo_tensor(dimensions_ = [self.system_K.dimensions[0], self.system_K.dimensions[0], self.system_K.dimensions[0], self.system_K.dimensions[0]])
+        # > zeroTensor.concatenateTensor(self.jacobian_Psi)
+        # > self.jacobian_Psi = zeroTensor
+        
+        self.jacobian_forcePattern      = np.append(self.system_forcePattern, self.jacobian_forcePattern)
+        self.jacobian_initialConditions = np.append(self.system_initialConditions, self.jacobian_initialConditions)
+        
         
             

@@ -49,6 +49,7 @@ class __GpuDriver{
   // Load ForcePattern and InitialConditions as vectors
   void _setForcePattern(std::vector<reel> & forcePattern_);
   void _setInitialConditions(std::vector<reel> & initialConditions_);
+
   void _setInterpolationMatrix(std::vector<reel> & interpolationMatrix_,
                                uint interpolationWindowSize_);
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
@@ -56,9 +57,10 @@ class __GpuDriver{
   void _allocateOnDevice();
   void _displaySimuInfos();
 
+  // Simulation related functions
   std::vector<reel> _getAmplitudes();
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-  std::vector<reel> _getGradient(uint globalAdjointSize_,
+  std::vector<reel> _getGradient(uint adjointSize_,
                                  uint save);
 
  private:
