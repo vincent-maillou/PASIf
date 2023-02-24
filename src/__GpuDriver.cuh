@@ -49,8 +49,24 @@ class __GpuDriver{
 
 
   //            Backward system interface 
+  void _setBwdB(std::vector<reel> values_,
+                std::vector<uint> row_,
+                std::vector<uint> col_,
+                uint n_); 
+  void _setBwdK(std::vector<reel> values_,
+                std::vector<uint> row_,
+                std::vector<uint> col_,
+                uint n_);
+  void _setBwdGamma(std::vector<uint> dimensions_,
+                    std::vector<reel> values_,
+                    std::vector<uint> indices_);
+  void _setBwdLambda(std::vector<uint> dimensions_,
+                     std::vector<reel> values_,
+                     std::vector<uint> indices_);
+  void _setBwdForcePattern(std::vector<reel> & forcePattern_);
+  void _setBwdInitialConditions(std::vector<reel> & initialConditions_);
 
-
+  void _allocateAdjointOnDevice();
 
 
   //            Compute options interface 
@@ -61,19 +77,16 @@ class __GpuDriver{
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
 
 
-
-
   //            Solvers interface
   std::vector<reel> _getAmplitudes();
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-  std::vector<reel> _getGradient(uint adjointSize_,
-                                 uint save);
+  std::vector<reel> _getGradient(uint save);
+
 
  private:
   // Initialization functions
   int  setCUDA(uint nStreams_);
   void setTimesteps();
-  void resetStatesVectors();
 
 
   //            Solver functions
@@ -156,6 +169,7 @@ class __GpuDriver{
   reel* d_m4; cusparseDnVecDescr_t d_m4_desc;
 
   void setComputeSystem(problemType type_ = forward);
+  void resetStatesVectors();
   void displaySimuInfos();
 
 
@@ -210,17 +224,17 @@ class __GpuDriver{
   reel* d_bwd_m3; cusparseDnVecDescr_t d_bwd_m3_desc;
   reel* d_bwd_m4; cusparseDnVecDescr_t d_bwd_m4_desc;
 
-  // void  allocateDeviceSystem();
-  // void  allocateDeviceSystemStatesVector();
+  void  allocateDeviceAdjoint();
+  void  allocateDeviceAdjointStatesVector();
   void  extendAdjoint();
 
-  // void  clearFwdB();
-  // void  clearFwdK();
-  // void  clearFwdGamma();
-  // void  clearFwdLambda();
-  // void  clearFwdForcePattern();
-  // void  clearFwdInitialConditions();
-  // void  clearSystemStatesVector();
+  void  clearBwdB();
+  void  clearBwdK();
+  void  clearBwdGamma();
+  void  clearBwdLambda();
+  void  clearBwdForcePattern();
+  void  clearBwdInitialConditions();
+  void  clearAdjointStatesVector();
 
 
   //            Interpolation related data

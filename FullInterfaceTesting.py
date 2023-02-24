@@ -103,13 +103,13 @@ print("Amplitudes: ", results) """
 
 
 
-""" start      = time.time()
+start      = time.time()
 trajectory = pasif.getTrajectory(saveSteps = 1)
 end        = time.time()
 
 print("getTrajectories() overall time: ", end - start)
 plt.plot(trajectory[0], trajectory[1])
-plt.show() """
+plt.show()
 
 
 """ jac_M : dia_matrix = dia_matrix(([1., 1., 1., 1., 1., 1.], [0]), shape=(6, 6))
@@ -165,19 +165,19 @@ end        = time.time()
 
 print("setJacobian() overall time: ", end - start)
 
-start      = time.time()
+""" start      = time.time()
 gradient = pasif.getGradient()
 end        = time.time()
 
-print("getGradient() overall time: ", end - start)
+print("getGradient() overall time: ", end - start) """
 
 """ plt.plot(gradient[0], gradient[1], 'r')
 plt.plot(gradient[0], gradient[2], 'b')
 plt.show() """
 
-for i in range(len(gradient)-1):
+""" for i in range(len(gradient)-1):
     plt.plot(gradient[0], gradient[i+1])
-plt.show()
+plt.show() """
 
 
 

@@ -60,6 +60,30 @@ PYBIND11_MODULE(PASIfgpu, m) {
 
 
     //            Backward system interface 
+    .def("_setBwdB", &__GpuDriver::_setBwdB,
+      py::arg("values_"),
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
+    .def("_setBwdK", &__GpuDriver::_setBwdK,
+      py::arg("values_"),
+      py::arg("row_"),
+      py::arg("col_"),
+      py::arg("n_"))
+    .def("_setBwdGamma", &__GpuDriver::_setBwdGamma,
+      py::arg("dimensions_"),
+      py::arg("values_"),
+      py::arg("indices_"))
+    .def("_setBwdLambda", &__GpuDriver::_setBwdLambda,
+      py::arg("dimensions_"),
+      py::arg("values_"),
+      py::arg("indices_"))
+    .def("_setBwdForcePattern", &__GpuDriver::_setBwdForcePattern,
+      py::arg("forcePattern_"))
+    .def("_setBwdInitialConditions", &__GpuDriver::_setBwdInitialConditions,
+      py::arg("initialConditions_"))
+
+    .def("_allocateAdjointOnDevice", &__GpuDriver::_allocateAdjointOnDevice)
 
 
     //            Compute options interface 
@@ -71,13 +95,12 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("interpolationWindowSize_"))
     .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
       py::arg("modulationBuffer_"))
-      
+
 
     //            Solvers interface
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)
     .def("_getTrajectory", &__GpuDriver::_getTrajectory,
       py::arg("saveSteps_") = 1)
     .def("_getGradient", &__GpuDriver::_getGradient,
-      py::arg("adjointSize_"),
       py::arg("save"));
 }

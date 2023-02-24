@@ -312,11 +312,7 @@ class PASIf(__GpuDriver):
                                vecPsi)
 
         self.__jacobianPreprocessing() 
-        self.jacobianSet = True 
-        
-        # Stick the System and jacobian together to form the full system 
-        # that will be parsed to the GPU.
-        self.__assembleSystemAndJacobian()      
+        self.jacobianSet = True     
 
         """ print("jacob M: \n", self.jacobian_M.todense())
         print("jacob B: \n", self.jacobian_B.todense())
@@ -336,29 +332,29 @@ class PASIf(__GpuDriver):
         rowK  = [x for x, _ in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
         colK  = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
         
-        self._setB(dataB, 
-                   rowB, 
-                   colB,
-                   self.jacobian_B.shape[0])
-        self._setK(dataK, 
-                   rowK, 
-                   colK,
-                   self.jacobian_K.shape[0])
-        self._setGamma(self.jacobian_Gamma.dimensions, 
-                       self.jacobian_Gamma.val, 
-                       self.jacobian_Gamma.indices)
-        self._setLambda(self.jacobian_Lambda.dimensions,
-                        self.jacobian_Lambda.val,
-                        self.jacobian_Lambda.indices)
-        self._setForcePattern(self.jacobian_forcePattern)
-        self._setInitialConditions(self.jacobian_initialConditions)
-        """ self._setPsi(self.jacobian_Psi.dimensions,
-                     self.jacobian_Psi.val,
-                     self.jacobian_Psi.indices) """
+        self._setBwdB(dataB, 
+                      rowB, 
+                      colB,
+                      self.jacobian_B.shape[0])
+        self._setBwdK(dataK, 
+                      rowK, 
+                      colK,
+                      self.jacobian_K.shape[0])
+        self._setBwdGamma(self.jacobian_Gamma.dimensions, 
+                          self.jacobian_Gamma.val, 
+                          self.jacobian_Gamma.indices)
+        self._setBwdLambda(self.jacobian_Lambda.dimensions,
+                           self.jacobian_Lambda.val,
+                           self.jacobian_Lambda.indices)
+        self._setBwdForcePattern(self.jacobian_forcePattern)
+        self._setBwdInitialConditions(self.jacobian_initialConditions)
+        #self._setPsi(self.jacobian_Psi.dimensions,
+        #             self.jacobian_Psi.val,
+        #             self.jacobian_Psi.indices)
         self.jacobianSet = True
         
         # Load the system on the GPU
-        self._allocateOnDevice()
+        self._allocateAdjointOnDevice()
  
     def setInterpolationMatrix(self, 
                                interpolationMatrix_: list[np.ndarray]):
@@ -413,15 +409,13 @@ class PASIf(__GpuDriver):
     
         return unwrappedTrajectory
     
-    def getGradient(self, save = 0):
+    def getGradient(self, save_ = 0):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
         
-        gradient = self._getGradient(self.globalAdjointSize, save)
+        gradient = self._getGradient(save_)
         
-        
-        
-        chunkSize = 280
+        chunkSize    = 280
         numSetpoints = 279
         
         # re-arrange the computed trajectory in a plotable way.
@@ -625,8 +619,13 @@ class PASIf(__GpuDriver):
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
         
         self.jacobian_forcePattern *= -1*self.jacobian_M.data
-                
+    
+    
+    
+    ###             DEPRECATED              ###        
+        
     def __assembleSystemAndJacobian(self):
+        
         """
         Concatenate the system and jacobian matrices to form the final system
         to be used during the getGradient() method. We do so because during 
