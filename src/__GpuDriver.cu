@@ -153,23 +153,22 @@
     * 
     */
     __GpuDriver::~__GpuDriver(){
-      // Free memory      
-      if(d_ExcitationsSet != nullptr){
-        CHECK_CUDA( cudaFree(d_ExcitationsSet) );
-        d_ExcitationsSet = nullptr;
-      }
 
+      //            Compute option cleaners
+      clearExcitationsSet();
+      clearTrajectories();
+      clearInterpolationMatrix();
+      clearModulationBuffer();
+
+      //            Forward system destructor
       clearFwdB();
       clearFwdK();
       clearFwdGamma();
       clearFwdLambda();
       clearFwdForcePattern();
       clearFwdInitialConditions();
-
-      clearInterpolationMatrix();
-      clearModulationBuffer();
-      clearDeviceStatesVector();
-      clearTrajectories();
+      clearSystemStatesVector();
+      
 
       if(streams != nullptr){
         for(uint i = 0; i < nStreams; i++){
@@ -248,10 +247,15 @@
     allocateDeviceSystems();
   } */
 
-  void _allocateSystemOnDevice(){
+  void __GpuDriver::_allocateSystemOnDevice(){
+    // Extend the systems to exploit the GPU memory
+    parallelizeThroughExcitations();
 
-    allocateDeviceSystem();
+    // Allocate the rk4 vectors on the GPU
     allocateDeviceSystemStatesVector();
+
+    // Allocate the matrix on the GPU
+    allocateDeviceSystem();
   }
 
 
@@ -332,73 +336,19 @@
 
 
 
+/*                    Solvers interface                    */
 
-  void __GpuDriver::_displaySimuInfos(){
-    if(dCompute){
-      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
-      std::cout << "  This system is composed of " << parallelismThroughExcitations << " parallelized simulations of " << n_dofs/parallelismThroughExcitations << " DOF each." << std::endl;
-      std::cout << "  The total number of excitation files is " << numberOfExcitations;
-      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
-      if(numsteps < lengthOfeachExcitation){
-        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
-      }
-    }
-    
-    if(dSystem){
-      std::cout << "Here is the assembled system" << std::endl;
-      std::cout << "B:" << std::endl << *B << std::endl;
-      std::cout << "K:" << std::endl << *K << std::endl;
-      std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
-      std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
-      std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
-      std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
-
-      std::cout << "InterpolationMatrix:" << std::endl;
-      if(!interpolationMatrix.empty()){
-        for(uint i=0; i<interpolationNumberOfPoints; ++i){
-          for(uint j=0; j<interpolationWindowSize; ++j){
-            std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
-          }
-          std::cout << std::endl;
-        }
-      }
-      else{
-        std::cout << "  No interpolation matrix has been provided" << std::endl;
-      }
-      std::cout << std::endl;
-
-      std::cout << "Modulation buffer:" <<  std::endl;
-      if(!modulationBuffer.empty()){
-        printVector(modulationBuffer);
-      }
-      else{
-        std::cout << "  No modulation buffer has been provided" << std::endl << std::endl;
-      }
-    }
-
-    if(dSolver){
-      std::cout << "Solver info:" << std::endl;
-      std::cout << "  Number of steps to perform: " << numsteps << std::endl;
-      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
-      std::cout << "  Duration length: " << duration << "s" << std::endl;
-      std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
-    }
-  }
-
-  /** __GpuDriver::driver_getAmplitudes()
-   * @brief 
-   * 
-   * @return std::vector<reel>
-   */
-   std::vector<reel> __GpuDriver::_getAmplitudes(){
+  std::vector<reel> __GpuDriver::_getAmplitudes(){
     setComputeSystem();
 
     std::vector<reel> resultsQ;
     resultsQ.resize(n_dofs*numberOfSimulationToPerform);
 
+
+
     auto begin = std::chrono::high_resolution_clock::now();
     // Perform the simulations
-    for(size_t k(0); k<numberOfSimulationToPerform; ++k){
+    for(size_t k(0); k < numberOfSimulationToPerform; ++k){
 
       forwardRungeKutta(0, numsteps, k);
 
@@ -412,6 +362,7 @@
     auto end = std::chrono::high_resolution_clock::now();
 
 
+
     std::chrono::duration<double> elapsed_seconds = end-begin;
     std::cout << "CUDA getAmplitudes() execution time: " << elapsed_seconds.count() << "s" << std::endl;
 
@@ -421,7 +372,7 @@
     }
 
     return std::vector<reel>{resultsQ};
-   }
+  }
 
 
 
@@ -830,76 +781,11 @@
   }
 
 
-  void __GpuDriver::optimizeIntraStrmParallelisme(){
-    
-    // 1. Get free storage on the GPU
-    size_t freeSpace, totalSpace;
-    CHECK_CUDA( cudaMemGetInfo(&freeSpace, &totalSpace) )
 
-    /* std::cout << "Free space on the GPU: " << freeSpace << " bytes" << std::endl;
-    std::cout << "Total space on the GPU: " << totalSpace << " bytes" << std::endl;
-    std::cout << "Used space " << totalSpace-freeSpace << " bytes" << std::endl; */
-
-    // 2. Compute the size required by 1 instance of the system
-
-    // .1 Size of the matrix of the system
-    size_t sizeOfSystem(0);
-    sizeOfSystem += B->memFootprint();
-    sizeOfSystem += K->memFootprint();
-    sizeOfSystem += Gamma->memFootprint();
-    sizeOfSystem += Lambda->memFootprint();
-    sizeOfSystem += ForcePattern->memFootprint();
-
-    // std::cout << "Size of 1 system: " << sizeOfSystem << " bytes" << std::endl;
-
-    // .2 Size of the rk4 and states vector needed for the computation
-    size_t sizeOfStates(0);
-    sizeOfStates += 13*sizeof(reel)*n_dofs;
-
-    // std::cout << "Size of the states: " << sizeOfStates << " bytes" << std::endl;
-
-    size_t totalSize = sizeOfSystem + sizeOfStates;
-
-    // 3. Compute the max number of system that we can fit in the gpu memory
-
-    size_t maxNumberOfSystem = (0.8*freeSpace) / totalSize;
-
-    if(maxNumberOfSystem > numberOfExcitations){
-      maxNumberOfSystem = numberOfExcitations;
-    }
-
-    parallelismThroughExcitations = maxNumberOfSystem;
-
-    numberOfSimulationToPerform = numberOfExcitations / parallelismThroughExcitations;
-    exceedingSimulations = numberOfExcitations % parallelismThroughExcitations;
-    if(exceedingSimulations != 0){
-      numberOfSimulationToPerform++;
-    }
-
-    // Extend each system by the number of intra-stream parallelization wanted
-    std::array<uint, 6> dofChecking = {B->extendTheSystem(parallelismThroughExcitations-1), 
-                                       K->extendTheSystem(parallelismThroughExcitations-1), 
-                                       Gamma->extendTheSystem(parallelismThroughExcitations-1), 
-                                       Lambda->extendTheSystem(parallelismThroughExcitations-1), 
-                                       ForcePattern->extendTheSystem(parallelismThroughExcitations-1),
-                                       extendTheVector(QinitCond, parallelismThroughExcitations-1)};
-
-    // Checking that each system is of the same size
-    for(uint i = 0; i < dofChecking.size(); i++){
-      if(dofChecking[i] != dofChecking[0]){
-        std::cout << "[Error] __GpuDriver: The number of DOFs is not the same for all the Matrix describing the system" << std::endl;
-      }
-    }
-
-    // Modify if needed the number of DOFs
-    if(n_dofs != dofChecking[0]){
-      n_dofs = dofChecking[0];
-    }
-  }
-
+/*                    GPU work distribution                    */
 
   void __GpuDriver::parallelizeThroughExcitations(){
-    size_t freeGpuSpace(0) 
+    size_t freeGpuSpace(0); 
     size_t totalGpuSpace(0);
     CHECK_CUDA( cudaMemGetInfo(&freeGpuSpace, &totalGpuSpace) )
 
@@ -968,9 +854,14 @@
 
   
 
+/*                    Compute option cleaners                    */
 
-
-
+  void __GpuDriver::clearExcitationsSet(){
+    if(d_ExcitationsSet != nullptr){
+      CHECK_CUDA( cudaFree(d_ExcitationsSet) );
+      d_ExcitationsSet = nullptr;
+    }
+  }
 
   void __GpuDriver::clearTrajectories(){
     if(d_trajectories != nullptr){
@@ -1003,7 +894,7 @@
 
 /*                    Compute system private methods                    */
 
-  void setComputeSystem(problemType type_){
+  void __GpuDriver::setComputeSystem(problemType type_){
     if(type_ == forward){
       n_dofs      = n_dofs_fwd;
 
@@ -1015,12 +906,15 @@
 
       d_QinitCond  = d_fwd_QinitCond;
 
-      d_Q  = d_fwd_Q;  d_fwd_Q_desc  = d_fwd_Q_desc;
-      d_mi = d_fwd_mi; d_fwd_mi_desc = d_fwd_mi_desc;
-      d_m1 = d_fwd_m1; d_fwd_m1_desc = d_fwd_m1_desc;
-      d_m2 = d_fwd_m2; d_fwd_m2_desc = d_fwd_m2_desc;
-      d_m3 = d_fwd_m3; d_fwd_m3_desc = d_fwd_m3_desc;
-      d_m4 = d_fwd_m4; d_fwd_m4_desc = d_fwd_m4_desc;
+      d_Q  = d_fwd_Q;  d_Q_desc  = d_fwd_Q_desc;
+      d_mi = d_fwd_mi; d_mi_desc = d_fwd_mi_desc;
+      d_m1 = d_fwd_m1; d_m1_desc = d_fwd_m1_desc;
+      d_m2 = d_fwd_m2; d_m2_desc = d_fwd_m2_desc;
+      d_m3 = d_fwd_m3; d_m3_desc = d_fwd_m3_desc;
+      d_m4 = d_fwd_m4; d_m4_desc = d_fwd_m4_desc;
+
+      std::cout << "Forward system set" << std::endl;
+      displaySimuInfos();
     }
     else if(type_ == backward){
       n_dofs       = n_dofs_bwd;
@@ -1033,12 +927,67 @@
 
       d_QinitCond  = d_bwd_QinitCond;
 
-      d_Q  = d_bwd_Q;  d_bwd_Q_desc  = d_bwd_Q_desc;
-      d_mi = d_bwd_mi; d_bwd_mi_desc = d_bwd_mi_desc;
-      d_m1 = d_bwd_m1; d_bwd_m1_desc = d_bwd_m1_desc;
-      d_m2 = d_bwd_m2; d_bwd_m2_desc = d_bwd_m2_desc;
-      d_m3 = d_bwd_m3; d_bwd_m3_desc = d_bwd_m3_desc;
-      d_m4 = d_bwd_m4; d_bwd_m4_desc = d_bwd_m4_desc;
+      d_Q  = d_bwd_Q;  d_Q_desc  = d_bwd_Q_desc;
+      d_mi = d_bwd_mi; d_mi_desc = d_bwd_mi_desc;
+      d_m1 = d_bwd_m1; d_m1_desc = d_bwd_m1_desc;
+      d_m2 = d_bwd_m2; d_m2_desc = d_bwd_m2_desc;
+      d_m3 = d_bwd_m3; d_m3_desc = d_bwd_m3_desc;
+      d_m4 = d_bwd_m4; d_m4_desc = d_bwd_m4_desc;
+
+      std::cout << "Backward system set" << std::endl;
+      displaySimuInfos();
+    }
+  }
+
+  void __GpuDriver::displaySimuInfos(){
+    if(dCompute){
+      std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
+      std::cout << "  This system is composed of " << parallelismThroughExcitations << " parallelized simulations of " << n_dofs/parallelismThroughExcitations << " DOF each." << std::endl;
+      std::cout << "  The total number of excitation files is " << numberOfExcitations;
+      std::cout << "  hence the number of simulation to perform is " << numberOfSimulationToPerform << std::endl;
+      if(numsteps < lengthOfeachExcitation){
+        std::cout << "  Warning: The number of steps to perform is inferior to the length of the excitation files" << std::endl;
+      }
+    }
+    
+    if(dSystem){
+      std::cout << "Here is the assembled system" << std::endl;
+      std::cout << "B:" << std::endl << *B << std::endl;
+      std::cout << "K:" << std::endl << *K << std::endl;
+      std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
+      std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
+      std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
+      // std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
+
+      std::cout << "InterpolationMatrix:" << std::endl;
+      if(!interpolationMatrix.empty()){
+        for(uint i=0; i<interpolationNumberOfPoints; ++i){
+          for(uint j=0; j<interpolationWindowSize; ++j){
+            std::cout << interpolationMatrix[i*interpolationWindowSize + j] << " ";
+          }
+          std::cout << std::endl;
+        }
+      }
+      else{
+        std::cout << "  No interpolation matrix has been provided" << std::endl;
+      }
+      std::cout << std::endl;
+
+      std::cout << "Modulation buffer:" <<  std::endl;
+      if(!modulationBuffer.empty()){
+        printVector(modulationBuffer);
+      }
+      else{
+        std::cout << "  No modulation buffer has been provided" << std::endl << std::endl;
+      }
+    }
+
+    if(dSolver){
+      std::cout << "Solver info:" << std::endl;
+      std::cout << "  Number of steps to perform: " << numsteps << std::endl;
+      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
+      std::cout << "  Duration length: " << duration << "s" << std::endl;
+      std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
     }
   }
 

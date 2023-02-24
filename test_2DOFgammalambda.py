@@ -142,6 +142,9 @@ cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
 """ intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 cudaEnvironment.setInterpolationMatrix(intMat) """
 
+
+print("---------------------------------------------------")
+
 start = time.time()
 amplitudes = cudaEnvironment.getAmplitudes(vecSystem)
 stop = time.time()

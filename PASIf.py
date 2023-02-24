@@ -390,8 +390,6 @@ class PASIf(__GpuDriver):
     def getAmplitudes(self):
         if self.systemSet == False:
             raise ValueError("The system must be set before computing the amplitudes.")
-        else:
-            self._displaySimuInfos()
         
         return self._getAmplitudes()
 
@@ -399,8 +397,6 @@ class PASIf(__GpuDriver):
                       saveSteps: int = 1):
         if self.systemSet == False:
             raise ValueError("The system must be set before computing the trajectory.")
-        else:
-            self._displaySimuInfos()
         
         self.saveSteps = saveSteps
         trajectory = self._getTrajectory(saveSteps)
@@ -420,8 +416,6 @@ class PASIf(__GpuDriver):
     def getGradient(self, save = 0):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
-        else:
-            self._displaySimuInfos()
         
         gradient = self._getGradient(self.globalAdjointSize, save)
         

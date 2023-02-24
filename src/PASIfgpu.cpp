@@ -71,8 +71,7 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("interpolationWindowSize_"))
     .def("_setModulationBuffer", &__GpuDriver::_setModulationBuffer,
       py::arg("modulationBuffer_"))
-
-    .def("_displaySimuInfos", &__GpuDriver::_displaySimuInfos)
+      
 
     //            Solvers interface
     .def("_getAmplitudes", &__GpuDriver::_getAmplitudes)

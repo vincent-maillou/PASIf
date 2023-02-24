@@ -60,7 +60,7 @@ class __GpuDriver{
                                uint interpolationWindowSize_);
   void _setModulationBuffer(std::vector<reel> & modulationBuffer_);
 
-  void _displaySimuInfos();
+
 
 
   //            Solvers interface
@@ -101,14 +101,15 @@ class __GpuDriver{
                      uint  i,
                      uint  m);
 
-  // GPU work distribution functions
-  void optimizeIntraStrmParallelisme();
 
+  //            GPU work distribution
   void   parallelizeThroughExcitations();
   size_t getSystemMemFootprint();
   size_t getAdjointMemFootprint(); 
 
-  // Memory cleaning functions
+
+  //            Compute option cleaners
+  void clearExcitationsSet();
   void clearTrajectories();
   void clearInterpolationMatrix();
   void clearModulationBuffer();
@@ -155,6 +156,7 @@ class __GpuDriver{
   reel* d_m4; cusparseDnVecDescr_t d_m4_desc;
 
   void setComputeSystem(problemType type_ = forward);
+  void displaySimuInfos();
 
 
   //            Forward system related data
