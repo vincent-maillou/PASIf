@@ -80,7 +80,7 @@ class __GpuDriver{
   //            Solvers interface
   std::vector<reel> _getAmplitudes();
   std::vector<reel> _getTrajectory(uint saveSteps_ = 1);
-  std::vector<reel> _getGradient(uint save);
+  std::vector<reel> _getGradient(uint   save);
 
 
  private:
@@ -96,13 +96,25 @@ class __GpuDriver{
                          uint saveSteps  = 1,
                          uint saveOffset = 0);
 
-  void rkStep(uint k, 
-              uint t,
-              uint i,
-              uint m);
+  void fwdStep(uint k, 
+               uint t,
+               uint i,
+               uint m);
+
+  void backwardRungeKutta(uint  tStart_, 
+                          uint  tEnd_,
+                          uint  k,
+                          uint  startSetpoint);
+
+  void bwdStep(uint k, 
+               uint t,
+               uint i,
+               uint m,
+               uint startSetpoint);                        
 
   void derivatives(cusparseDnVecDescr_t m_desc, 
-                   cusparseDnVecDescr_t q_desc, 
+                   cusparseDnVecDescr_t q_desc,
+                   reel*                pq_adjt, 
                    uint k, 
                    uint t,
                    uint i,
@@ -159,7 +171,8 @@ class __GpuDriver{
   COOTensor4D* Lambda;
   COOVector*   ForcePattern;
 
-  reel* d_QinitCond; 
+  std::vector<reel>* h_QinitCond; 
+  reel*              d_QinitCond; 
   
   reel* d_Q;  cusparseDnVecDescr_t d_Q_desc;
   reel* d_mi; cusparseDnVecDescr_t d_mi_desc;
@@ -168,9 +181,9 @@ class __GpuDriver{
   reel* d_m3; cusparseDnVecDescr_t d_m3_desc;
   reel* d_m4; cusparseDnVecDescr_t d_m4_desc;
 
-  void setComputeSystem(problemType type_ = forward);
+  void setComputeSystem(problemType type_);
   void resetStatesVectors();
-  void displaySimuInfos();
+  void displaySimuInfos(problemType type_);
 
 
   //            Forward system related data
@@ -224,7 +237,7 @@ class __GpuDriver{
   reel* d_bwd_m3; cusparseDnVecDescr_t d_bwd_m3_desc;
   reel* d_bwd_m4; cusparseDnVecDescr_t d_bwd_m4_desc;
 
-  void  allocateDeviceAdjoint();
+  void  allocateDeviceAdjointSystem();
   void  allocateDeviceAdjointStatesVector();
   void  extendAdjoint();
 
@@ -291,6 +304,22 @@ class __GpuDriver{
 - [ ] Adapted thread/block for sparse Tensors and forces kernels 
 - [ ] CUBLAS_COMPUTE_32F_FAST_TF32
 - [ ] Interleaved excitations files
+*/
+
+
+
+/**
+ * @brief Issues
+ * 
+ */
+
+/*
+- [ ] cuda API crash when using more than 1.6M DOF
+- [ ] COOTensor3D is tied to be square, need to change and keep track
+of each dimension
+- [ ] coo_tensor order of the index
+      - [ ] Modify the CUDA parsing regarding the re-ordering
+- [ ] Merge B and K in a single matrix
 */
 
 

@@ -24,14 +24,15 @@
              uint *d_col, 
              uint *d_slice, 
              uint nzz,
-             reel* X, 
+             reel* X1,
+             reel* X2, 
              reel* Y){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_slice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]]);
+    atomicAdd(&Y[d_slice[k]], d_val[k] * X1[d_row[k]] * X2[d_col[k]]);
   }
  }
 
@@ -48,14 +49,16 @@
              uint *d_slice, 
              uint *d_hyperslice,
              uint nzz,
-             reel* X, 
+             reel* X1,
+             reel* X2,
+             reel* X3, 
              reel* Y){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X[d_row[k]] * X[d_col[k]] * X[d_slice[k]]);
+    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X1[d_slice[k]] * X2[d_col[k]] * X3[d_row[k]]);
   }
  }
 

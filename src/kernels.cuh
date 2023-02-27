@@ -24,7 +24,8 @@
              uint *d_col, 
              uint *d_slice, 
              uint  nzz,
-             reel* X, 
+             reel* X1,
+             reel* X2, 
              reel* Y);
 
             
@@ -41,7 +42,9 @@
              uint *d_slice, 
              uint *d_hyperslice,
              uint  nzz,
-             reel* X, 
+             reel* X1,
+             reel* X2,
+             reel* X3,  
              reel* Y);
 
 

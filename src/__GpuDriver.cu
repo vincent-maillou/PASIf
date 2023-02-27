@@ -51,6 +51,7 @@
         Lambda(nullptr), 
         ForcePattern(nullptr),
 
+        h_QinitCond(nullptr),
         d_QinitCond(nullptr),
 
         d_Q(nullptr),  d_Q_desc(NULL),
@@ -155,6 +156,7 @@
     clearInterpolationMatrix();
     clearModulationBuffer();
 
+
     //            Forward system destructor
     clearFwdB();
     clearFwdK();
@@ -163,6 +165,16 @@
     clearFwdForcePattern();
     clearFwdInitialConditions();
     clearSystemStatesVector();
+
+
+    //            Backward system destructor
+    clearBwdB();
+    clearBwdK();
+    clearBwdGamma();
+    clearBwdLambda();
+    clearBwdForcePattern();
+    clearBwdInitialConditions();
+    clearAdjointStatesVector();
     
 
     if(streams != nullptr){
@@ -317,7 +329,7 @@
     allocateDeviceAdjointStatesVector();
 
     // Allocate the matrix on the GPU
-    allocateDeviceAdjoint();
+    allocateDeviceAdjointSystem();
   }
 
 
@@ -399,6 +411,7 @@
 
   std::vector<reel> __GpuDriver::_getAmplitudes(){
     setComputeSystem(forward);
+    displaySimuInfos(forward);
 
     std::vector<reel> resultsQ;
     resultsQ.resize(n_dofs*numberOfSimulationToPerform);
@@ -410,6 +423,15 @@
     for(size_t k(0); k < numberOfSimulationToPerform; ++k){
 
       forwardRungeKutta(0, numsteps, k);
+
+      std::cout << "k = " << k << std::endl;
+      std::cout << "n_doofs = " << n_dofs << std::endl;
+      std::cout << "numsteps = " << numsteps << std::endl;
+      std::cout << "d_Q = " << d_Q << std::endl;
+      std::cout << "d_fwd_Q = " << d_fwd_Q << std::endl;
+      std::cout << "sizeof(reel) = " << sizeof(reel) << std::endl;
+      std::cout << "resultsQ.max_size() = " << resultsQ.max_size() << std::endl;
+      std::cout << "numberOfSimulationToPerform = " << numberOfSimulationToPerform << std::endl;
 
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(resultsQ.data()+k*n_dofs, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToHost) )
@@ -435,6 +457,7 @@
 
   std::vector<reel> __GpuDriver::_getTrajectory(uint saveSteps_){
     setComputeSystem(forward);
+    displaySimuInfos(forward);
 
     // Reserve the size of the trajectories vector on the CPU
     h_trajectories.clear();
@@ -473,6 +496,8 @@
   }
 
   std::vector<reel> __GpuDriver::_getGradient(uint save){
+    displaySimuInfos(forward);
+    displaySimuInfos(backward);
 
     numSetpoints  = std::sqrt(totalNumsteps);
     chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
@@ -482,7 +507,7 @@
     // 1. Compute the setPoints (chunks first step)
     setComputeSystem(forward);
 
-    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs;
+    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs_fwd;
 
     h_trajectories.clear();
     h_trajectories.resize(reservedTrajSize);
@@ -520,29 +545,36 @@
         break;
       }
 
-      // Copy the stored setpoint to the state vector
+      // 2. Compute the current chunk
       CHECK_CUBLAS( cublasScopy(h_cublas,
-                                n_dofs, 
-                                d_trajectories + (setpoint-1)*n_dofs, 
+                                n_dofs_fwd, 
+                                d_trajectories + (setpoint-1)*n_dofs_fwd, 
                                 1, 
-                                d_Q, 
+                                d_fwd_Q, 
                                 1) )
 
-      // Compute the chunk
+      setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint-1);
+
+      // 3. Compute backward the gradient on the current chunk
+      setComputeSystem(backward);
+      backwardRungeKutta(endStep, startStep, 0, setpoint-1);
+
+
 
       /* std::cout << "setpoint: " << setpoint << " / ";
       std::cout << "startStep: " << startStep << " / ";
       std::cout << "endStep: " << endStep << std::endl; */
     }
 
-
-
-
-    CHECK_CUDA( cudaMemcpy(h_trajectories.data(), d_trajectories, h_trajectories.size()*sizeof(reel), cudaMemcpyDeviceToHost) )
     clearTrajectories();
 
-    return h_trajectories;
+    std::vector<reel> h_gradient;
+    h_gradient.resize(n_dofs_bwd);
+
+    CHECK_CUDA( cudaMemcpy(h_gradient.data(), d_bwd_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
+
+    return h_gradient;
   }
   
 
@@ -550,47 +582,41 @@
 /****************************************************
  *              Private functions                   *
  ****************************************************/
-  /** __GpuDriver::setCUDA()
-    * @brief Set the parameters of the computation
-    * 
-    * @param nStreams_ 
-    * @param nIntraStrmParallelism_ 
-    * @return int 
-    */
-    int __GpuDriver::setCUDA(uint nStreams_){
-      nStreams = nStreams_;
 
-      /* // Query the number of available devices
-      int nDevices;
-      CHECK_CUDA( cudaGetDeviceCount(&nDevices) ) */
+  int __GpuDriver::setCUDA(uint nStreams_){
+    nStreams = nStreams_;
 
-      // Query the device parameters
-      CHECK_CUDA( cudaGetDevice(&deviceId) )
-      CHECK_CUDA( cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId) )
+    /* // Query the number of available devices
+    int nDevices;
+    CHECK_CUDA( cudaGetDeviceCount(&nDevices) ) */
 
-      nThreadsPerBlock = 128;
-      nBlocks = numberOfSMs * 32;
+    // Query the device parameters
+    CHECK_CUDA( cudaGetDevice(&deviceId) )
+    CHECK_CUDA( cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId) )
 
-      // Spawn the streams
-      streams = new cudaStream_t[nStreams];
-      for(uint i = 0; i < nStreams; i++){
-        CHECK_CUDA( cudaStreamCreate(&streams[i]) )
-      }
+    nThreadsPerBlock = 128;
+    nBlocks = numberOfSMs * 32;
 
-      // Create the cuBLAS handle
-      CHECK_CUBLAS( cublasCreate(&h_cublas) )
-      CHECK_CUBLAS( cublasSetPointerMode(h_cublas, CUBLAS_POINTER_MODE_DEVICE) )
-
-      CHECK_CUBLAS( cublasSetStream(h_cublas, streams[0]) )
-
-      // Create the cuSPARSE handle
-      CHECK_CUSPARSE( cusparseCreate(&h_cusparse) )
-      CHECK_CUSPARSE( cusparseSetPointerMode(h_cusparse, CUSPARSE_POINTER_MODE_DEVICE) )
-
-      CHECK_CUSPARSE( cusparseSetStream(h_cusparse, streams[0]) )
-
-      return 0;
+    // Spawn the streams
+    streams = new cudaStream_t[nStreams];
+    for(uint i = 0; i < nStreams; i++){
+      CHECK_CUDA( cudaStreamCreate(&streams[i]) )
     }
+
+    // Create the cuBLAS handle
+    CHECK_CUBLAS( cublasCreate(&h_cublas) )
+    CHECK_CUBLAS( cublasSetPointerMode(h_cublas, CUBLAS_POINTER_MODE_DEVICE) )
+
+    CHECK_CUBLAS( cublasSetStream(h_cublas, streams[0]) )
+
+    // Create the cuSPARSE handle
+    CHECK_CUSPARSE( cusparseCreate(&h_cusparse) )
+    CHECK_CUSPARSE( cusparseSetPointerMode(h_cusparse, CUSPARSE_POINTER_MODE_DEVICE) )
+
+    CHECK_CUSPARSE( cusparseSetStream(h_cusparse, streams[0]) )
+
+    return 0;
+  }
 
   void __GpuDriver::setTimesteps(){
     if(!interpolationMatrix.empty()){
@@ -621,10 +647,11 @@
     for(uint t(tStart_); t<tEnd_ ; ++t){
       // Always performe one step without interpolation, and then performe the
       // interpolation steps
-      for(uint i(0); i<=interpolationNumberOfPoints; ++i){
-        rkStep(k, t, i, m);
 
-        if(d_trajectories != NULL && (t*(interpolationNumberOfPoints+1)+i)%saveSteps==0){
+      for(uint i(0); i<=interpolationNumberOfPoints; ++i){
+        fwdStep(k, t, i, m);
+
+        if(d_trajectories != nullptr && (t*(interpolationNumberOfPoints+1)+i)%saveSteps==0){
           CHECK_CUBLAS( cublasScopy(h_cublas,
                                     n_dofs, 
                                     d_Q, 
@@ -644,41 +671,95 @@
     }                       
   }
 
-  void __GpuDriver::rkStep(uint k, 
-                           uint t,
-                           uint i,
-                           uint m){
+  void __GpuDriver::fwdStep(uint k, 
+                            uint t,
+                            uint i,
+                            uint m){
 
     // Compute the derivatives
-    derivatives(d_m1_desc, d_Q_desc, k, t, i, m);
+    derivatives(d_m1_desc, d_Q_desc, nullptr, k, t, i, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2_desc, d_mi_desc, k, t, i+1, m);
+    derivatives(d_m2_desc, d_mi_desc, nullptr, k, t, i+1, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3_desc, d_mi_desc, k, t, i+1, m);
+    derivatives(d_m3_desc, d_mi_desc, nullptr, k, t, i+1, m);
 
       updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4_desc, d_mi_desc, k, t, i+2, m);
+    derivatives(d_m4_desc, d_mi_desc, nullptr, k, t, i+2, m);
+
+    // Compute next state vector Q
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+  }
+
+  void __GpuDriver::backwardRungeKutta(uint  tStart_, 
+                                       uint  tEnd_,
+                                       uint  k,
+                                       uint  startSetpoint){
+
+    uint   m(0); // Modulation index
+    uint   currentSetpoint(startSetpoint);
+
+    // Performe the rk4 steps
+    for(uint t(tStart_); t>tEnd_ ; --t){
+
+      for(int i(interpolationNumberOfPoints); i>=0; --i){
+        
+        bwdStep(k, t, i, m, currentSetpoint);
+
+        // Point to the next state vector stored in the trajectory buffer
+        ++currentSetpoint;
+      }
+    }   
+  }
+
+  void __GpuDriver::bwdStep(uint k, 
+                            uint t,
+                            uint i,
+                            uint m,
+                            uint currentSetpoint){
+
+    // Compute the derivatives
+    derivatives(d_m1_desc, d_Q_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+
+    derivatives(d_m2_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+
+    derivatives(d_m3_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+
+      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+
+    derivatives(d_m4_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-2, m);
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
   }
 
   inline void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
-                                      cusparseDnVecDescr_t q_desc, 
-                                      uint k, 
-                                      uint t,
-                                      uint i,
-                                      uint m){
+                                       cusparseDnVecDescr_t q_desc,
+                                       reel*                pq_adjt, 
+                                       uint k, 
+                                       uint t,
+                                       uint i,
+                                       uint m){
 
     // Get the pointers from the descriptors
-    reel *pm; reel *pq;
+    reel *pm; 
+    reel *pq;
+    //reel *pq_adjt;
+
     CHECK_CUSPARSE( cusparseDnVecGetValues(m_desc, (void**)&pm) )
     CHECK_CUSPARSE( cusparseDnVecGetValues(q_desc, (void**)&pq) )
+    //CHECK_CUSPARSE( cusparseDnVecGetValues(q_adjt_desc, (void**)&pq_adjt) )
+    if(pq_adjt == nullptr){
+      pq_adjt = pq;
+    }
     
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k = B.d_ki
@@ -711,7 +792,8 @@
                                                           Gamma->d_col,
                                                           Gamma->d_slice, 
                                                           Gamma->nzz, 
-                                                          pq, 
+                                                          pq_adjt,
+                                                          pq,
                                                           pm);
     
     // k += Lambda.d_mi³
@@ -721,12 +803,14 @@
                                                           Lambda->d_slice, 
                                                           Lambda->d_hyperslice,
                                                           Lambda->nzz, 
+                                                          pq_adjt,
+                                                          pq,
                                                           pq, 
                                                           pm);
     
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
-    if(t < lengthOfeachExcitation){
+    if(t < lengthOfeachExcitation && (pq == pq_adjt /* WOP: Just to ensure the fwd only for now*/ )){
       // k += ForcePattern.d_ExcitationsSet
       modterpolator(pm, k, t, i, m);
     }
@@ -840,8 +924,12 @@
     }
 
     if(parallelismThroughExcitations > 1){
-      extendSystem();
-      extendAdjoint();
+      if(n_dofs_fwd > 0){
+        extendSystem();
+      }
+      if(n_dofs_bwd > 0){
+        extendAdjoint();
+      }
     }
   }
 
@@ -927,7 +1015,7 @@
 
   void __GpuDriver::setComputeSystem(problemType type_){
     if(type_ == forward){
-      n_dofs      = n_dofs_fwd;
+      n_dofs       = n_dofs_fwd;
 
       B            = fwd_B;
       K            = fwd_K;
@@ -935,6 +1023,7 @@
       Lambda       = fwd_Lambda;
       ForcePattern = fwd_ForcePattern;
 
+      h_QinitCond  = &h_fwd_QinitCond;
       d_QinitCond  = d_fwd_QinitCond;
 
       d_Q  = d_fwd_Q;  d_Q_desc  = d_fwd_Q_desc;
@@ -946,9 +1035,6 @@
 
       // Set the initial conditions to the states vectors
       resetStatesVectors();
-
-      std::cout << "Forward system set" << std::endl;
-      displaySimuInfos();
     }
     else if(type_ == backward){
       n_dofs       = n_dofs_bwd;
@@ -959,6 +1045,7 @@
       Lambda       = bwd_Lambda;
       ForcePattern = bwd_ForcePattern;
 
+      h_QinitCond  = &h_bwd_QinitCond;
       d_QinitCond  = d_bwd_QinitCond;
 
       d_Q  = d_bwd_Q;  d_Q_desc  = d_bwd_Q_desc;
@@ -970,9 +1057,6 @@
 
       // Set the initial conditions to the states vectors
       resetStatesVectors();
-
-      std::cout << "Backward system set" << std::endl;
-      displaySimuInfos();
     }
   }
 
@@ -989,7 +1073,14 @@
     CHECK_CUDA( cudaMemset(d_m4, 0, n_dofs*sizeof(reel)) )
   }
 
-  void __GpuDriver::displaySimuInfos(){
+  void __GpuDriver::displaySimuInfos(problemType type_){
+    if(type_ == forward){
+      setComputeSystem(forward);
+    }
+    else{
+      setComputeSystem(backward);
+    }
+
     if(dCompute){
       std::cout << "A system with " << n_dofs << " DOFs has been assembled" << std::endl;
       std::cout << "  This system is composed of " << parallelismThroughExcitations << " parallelized simulations of " << n_dofs/parallelismThroughExcitations << " DOF each." << std::endl;
@@ -1001,13 +1092,22 @@
     }
     
     if(dSystem){
+      if(type_ == forward){
+        setComputeSystem(forward);
+        std::cout << std::endl << "Forward system:" << std::endl;
+      }
+      else{
+        setComputeSystem(backward);
+        std::cout << std::endl << "Backward system:" << std::endl;
+      }
+
       std::cout << "Here is the assembled system" << std::endl;
       std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
       std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
       std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
       std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
-      // std::cout << "QinitCond:" << std::endl << "  "; printVector(QinitCond);
+      std::cout << "QinitCond:" << std::endl << "  "; printVector(*h_QinitCond);
 
       std::cout << "InterpolationMatrix:" << std::endl;
       if(!interpolationMatrix.empty()){
@@ -1103,7 +1203,6 @@
 
     n_dofs_fwd = dofChecking[0];
   }
-
 
   void __GpuDriver::clearFwdB(){
     if(B == fwd_B){
@@ -1232,7 +1331,7 @@
 
 /*                    Adjoint system private methods                    */
 
-  void __GpuDriver::allocateDeviceAdjoint(){
+  void __GpuDriver::allocateDeviceAdjointSystem(){
     bwd_B->allocateOnGPU(h_cusparse,
                          d_bwd_mi_desc, 
                          d_bwd_Q_desc);

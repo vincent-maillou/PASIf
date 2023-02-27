@@ -415,22 +415,21 @@ class PASIf(__GpuDriver):
         
         gradient = self._getGradient(save_)
         
-        chunkSize    = 280
+        """ chunkSize    = 280
         numSetpoints = 279
         
         # re-arrange the computed trajectory in a plotable way.
         #numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/chunkSize)
         numOfSavedSteps = numSetpoints + chunkSize - 2 
-        totalSize = self.globalSystemSize + self.globalAdjointSize
-        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(totalSize + 1)])
-    
+        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalAdjointSize + 1)])
+        
         for t in range(numOfSavedSteps):
             # first row always contain time
             unwrappedGradient[0][t] = t*numSetpoints/(self.sampleRate*(self.interpolSize+1))
-            for i in range(totalSize):
-                unwrappedGradient[i+1][t] = gradient[t*totalSize + i]
+            for i in range(self.globalAdjointSize):
+                unwrappedGradient[i+1][t] = gradient[t*self.globalAdjointSize + i]
     
-        return unwrappedGradient
+        return unwrappedGradient """
         
         return gradient
 
@@ -458,8 +457,9 @@ class PASIf(__GpuDriver):
             assert inputVecM[i].shape[0] == inputVecM[i].shape[1], "The matrix M must be squared."
             assert inputVecB[i].shape[0] == inputVecB[i].shape[1], "The matrix B must be squared."
             assert inputVecK[i].shape[0] == inputVecK[i].shape[1], "The matrix K must be squared."
-            assert inputVecGamma[i].dimensions[0]  == inputVecGamma[i].dimensions[1]  == inputVecGamma[i].dimensions[2], "The Gamma tensor must be squared."
-            assert inputVecLambda[i].dimensions[0] == inputVecLambda[i].dimensions[1] == inputVecLambda[i].dimensions[2] == inputVecLambda[i].dimensions[3], "The Lambda tensor must be squared."
+            if inputVecPsi is None:
+                assert inputVecGamma[i].dimensions[0]  == inputVecGamma[i].dimensions[1]  == inputVecGamma[i].dimensions[2], "The System Gamma tensor must be squared."
+                assert inputVecLambda[i].dimensions[0] == inputVecLambda[i].dimensions[1] == inputVecLambda[i].dimensions[2] == inputVecLambda[i].dimensions[3], "The System Lambda tensor must be squared."
             
             assert inputVecB[i].shape[0]                 == ndofs, "The matrix B must have the same size as the matrix M."
             assert inputVecK[i].shape[0]                 == ndofs, "The matrix K must have the same size as the matrix M."
@@ -502,8 +502,11 @@ class PASIf(__GpuDriver):
             rowK  : np.ndarray = inputVecK[0].row
             colK  : np.ndarray = inputVecK[0].col
             
+            self.system_Gamma  = cp.deepcopy(inputVecGamma[0])
+            self.system_Lambda = cp.deepcopy(inputVecLambda[0])
+            
             for i in range(1, self.numberOfSystems):
-                diagM = np.concatenate((diagM, inputVecM[i].data)).flatten()
+                diagM = np.concatenate((diagM, inputVecM[i].data))
                 
                 valB = np.concatenate((valB, inputVecB[i].data))
                 rowB = np.concatenate((rowB, inputVecB[i].row + self.globalSystemSize))
@@ -513,13 +516,15 @@ class PASIf(__GpuDriver):
                 rowK = np.concatenate((rowK, inputVecK[i].row + self.globalSystemSize))
                 colK = np.concatenate((colK, inputVecK[i].col + self.globalSystemSize))
                 
-                inputVecGamma[0].concatenateTensor(inputVecGamma[i])
-                inputVecLambda[0].concatenateTensor(inputVecLambda[i])
+                self.system_Gamma.concatenateTensor(inputVecGamma[i])
+                self.system_Lambda.concatenateTensor(inputVecLambda[i])
                 inputVecForcePattern[0]      = np.concatenate((inputVecForcePattern[0], inputVecForcePattern[i]), axis = 0)
                 inputVecInitialConditions[0] = np.concatenate((inputVecInitialConditions[0], inputVecInitialConditions[i]), axis = 0)
                 
                 self.globalSystemSize += inputVecM[i].shape[0]
             
+
+            diagM         = diagM.reshape((self.globalSystemSize))
             self.system_M = dia_matrix((diagM, [0]),         shape = (self.globalSystemSize, self.globalSystemSize))
             self.system_B = coo_matrix((valB, (rowB, colB)), shape = (self.globalSystemSize, self.globalSystemSize))
             self.system_K = coo_matrix((valK, (rowK, colK)), shape = (self.globalSystemSize, self.globalSystemSize))
@@ -529,8 +534,9 @@ class PASIf(__GpuDriver):
             self.system_B = cp.deepcopy(inputVecB[0])
             self.system_K = cp.deepcopy(inputVecK[0])
             
-        self.system_Gamma             = cp.deepcopy(inputVecGamma[0])
-        self.system_Lambda            = cp.deepcopy(inputVecLambda[0])
+            self.system_Gamma  = cp.deepcopy(inputVecGamma[0])
+            self.system_Lambda = cp.deepcopy(inputVecLambda[0])
+            
         self.system_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
         self.system_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
         

@@ -102,13 +102,11 @@ enum problemType {forward, backward};
     uint *d_col;
 
     cusparseSpMatDescr_t sparseMat_desc;
-    void *d_buffer;
+    void*  d_buffer;
     size_t bufferSize;
 
-    reel alpha;
-    reel beta;
-    reel *d_alpha;
-    reel *d_beta;
+    reel  alpha; reel *d_alpha;
+    reel  beta;  reel *d_beta;
   };
 
   std::ostream& operator<<(std::ostream& out, COOMatrix const& mat);
