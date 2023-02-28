@@ -76,7 +76,7 @@ enum problemType {forward, backward};
     COOMatrix(std::vector<reel> values_,
               std::vector<uint> row_,
               std::vector<uint> col_,
-              uint n_);
+              uint              n_);
     ~COOMatrix();
 
     uint   extendTheSystem(uint nTimes);
@@ -135,15 +135,16 @@ enum problemType {forward, backward};
     uint nzz;
     uint n;
     std::vector<reel> val;
+    std::vector<uint> slice;
     std::vector<uint> row;
     std::vector<uint> col;
-    std::vector<uint> slice;
+    
 
    // Device-side data
     reel *d_val;
+    uint *d_slice;
     uint *d_row;
     uint *d_col;
-    uint *d_slice;
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor3D const& tensor_);
@@ -172,17 +173,19 @@ enum problemType {forward, backward};
     uint nzz;
     uint n;
     std::vector<reel> val;
+    std::vector<uint> hyperslice;
+    std::vector<uint> slice;
     std::vector<uint> row;
     std::vector<uint> col;
-    std::vector<uint> slice;
-    std::vector<uint> hyperslice;
+    
 
    // Device-side data
     reel *d_val;
+    uint *d_hyperslice;
+    uint *d_slice;
     uint *d_row;
     uint *d_col;
-    uint *d_slice;
-    uint *d_hyperslice;
+    
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_);

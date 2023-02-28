@@ -27,6 +27,13 @@ from scipy.sparse.linalg import inv
 
 @dataclass
 class coo_tensor:
+    """_summary_ : Describe a sparse tensor in a COO format
+    
+       _description_ : The coo_tensor is described as higher-dimmension major 
+    format with the following ordering: N-dims, N-dims-1, ..., slices, rows, columns.
+    - For example a 2D tensor (matrices) is described as: rows-major format.
+    - For example a 3D tensor is described as: slices-major format.. and so on.
+    """
     def __init__(self, dimensions_: list[int] = [2, 2]):
         self.dimensions = dimensions_
         self.val        = []
@@ -68,8 +75,7 @@ class coo_tensor:
     dimensions: list[int]
     #   - List of values of the tensor in a row major order (smaller dimension first)
     val       : list[float]
-    #   - Indices are stored sequentially in the following order (0-indexing):
-    #       -> pt1_dim1, pt1_dim2, ..., pt1_dimN, pt2_dim1, pt2_dim2, ..., pt2_dimN, ...
+    #   - Indices are stored sequentially in the higher-dimmension major order
     indices   : list[int]
     
     
@@ -91,7 +97,7 @@ class coo_tensor:
         
     def multiplyByDiagMatrix(self, diagMatrix_: list):
         # Check input tensor dimensions
-        if len(diagMatrix_) != self.dimensions[0] or len(diagMatrix_) != self.dimensions[1]:
+        if len(diagMatrix_) != self.dimensions[-2] or len(diagMatrix_) != self.dimensions[-1]:
             raise Exception("The input matrix dimensions must match the row/col dimensions of the tensor")
         
         if len(self.dimensions) == 2:
@@ -99,7 +105,7 @@ class coo_tensor:
                 self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)]]
         else:
             for i in range(len(self.val)):
-                self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)+len(self.dimensions)-1]]
+                self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)]]
         
     def getIndicesDim(self, dim_: int) -> list[int]:
         # Unfold the indices list of the tensor and return the indices  
@@ -164,13 +170,13 @@ class PASIf(__GpuDriver):
         
         self.systemSet       : bool = False
         self.numberOfSystems : int  = 0
-        self.system_M                 : dia_matrix = None 
-        self.system_B                 : coo_matrix = None 
-        self.system_K                 : coo_matrix = None 
-        self.system_Gamma             : coo_tensor = None # 3D tensor    
-        self.system_Lambda            : coo_tensor = None # 4D tensor
-        self.system_forcePattern      : np.ndarray = None 
-        self.system_initialConditions : np.ndarray = None
+        self.system_M                   : dia_matrix = None 
+        self.system_B                   : coo_matrix = None 
+        self.system_K                   : coo_matrix = None 
+        self.system_Gamma               : coo_tensor = None # 3D tensor    
+        self.system_Lambda              : coo_tensor = None # 4D tensor
+        self.system_forcePattern        : np.ndarray = None 
+        self.system_initialConditions   : np.ndarray = None
         
         self.jacobianSet : bool = False
         self.jacobian_M                 : dia_matrix = None
@@ -189,13 +195,13 @@ class PASIf(__GpuDriver):
         self._loadExcitationsSet(excitationSet, self.sampleRate)
   
     def setSystems(self,
-                   vecM                : list[dia_matrix],
-                   vecB                : list[coo_matrix],
-                   vecK                : list[coo_matrix],
-                   vecGamma            : list[coo_tensor],
-                   vecLambda           : list[coo_tensor],
-                   vecForcePattern     : list[np.ndarray],
-                   vecInitialConditions: list[np.ndarray]):
+                   vecM                 : list[dia_matrix],
+                   vecB                 : list[coo_matrix],
+                   vecK                 : list[coo_matrix],
+                   vecGamma             : list[coo_tensor],
+                   vecLambda            : list[coo_tensor],
+                   vecForcePattern      : list[np.ndarray],
+                   vecInitialConditions : list[np.ndarray]):
         
         self.systemSet = False
         

@@ -317,8 +317,6 @@ class __GpuDriver{
 - [ ] cuda API crash when using more than 1.6M DOF
 - [ ] COOTensor3D is tied to be square, need to change and keep track
 of each dimension
-- [ ] coo_tensor order of the index
-      - [ ] Modify the CUDA parsing regarding the re-ordering
 - [ ] Merge B and K in a single matrix
 */
 

@@ -23,7 +23,7 @@
              uint *d_row, 
              uint *d_col, 
              uint *d_slice, 
-             uint nzz,
+             uint  nzz,
              reel* X1,
              reel* X2, 
              reel* Y){
@@ -48,7 +48,7 @@
              uint *d_col, 
              uint *d_slice, 
              uint *d_hyperslice,
-             uint nzz,
+             uint  nzz,
              reel* X1,
              reel* X2,
              reel* X3, 

@@ -218,9 +218,9 @@
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
-        row.push_back(indices_[3*i]);
-        col.push_back(indices_[3*i+1]);
-        slice.push_back(indices_[3*i+2]);
+        slice.push_back(indices_[3*i]);
+        row.push_back(indices_[3*i+1]);
+        col.push_back(indices_[3*i+2]);
       }
     }
 
@@ -344,20 +344,21 @@
                              std::vector<uint> indices_) : n(0){
       // Set device pointer to nullprt
       d_val        = nullptr;
+      d_hyperslice = nullptr;
+      d_slice      = nullptr;
       d_row        = nullptr;
       d_col        = nullptr;
-      d_slice      = nullptr;
-      d_hyperslice = nullptr;
+      
 
 
       n   = dimensions_[0];
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
-        row.push_back(indices_[4*i]);
-        col.push_back(indices_[4*i+1]);
-        slice.push_back(indices_[4*i+2]);
-        hyperslice.push_back(indices_[4*i+3]);
+        hyperslice.push_back(indices_[4*i]);
+        slice.push_back(indices_[4*i+1]);
+        row.push_back(indices_[4*i+2]);
+        col.push_back(indices_[4*i+3]);
       }
     }
 

@@ -45,12 +45,12 @@ vecK : list[coo_matrix] = [K] * n
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize])
 Gamma.val          = [-10, -10, -1, -1]
-Gamma.indices      = [0,1,4 , 0,0,5 , 0,0,6, 1,1,7]
+Gamma.indices      = [4,0,1 , 5,0,0 , 6,0,0, 7,1,1]
 vecGamma : list[coo_tensor] = [Gamma] * n
 
 Lambda : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize, systemSize])
 Lambda.val          = [40000]
-Lambda.indices      = [1,1,1,5]
+Lambda.indices      = [5,1,1,1]
 vecLambda : list[coo_tensor] = [Lambda] * n
 
 forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0.5, 0, 0, 0])
@@ -229,7 +229,7 @@ Psi.indices      = [1,1,1,1,1]
 vecPsi : list[coo_tensor] = [Psi] * n
 
 
-start      = time.time()
+""" start      = time.time()
 pasif.setJacobian(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition, vecPsi)
 end        = time.time()
 
@@ -240,7 +240,7 @@ gradient = pasif.getGradient()
 end        = time.time()
 
 print("getGradient() overall time: ", end - start)
-print("Gradient: ", gradient)
+print("Gradient: ", gradient) """
 
 """ plt.plot(gradient[0], gradient[1], 'r')
 plt.plot(gradient[0], gradient[2], 'b')
