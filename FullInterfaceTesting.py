@@ -176,7 +176,19 @@ Gamma_indexes  = [0, 5, 0,
                   9, 4, 4,
                   11, 5, 5]
 
-Gamma_dims     = [12, 12, 12]
+Gamma_values   = [-20.0, -2.0, 1, -20, 1, -1.0, -1.0, -0.1, -0.1]
+Gamma_indexes  = [4, 1, 0,
+                  5, 0, 0, 
+                  6, 0, 0, 
+                  4, 0, 1, 
+                  7, 1, 1,
+                  4, 0, 8, 
+                  4, 4, 9, 
+                  5, 1, 10, 
+                  5, 5, 11]
+
+
+""" Gamma_dims     = [12, 12, 12]
 Gamma_values   = [-20.0, -20, -1.0, -1.0, -2.0, -0.1, -0.1, 1, 1]
 Gamma_indexes  = [0, 1, 4, 
                   1, 0, 4, 
@@ -186,7 +198,7 @@ Gamma_indexes  = [0, 1, 4,
                   10, 1, 5, 
                   11, 5, 5,
                   0, 0, 6, 
-                  1, 1, 7]
+                  1, 1, 7] """
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = Gamma_dims)
 Gamma.val          = Gamma_values
