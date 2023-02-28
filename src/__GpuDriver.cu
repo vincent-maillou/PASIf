@@ -190,46 +190,46 @@
 
 /*                    Forward system interface                    */
 
-  void __GpuDriver::_setFwdB(std::vector<reel> values_,
-                             std::vector<uint> row_,
-                             std::vector<uint> col_,
-                             uint n_){
+  void __GpuDriver::_setFwdB(std::array<uint, 2> n_,
+                             std::vector<reel>   values_,
+                             std::vector<uint>   row_,
+                             std::vector<uint>   col_){
     clearFwdB();
 
-    fwd_B = new COOMatrix(values_,
+    fwd_B = new COOMatrix(n_,
+                          values_,
                           row_,
-                          col_,
-                          n_);
+                          col_);
   }
 
-  void __GpuDriver::_setFwdK(std::vector<reel> values_,
-                             std::vector<uint> row_,
-                             std::vector<uint> col_,
-                             uint n_){
+  void __GpuDriver::_setFwdK(std::array<uint, 2> n_,
+                             std::vector<reel>   values_,
+                             std::vector<uint>   row_,
+                             std::vector<uint>   col_){
     clearFwdK();
 
-    fwd_K = new COOMatrix(values_,
+    fwd_K = new COOMatrix(n_,
+                          values_,
                           row_,
-                          col_,
-                          n_);
+                          col_);
   }
 
-  void __GpuDriver::_setFwdGamma(std::vector<uint> dimensions_,
-                                 std::vector<reel> values_,
-                                 std::vector<uint> indices_){
+  void __GpuDriver::_setFwdGamma(std::array<uint, 3> n_,
+                                 std::vector<reel>   values_,
+                                 std::vector<uint>   indices_){
     clearFwdGamma();
 
-    fwd_Gamma = new COOTensor3D(dimensions_,
+    fwd_Gamma = new COOTensor3D(n_,
                                 values_,
                                 indices_);
   }
 
-  void __GpuDriver::_setFwdLambda(std::vector<uint> dimensions_,
-                                  std::vector<reel> values_,
-                                  std::vector<uint> indices_){
+  void __GpuDriver::_setFwdLambda(std::array<uint, 4> n_,
+                                  std::vector<reel>   values_,
+                                  std::vector<uint>   indices_){
     clearFwdLambda();
 
-    fwd_Lambda = new COOTensor4D(dimensions_,
+    fwd_Lambda = new COOTensor4D(n_,
                                  values_,
                                  indices_);
   }
@@ -263,46 +263,46 @@
 
 /*                    Backward system interface                    */
 
-  void __GpuDriver::_setBwdB(std::vector<reel> values_,
-                             std::vector<uint> row_,
-                             std::vector<uint> col_,
-                             uint n_){
+  void __GpuDriver::_setBwdB(std::array<uint, 2> n_,
+                             std::vector<reel>   values_,
+                             std::vector<uint>   row_,
+                             std::vector<uint>   col_){
     clearBwdB();
 
-    bwd_B = new COOMatrix(values_,
+    bwd_B = new COOMatrix(n_,
+                          values_,
                           row_,
-                          col_,
-                          n_);
+                          col_);
   }
 
-  void __GpuDriver::_setBwdK(std::vector<reel> values_,
-                             std::vector<uint> row_,
-                             std::vector<uint> col_,
-                             uint n_){
+  void __GpuDriver::_setBwdK(std::array<uint, 2> n_,
+                             std::vector<reel>   values_,
+                             std::vector<uint>   row_,
+                             std::vector<uint>   col_){
     clearBwdK();
 
-    bwd_K = new COOMatrix(values_,
+    bwd_K = new COOMatrix(n_,
+                          values_,
                           row_,
-                          col_,
-                          n_);
+                          col_);
   }
 
-  void __GpuDriver::_setBwdGamma(std::vector<uint> dimensions_,
-                                 std::vector<reel> values_,
-                                 std::vector<uint> indices_){
+  void __GpuDriver::_setBwdGamma(std::array<uint, 3> n_,
+                                 std::vector<reel>   values_,
+                                 std::vector<uint>   indices_){
     clearBwdGamma();
 
-    bwd_Gamma = new COOTensor3D(dimensions_,
+    bwd_Gamma = new COOTensor3D(n_,
                                 values_,
                                 indices_);
   }
 
-  void __GpuDriver::_setBwdLambda(std::vector<uint> dimensions_,
-                                  std::vector<reel> values_,
-                                  std::vector<uint> indices_){
+  void __GpuDriver::_setBwdLambda(std::array<uint, 4> n_,
+                                  std::vector<reel>   values_,
+                                  std::vector<uint>   indices_){
     clearBwdLambda();
 
-    bwd_Lambda = new COOTensor4D(dimensions_,
+    bwd_Lambda = new COOTensor4D(n_,
                                  values_,
                                  indices_);
   }

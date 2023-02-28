@@ -23,13 +23,14 @@
   * @param denseMatrix 
   * @param scaleMatrix 
   */
-    COOMatrix::COOMatrix(std::vector<reel> values_,
-                         std::vector<uint> row_,
-                         std::vector<uint> col_,
-                         uint n_):
-        n(0),
-        alpha(1),
-        beta(1){
+    COOMatrix::COOMatrix(std::array<uint,2> n_,
+                         std::vector<reel>  values_,
+                         std::vector<uint>  row_,
+                         std::vector<uint>  col_):
+      n(n_),
+      alpha(1),
+      beta(1){
+
       // Set device pointer to nullprt
       d_val = nullptr;
       d_row = nullptr;
@@ -41,9 +42,6 @@
       d_alpha = nullptr;
       d_beta = nullptr;
 
-      // Higher dimension = Number of DOFs
-      //   - Square matrix supposed
-      n   = n_; 
       for(size_t i(0); i<values_.size(); ++i){
         if(std::abs(values_[i]) > reel_eps){
           val.push_back(values_[i]);
@@ -104,21 +102,25 @@
    * @param n 
    */
     uint COOMatrix::extendTheSystem(uint nTimes){
+      // Return the highest dimmention of the matrix
+      // after the extension
       if(nTimes == 0){
-        return n;
+        return n[0];
       }
       
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
-          row.push_back(row[j]+(i+1)*n);
-          col.push_back(col[j]+(i+1)*n);
+          row.push_back(row[j]+(i+1)*n[0]);
+          col.push_back(col[j]+(i+1)*n[1]);
           val.push_back(val[j]);
         }
       }
-      n += nTimes*n;
-      nzz = val.size();
 
-      return n;
+      nzz   = val.size();
+      n[0] += nTimes*n[0];
+      n[1] += nTimes*n[1];
+
+      return n[0];
     }
 
 
@@ -127,7 +129,7 @@
    * @brief Construct a new COOMatrix::allocateOnGPU object
    * 
    */
-    void COOMatrix::allocateOnGPU(cusparseHandle_t & handle, 
+    void COOMatrix::allocateOnGPU(cusparseHandle_t     & handle, 
                                   cusparseDnVecDescr_t & vecX, 
                                   cusparseDnVecDescr_t & vecY){
       // Allocate memory on the device
@@ -141,16 +143,30 @@
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
 
       // Create the sparse matrix descriptor and allocate the needed buffer
-      CHECK_CUSPARSE( cusparseCreateCoo(&sparseMat_desc, n, n, 
-                                        nzz, d_row, d_col, d_val, 
-                                        CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
+      CHECK_CUSPARSE( cusparseCreateCoo(&sparseMat_desc, 
+                                        n[0], 
+                                        n[1], 
+                                        nzz, 
+                                        d_row, 
+                                        d_col, 
+                                        d_val, 
+                                        CUSPARSE_INDEX_32I, 
+                                        CUSPARSE_INDEX_BASE_ZERO, 
+                                        CUDA_R_32F) )
       
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_beta, sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_beta,  sizeof(reel)) );
 
-      CHECK_CUSPARSE( cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                              &d_alpha, sparseMat_desc, vecX, &d_beta, vecY, CUDA_R_32F, 
-                                              CUSPARSE_SPMV_ALG_DEFAULT, &bufferSize) )
+      CHECK_CUSPARSE( cusparseSpMV_bufferSize(handle, 
+                                              CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                              &d_alpha, 
+                                              sparseMat_desc, 
+                                              vecX, 
+                                              &d_beta, 
+                                              vecY, 
+                                              CUDA_R_32F, 
+                                              CUSPARSE_SPMV_ALG_DEFAULT, 
+                                              &bufferSize) )
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
     }
@@ -173,8 +189,8 @@
 
       out << "  ";
       size_t k(0);
-      for(size_t i(0); i<n; ++i){
-        for(size_t j(0); j<n; ++j){
+      for(size_t i(0); i<n[0]; ++i){
+        for(size_t j(0); j<n[1]; ++j){
           if(col[k] == j && row[k] == i){
             out << val[k] << " ";
             ++k;
@@ -205,16 +221,16 @@
   * @param denseTensor 
   * @param scaleMatrix 
   */
-    COOTensor3D::COOTensor3D(std::vector<uint> dimensions_,
-                             std::vector<reel> values_,
-                             std::vector<uint> indices_) : n(0){
+    COOTensor3D::COOTensor3D(std::array<uint, 3> n_,
+                             std::vector<reel>   values_,
+                             std::vector<uint>   indices_) : 
+      n(n_){
       // Set device pointer to nullprt
       d_val   = nullptr;
       d_row   = nullptr;
       d_col   = nullptr;
       d_slice = nullptr;
 
-      n   = dimensions_[0];
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
@@ -250,21 +266,24 @@
    */
     uint COOTensor3D::extendTheSystem(uint nTimes){
       if(nTimes == 0){
-        return n;
+        return n[0];
       }
 
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
-          row.push_back(row[j]+(i+1)*n);
-          col.push_back(col[j]+(i+1)*n);
-          slice.push_back(slice[j]+(i+1)*n);
+          slice.push_back(slice[j]+(i+1)*n[0]);
+          row.push_back(row[j]+(i+1)*n[1]);
+          col.push_back(col[j]+(i+1)*n[2]);
           val.push_back(val[j]);
         }
       }
-      n += nTimes*n;
+
+      n[0] += nTimes*n[0];
+      n[1] += nTimes*n[1];
+      n[2] += nTimes*n[2];
       nzz = val.size();
 
-      return n;
+      return n[0];
     }
 
   /**
@@ -273,16 +292,16 @@
    */
     void COOTensor3D::allocateOnGPU(){
       // Allocate memory on the device
-      CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_row,   nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_col,   nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_slice, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_val,   nzz*sizeof(reel)) );
 
       // Copy the data to the device
-      CHECK_CUDA( cudaMemcpy(d_row, row.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_col, col.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_val,   val.data(),   nzz*sizeof(reel), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_slice, slice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_row,   row.data(),   nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_col,   col.data(),   nzz*sizeof(uint), cudaMemcpyHostToDevice) );
     }
 
     size_t COOTensor3D::memFootprint(){
@@ -302,10 +321,10 @@
 
       out << "  ";
       size_t p(0);
-      for(size_t m(0); m<n; ++m){
+      for(size_t m(0); m<n[0]; ++m){
         size_t k(p);
-        for(size_t j(0); j<n; ++j){
-          for(size_t i(0); i<n; ++i){
+        for(size_t j(0); j<n[1]; ++j){
+          for(size_t i(0); i<n[2]; ++i){
             if(row[k] == j && col[k] == i && slice[k] == m){
               out << val[k] << " ";
               ++k;
@@ -339,9 +358,10 @@
     * @param denseTensor 
     * @param scaleMatrix 
     */
-    COOTensor4D::COOTensor4D(std::vector<uint> dimensions_,
+    COOTensor4D::COOTensor4D(std::array<uint, 4> n_,
                              std::vector<reel> values_,
-                             std::vector<uint> indices_) : n(0){
+                             std::vector<uint> indices_) : 
+      n(n_){
       // Set device pointer to nullprt
       d_val        = nullptr;
       d_hyperslice = nullptr;
@@ -349,9 +369,6 @@
       d_row        = nullptr;
       d_col        = nullptr;
       
-
-
-      n   = dimensions_[0];
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
@@ -391,22 +408,25 @@
    */
     uint COOTensor4D::extendTheSystem(uint nTimes){
       if(nTimes == 0){
-        return n;
+        return n[0];
       }
 
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
-          row.push_back(row[j]+(i+1)*n);
-          col.push_back(col[j]+(i+1)*n);
-          slice.push_back(slice[j]+(i+1)*n);
-          hyperslice.push_back(hyperslice[j]+(i+1)*n);
           val.push_back(val[j]);
+          hyperslice.push_back(hyperslice[j]+(i+1)*n[0]);
+          slice.push_back(slice[j]+(i+1)*n[1]);
+          row.push_back(row[j]+(i+1)*n[2]);
+          col.push_back(col[j]+(i+1)*n[3]);
         }
       }
-      n += nTimes*n;
+      n[0] += nTimes*n[0];
+      n[1] += nTimes*n[1];
+      n[2] += nTimes*n[2];
+      n[3] += nTimes*n[3];
       nzz = val.size();
 
-      return n;
+      return n[0];
     }
 
   /**
@@ -415,18 +435,18 @@
    */
     void COOTensor4D::allocateOnGPU(){
       // Allocate memory on the device
-      CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_slice, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_row,        nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_col,        nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_slice,      nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_hyperslice, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_val,        nzz*sizeof(reel)) );
 
       // Copy the data to the device
-      CHECK_CUDA( cudaMemcpy(d_row, row.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_col, col.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_slice, slice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_val,        val.data(),        nzz*sizeof(reel), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_hyperslice, hyperslice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_slice,      slice.data(),      nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_row,        row.data(),        nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_col,        col.data(),        nzz*sizeof(uint), cudaMemcpyHostToDevice) );
     }
 
     size_t COOTensor4D::memFootprint(){

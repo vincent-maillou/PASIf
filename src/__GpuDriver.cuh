@@ -28,20 +28,20 @@ class __GpuDriver{
 
 
   //            Forward system interface 
-  void _setFwdB(std::vector<reel> values_,
-                std::vector<uint> row_,
-                std::vector<uint> col_,
-                uint n_); 
-  void _setFwdK(std::vector<reel> values_,
-                std::vector<uint> row_,
-                std::vector<uint> col_,
-                uint n_);
-  void _setFwdGamma(std::vector<uint> dimensions_,
-                    std::vector<reel> values_,
-                    std::vector<uint> indices_);
-  void _setFwdLambda(std::vector<uint> dimensions_,
-                     std::vector<reel> values_,
-                     std::vector<uint> indices_);
+  void _setFwdB(std::array<uint, 2> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   row_,
+                std::vector<uint>   col_); 
+  void _setFwdK(std::array<uint, 2> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   row_,
+                std::vector<uint>   col_);
+  void _setFwdGamma(std::array<uint, 3> n_,
+                    std::vector<reel>   values_,
+                    std::vector<uint>   indices_);
+  void _setFwdLambda(std::array<uint, 4> n_,
+                     std::vector<reel>   values_,
+                     std::vector<uint>   indices_);
   void _setFwdForcePattern(std::vector<reel> & forcePattern_);
   void _setFwdInitialConditions(std::vector<reel> & initialConditions_);
   
@@ -49,20 +49,20 @@ class __GpuDriver{
 
 
   //            Backward system interface 
-  void _setBwdB(std::vector<reel> values_,
-                std::vector<uint> row_,
-                std::vector<uint> col_,
-                uint n_); 
-  void _setBwdK(std::vector<reel> values_,
-                std::vector<uint> row_,
-                std::vector<uint> col_,
-                uint n_);
-  void _setBwdGamma(std::vector<uint> dimensions_,
-                    std::vector<reel> values_,
-                    std::vector<uint> indices_);
-  void _setBwdLambda(std::vector<uint> dimensions_,
-                     std::vector<reel> values_,
-                     std::vector<uint> indices_);
+  void _setBwdB(std::array<uint, 2> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   row_,
+                std::vector<uint>   col_); 
+  void _setBwdK(std::array<uint, 2> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   row_,
+                std::vector<uint>   col_);
+  void _setBwdGamma(std::array<uint, 3> n_,
+                    std::vector<reel>   values_,
+                    std::vector<uint>   indices_);
+  void _setBwdLambda(std::array<uint, 4> n_,
+                     std::vector<reel>   values_,
+                     std::vector<uint>   indices_);
   void _setBwdForcePattern(std::vector<reel> & forcePattern_);
   void _setBwdInitialConditions(std::vector<reel> & initialConditions_);
 
@@ -315,8 +315,6 @@ class __GpuDriver{
 
 /*
 - [ ] cuda API crash when using more than 1.6M DOF
-- [ ] COOTensor3D is tied to be square, need to change and keep track
-of each dimension
 - [ ] Merge B and K in a single matrix
 */
 

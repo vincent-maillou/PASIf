@@ -249,14 +249,14 @@ class PASIf(__GpuDriver):
         rowK  = [x for x, _ in sorted(zip(self.system_K.row, self.system_K.col))]
         colK  = [x for _, x in sorted(zip(self.system_K.row, self.system_K.col))]
         
-        self._setFwdB(dataB, 
+        self._setFwdB(self.system_B.shape,
+                      dataB, 
                       rowB, 
-                      colB,
-                      self.system_B.shape[0])
-        self._setFwdK(dataK, 
+                      colB)
+        self._setFwdK(self.system_K.shape,
+                      dataK, 
                       rowK, 
-                      colK,
-                      self.system_K.shape[0])
+                      colK)
         self._setFwdGamma(self.system_Gamma.dimensions, 
                           self.system_Gamma.val, 
                           self.system_Gamma.indices)
@@ -338,14 +338,14 @@ class PASIf(__GpuDriver):
         rowK  = [x for x, _ in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
         colK  = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
         
-        self._setBwdB(dataB, 
+        self._setBwdB(self.jacobian_B.shape,
+                      dataB, 
                       rowB, 
-                      colB,
-                      self.jacobian_B.shape[0])
-        self._setBwdK(dataK, 
+                      colB)
+        self._setBwdK(self.jacobian_K.shape,
+                      dataK, 
                       rowK, 
-                      colK,
-                      self.jacobian_K.shape[0])
+                      colK)
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 
                           self.jacobian_Gamma.indices)

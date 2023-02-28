@@ -73,10 +73,10 @@ enum problemType {forward, backward};
   
   struct COOMatrix{
     COOMatrix() {};
-    COOMatrix(std::vector<reel> values_,
-              std::vector<uint> row_,
-              std::vector<uint> col_,
-              uint              n_);
+    COOMatrix(std::array<uint,2> n_,
+              std::vector<reel>  values_,
+              std::vector<uint>  row_,
+              std::vector<uint>  col_);
     ~COOMatrix();
 
     uint   extendTheSystem(uint nTimes);
@@ -90,11 +90,11 @@ enum problemType {forward, backward};
 
 
    // Host-side data
-    uint nzz;
-    uint n;
-    std::vector<reel> val;
-    std::vector<uint> row;
-    std::vector<uint> col;
+    uint                nzz;
+    std::array<uint, 2> n;
+    std::vector<reel>   val;
+    std::vector<uint>   row;
+    std::vector<uint>   col;
 
    // Device-side data
     reel *d_val;
@@ -119,9 +119,9 @@ enum problemType {forward, backward};
 
   struct COOTensor3D{
     COOTensor3D() {};
-    COOTensor3D(std::vector<uint> dimensions_,
-                std::vector<reel> values_,
-                std::vector<uint> indices_);
+    COOTensor3D(std::array<uint, 3> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   indices_);
     ~COOTensor3D();
 
     uint   extendTheSystem(uint nTimes);
@@ -133,11 +133,11 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint nzz;
-    uint n;
-    std::vector<reel> val;
-    std::vector<uint> slice;
-    std::vector<uint> row;
-    std::vector<uint> col;
+    std::array<uint, 3> n;
+    std::vector<reel>   val;
+    std::vector<uint>   slice;
+    std::vector<uint>   row;
+    std::vector<uint>   col;
     
 
    // Device-side data
@@ -157,9 +157,9 @@ enum problemType {forward, backward};
 
   struct COOTensor4D{
     COOTensor4D() {};
-    COOTensor4D(std::vector<uint> dimensions_,
-                std::vector<reel> values_,
-                std::vector<uint> indices_);
+    COOTensor4D(std::array<uint, 4> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   indices_);
     ~COOTensor4D();
 
     uint   extendTheSystem(uint nTimes);
@@ -171,12 +171,12 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint nzz;
-    uint n;
-    std::vector<reel> val;
-    std::vector<uint> hyperslice;
-    std::vector<uint> slice;
-    std::vector<uint> row;
-    std::vector<uint> col;
+    std::array<uint, 4> n;
+    std::vector<reel>   val;
+    std::vector<uint>   hyperslice;
+    std::vector<uint>   slice;
+    std::vector<uint>   row;
+    std::vector<uint>   col;
     
 
    // Device-side data

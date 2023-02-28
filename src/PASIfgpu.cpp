@@ -34,21 +34,21 @@ PYBIND11_MODULE(PASIfgpu, m) {
 
     //            Forward system interface
     .def("_setFwdB", &__GpuDriver::_setFwdB,
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
+      py::arg("col_"))
     .def("_setFwdK", &__GpuDriver::_setFwdK,
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
+      py::arg("col_"))
     .def("_setFwdGamma", &__GpuDriver::_setFwdGamma,
-      py::arg("dimensions_"),
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("indices_"))
     .def("_setFwdLambda", &__GpuDriver::_setFwdLambda,
-      py::arg("dimensions_"),
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("indices_"))
     .def("_setFwdForcePattern", &__GpuDriver::_setFwdForcePattern,
@@ -61,21 +61,21 @@ PYBIND11_MODULE(PASIfgpu, m) {
 
     //            Backward system interface 
     .def("_setBwdB", &__GpuDriver::_setBwdB,
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
+      py::arg("col_"))
     .def("_setBwdK", &__GpuDriver::_setBwdK,
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("row_"),
-      py::arg("col_"),
-      py::arg("n_"))
+      py::arg("col_"))
     .def("_setBwdGamma", &__GpuDriver::_setBwdGamma,
-      py::arg("dimensions_"),
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("indices_"))
     .def("_setBwdLambda", &__GpuDriver::_setBwdLambda,
-      py::arg("dimensions_"),
+      py::arg("n_"),
       py::arg("values_"),
       py::arg("indices_"))
     .def("_setBwdForcePattern", &__GpuDriver::_setBwdForcePattern,
