@@ -97,9 +97,12 @@ class coo_tensor:
         
     def multiplyByDiagMatrix(self, diagMatrix_: list):
         # Check input tensor dimensions
-        if len(diagMatrix_) != self.dimensions[-2] or len(diagMatrix_) != self.dimensions[-1]:
-            raise Exception("The input matrix dimensions must match the row/col dimensions of the tensor")
         
+        """ print()
+        
+        if len(diagMatrix_) != self.dimensions[-2] or len(diagMatrix_) != self.dimensions[-1]:
+            raise Exception("The input matrix dimensions must match the two smallest (row/col) dimensions of the tensor")
+         """
         if len(self.dimensions) == 2:
             for i in range(len(self.val)):
                 self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)]]
@@ -354,6 +357,16 @@ class PASIf(__GpuDriver):
                            self.jacobian_Lambda.indices)
         self._setBwdForcePattern(self.jacobian_forcePattern)
         self._setBwdInitialConditions(self.jacobian_initialConditions)
+        
+        
+        """ psi_dim     = [12, 12, 8, 8, 8]
+        psi_val     = [1]
+        psi_indices = [0, 0, 0, 0, 0]
+        self._setBwdPsi(psi_dim,
+                        psi_val,
+                        psi_indices) """
+        
+        
         #self._setPsi(self.jacobian_Psi.dimensions,
         #             self.jacobian_Psi.val,
         #             self.jacobian_Psi.indices)
@@ -476,7 +489,8 @@ class PASIf(__GpuDriver):
             
             if inputVecPsi is not None:
                 assert inputVecPsi[i].dimensions[0] == ndofs, "The Psi tensor must have the same size as the matrix M."
-                assert inputVecPsi[i].dimensions[0] == inputVecPsi[i].dimensions[1] == inputVecPsi[i].dimensions[2] == inputVecPsi[i].dimensions[3]  == inputVecPsi[i].dimensions[4], "The Psi tensor must be squared."
+                assert inputVecPsi[i].dimensions[0] == inputVecPsi[i].dimensions[1], "The two highest dim of the Psi tensor should be of the size of the adjoint system."
+                assert inputVecPsi[i].dimensions[2] == inputVecPsi[i].dimensions[3]  == inputVecPsi[i].dimensions[4], "The tree smallest dim of the Psi tensor should be of the size of the forward system."
 
 
     def __unfoldSystems(self,
@@ -622,7 +636,8 @@ class PASIf(__GpuDriver):
         
     def __jacobianPreprocessing(self):
         
-        self.jacobian_M = -1*inv(self.jacobian_M)
+        #self.jacobian_M = -1*inv(self.jacobian_M)
+        self.jacobian_M = inv(self.jacobian_M)
         self.jacobian_B = coo_matrix(self.jacobian_M.dot(self.jacobian_B))
         self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))
         

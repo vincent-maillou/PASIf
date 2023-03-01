@@ -78,6 +78,10 @@ PYBIND11_MODULE(PASIfgpu, m) {
       py::arg("n_"),
       py::arg("values_"),
       py::arg("indices_"))
+    .def("_setBwdPsi", &__GpuDriver::_setBwdPsi,
+      py::arg("n_"),
+      py::arg("values_"),
+      py::arg("indices_"))
     .def("_setBwdForcePattern", &__GpuDriver::_setBwdForcePattern,
       py::arg("forcePattern_"))
     .def("_setBwdInitialConditions", &__GpuDriver::_setBwdInitialConditions,

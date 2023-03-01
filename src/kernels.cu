@@ -20,9 +20,9 @@
  */
  __global__
  void SpT3dV(reel *d_val, 
+             uint *d_slice,
              uint *d_row, 
              uint *d_col, 
-             uint *d_slice, 
              uint  nzz,
              reel* X1,
              reel* X2, 
@@ -43,11 +43,11 @@
  * 
  */
  __global__
- void SpT4dV(reel *d_val, 
+ void SpT4dV(reel *d_val,
+             uint *d_hyperslice, 
+             uint *d_slice, 
              uint *d_row, 
              uint *d_col, 
-             uint *d_slice, 
-             uint *d_hyperslice,
              uint  nzz,
              reel* X1,
              reel* X2,
@@ -58,7 +58,35 @@
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X1[d_slice[k]] * X2[d_col[k]] * X3[d_row[k]]);
+    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X1[d_slice[k]] * X2[d_row[k]] * X3[d_col[k]]);
+  }
+ }
+
+
+
+/** SpT5dV()
+ * @brief Perform the coo sparse tensor 5d - dense vector multiplication (order 4).
+ * 
+ */
+ __global__
+ void SpT5dV(reel *d_val,
+             uint *d_hyperhyperslice,
+             uint *d_hyperslice, 
+             uint *d_slice, 
+             uint *d_row, 
+             uint *d_col, 
+             uint  nzz,
+             reel* X1,
+             reel* X2,
+             reel* X3,  
+             reel* X4,  
+             reel* Y){
+
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint stride = blockDim.x * gridDim.x;  
+
+  for(uint k = index; k < nzz; k += stride){
+    atomicAdd(&Y[d_hyperhyperslice[k]], d_val[k] * X1[d_hyperslice[k]] * X2[d_slice[k]] * X3[d_row[k]] * X4[d_col[k]]);
   }
  }
 

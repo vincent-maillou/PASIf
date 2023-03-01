@@ -63,6 +63,9 @@ class __GpuDriver{
   void _setBwdLambda(std::array<uint, 4> n_,
                      std::vector<reel>   values_,
                      std::vector<uint>   indices_);
+  void _setBwdPsi(std::array<uint, 5> n_,
+                  std::vector<reel>   values_,
+                  std::vector<uint>   indices_);
   void _setBwdForcePattern(std::vector<reel> & forcePattern_);
   void _setBwdInitialConditions(std::vector<reel> & initialConditions_);
 
@@ -114,7 +117,7 @@ class __GpuDriver{
 
   void derivatives(cusparseDnVecDescr_t m_desc, 
                    cusparseDnVecDescr_t q_desc,
-                   reel*                pq_adjt, 
+                   reel*                pq_fwd_state, 
                    uint k, 
                    uint t,
                    uint i,
@@ -169,6 +172,7 @@ class __GpuDriver{
   COOMatrix*   K;
   COOTensor3D* Gamma;
   COOTensor4D* Lambda;
+  COOTensor5D* Psi;
   COOVector*   ForcePattern;
 
   std::vector<reel>* h_QinitCond; 
@@ -225,6 +229,7 @@ class __GpuDriver{
   COOMatrix*   bwd_K;
   COOTensor3D* bwd_Gamma;
   COOTensor4D* bwd_Lambda;
+  COOTensor5D* bwd_Psi;
   COOVector*   bwd_ForcePattern;
 
   std::vector<reel> h_bwd_QinitCond; 
@@ -245,6 +250,7 @@ class __GpuDriver{
   void  clearBwdK();
   void  clearBwdGamma();
   void  clearBwdLambda();
+  void  clearBwdPsi();
   void  clearBwdForcePattern();
   void  clearBwdInitialConditions();
   void  clearAdjointStatesVector();

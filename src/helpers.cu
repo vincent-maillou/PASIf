@@ -469,6 +469,16 @@
         std::cout << val[i] << " ";
       }
       std::cout << std::endl;
+      std::cout << "  hyperslice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << hyperslice[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "  slice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << slice[i] << " ";
+      }
+      std::cout << std::endl;
       std::cout << "  row: ";
       for(size_t i(0); i<nzz; ++i){
         std::cout << row[i] << " ";
@@ -479,9 +489,148 @@
         std::cout << col[i] << " ";
       }
       std::cout << std::endl;
-      std::cout << "  slice: ";
+      
+      return out;
+    }
+
+    std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_){
+      return tensor_.print(out);
+    }
+
+
+
+/****************************************************
+ *              COO Tensor 5D
+ ****************************************************/
+  /**
+    * @brief Construct a new COOTensor5D::COOTensor5D object
+    * 
+    * @param denseTensor 
+    * @param scaleMatrix 
+    */
+    COOTensor5D::COOTensor5D(std::array<uint, 5> n_,
+                             std::vector<reel> values_,
+                             std::vector<uint> indices_) : 
+      n(n_){
+      // Set device pointer to nullprt
+      d_val             = nullptr;
+      d_hyperhyperslice = nullptr;
+      d_hyperslice      = nullptr;
+      d_slice           = nullptr;
+      d_row             = nullptr;
+      d_col             = nullptr;
+      
+      nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
-        std::cout << slice[i] << " ";
+        val.push_back(values_[i]);
+        hyperhyperslice.push_back(indices_[5*i]);
+        hyperslice.push_back(indices_[5*i+1]);
+        slice.push_back(indices_[5*i+2]);
+        row.push_back(indices_[5*i+3]);
+        col.push_back(indices_[5*i+4]);
+      }
+    }
+
+  /**
+  * @brief Destroy the COOTensor3D::COOTensor3D object
+  * 
+  */
+    COOTensor5D::~COOTensor5D(){
+      if(d_val != nullptr){
+        CHECK_CUDA( cudaFree(d_val) );
+      }
+      if(d_hyperhyperslice != nullptr){
+        CHECK_CUDA( cudaFree(d_hyperhyperslice) );
+      }
+      if(d_hyperslice != nullptr){
+        CHECK_CUDA( cudaFree(d_hyperslice) );
+      }
+      if(d_slice != nullptr){
+        CHECK_CUDA( cudaFree(d_slice) );
+      }
+      if(d_row != nullptr){
+        CHECK_CUDA( cudaFree(d_row) );
+      }
+      if(d_col != nullptr){
+        CHECK_CUDA( cudaFree(d_col) );
+      }
+    }
+
+  /**
+   * @brief Extend the COO Tensor by appending n times the same tensor
+   * 
+   * @param nTimes 
+   */
+    uint COOTensor5D::extendTheSystem(uint nTimes){
+      if(nTimes == 0){
+        return n[0];
+      }
+
+      for(uint i(0); i<nTimes; ++i){
+        for(uint j(0); j<nzz; ++j){
+          val.push_back(val[j]);
+          hyperhyperslice.push_back(hyperhyperslice[j]+(i+1)*n[0]);
+          hyperslice.push_back(hyperslice[j]+(i+1)*n[1]);
+          slice.push_back(slice[j]+(i+1)*n[2]);
+          row.push_back(row[j]+(i+1)*n[3]);
+          col.push_back(col[j]+(i+1)*n[4]);
+        }
+      }
+      n[0] += nTimes*n[0];
+      n[1] += nTimes*n[1];
+      n[2] += nTimes*n[2];
+      n[3] += nTimes*n[3];
+      n[4] += nTimes*n[4];
+      nzz   = val.size();
+
+      return n[0];
+    }
+
+  /**
+   * @brief Construct a new COOTensor5D::allocateOnGPU object
+   * 
+   */
+    void COOTensor5D::allocateOnGPU(){
+      // Allocate memory on the device
+      CHECK_CUDA( cudaMalloc((void**)&d_hyperhyperslice, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_hyperslice,      nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_slice,           nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_row,             nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_col,             nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_val,             nzz*sizeof(reel)) );
+
+      // Copy the data to the device
+      CHECK_CUDA( cudaMemcpy(d_val,             val.data(),             nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_hyperhyperslice, hyperhyperslice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_hyperslice,      hyperslice.data(),      nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_slice,           slice.data(),           nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_row,             row.data(),             nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_col,             col.data(),             nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+    }
+
+    size_t COOTensor5D::memFootprint(){
+      // Return the number of bytes needed to store this element on the GPU
+      size_t memFootprint;
+
+      memFootprint = 5*nzz*sizeof(uint) + nzz*sizeof(reel); 
+
+      return memFootprint;
+    }
+
+    std::ostream& COOTensor5D::print(std::ostream& out) const{
+      if(nzz == 0){
+        out << "Empty COO Tensor" << std::endl;
+        return out;
+      }
+
+      std::cout << "  val: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << val[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "  hyperhyperslice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << hyperhyperslice[i] << " ";
       }
       std::cout << std::endl;
       std::cout << "  hyperslice: ";
@@ -489,11 +638,26 @@
         std::cout << hyperslice[i] << " ";
       }
       std::cout << std::endl;
+      std::cout << "  slice: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << slice[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "  row: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << row[i] << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "  col: ";
+      for(size_t i(0); i<nzz; ++i){
+        std::cout << col[i] << " ";
+      }
+      std::cout << std::endl;
       
       return out;
     }
 
-    std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_){
+    std::ostream& operator<<(std::ostream& out, COOTensor5D const& tensor_){
       return tensor_.print(out);
     }
 

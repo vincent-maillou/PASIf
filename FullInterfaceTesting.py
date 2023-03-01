@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 # Generate the excitation set
-excitation : np.ndarray = np.ones(2*78001)
+excitation : np.ndarray = np.ones(78001)
 # Fill the excitation vector with a ramp
 """ excitation = []
 for i in range(78001):
@@ -96,12 +96,12 @@ modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 #pasif.setModulationBuffer(modulationBuffer)
 
 
-start   = time.time()
+""" start   = time.time()
 results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-print("Amplitudes: ", results)
+print("Amplitudes: ", results) """
 
 
 
@@ -113,22 +113,6 @@ end        = time.time()
 print("getTrajectories() overall time: ", end - start)
 plt.plot(trajectory[0], trajectory[1])
 plt.show() """
-
-
-""" jac_M : dia_matrix = dia_matrix(([1., 1., 1., 1., 1., 1.], [0]), shape=(6, 6))
-vecJacM : list[dia_matrix] = [jac_M] * n
-
-jac_B : coo_matrix = coo_matrix(([1], ([2], [0])), shape=(6, 6))
-vecJacB : list[coo_matrix] = [jac_B] * n
-
-jac_K : coo_matrix = coo_matrix(([-6, -2], ([0, 2], [1, 1])), shape=(6, 6))
-vecJacK : list[coo_matrix] = [jac_K] * n
-
-jac_Gamma : coo_tensor = coo_tensor(dimensions_ = [6, 6, 4])
-jac_Gamma.val          = [2, -1, -1]
-jac_Gamma.indices      = [0, 2, 0, 4, 1, 2, 5, 1, 0]
-vecJac_Gamma : list[coo_tensor] = [jac_Gamma] * n """
-
 
 
 
@@ -144,7 +128,11 @@ vecM : list[dia_matrix] = [M] * n
 
 B_dims    = [12, 12]
 B_values  = [1, 1, 1, 1]
-B_indexes = [4, 0, 5, 1, 6, 2, 7, 3]
+B_indexes = [4, 0, 
+             5, 1, 
+             6, 2, 
+             7, 3]
+
 B_rows    = B_indexes[::2]
 B_cols    = B_indexes[1::2]
 
@@ -153,8 +141,12 @@ vecB : list[coo_matrix] = [B] * n
 
 
 K_dims    = [12, 12]
-K_values  = [-12.0, -2.0, -0.5, -1.0]
-K_indexes = [0, 4, 4, 4, 1, 5, 5, 5]
+K_values  = [-12.0, -2.0, -1, -1.0]
+K_indexes = [0, 4, 
+             4, 4, 
+             1, 5, 
+             5, 5]
+
 K_rows    = K_indexes[::2]
 K_cols    = K_indexes[1::2]
 K    : coo_matrix       = coo_matrix((K_values, (K_rows, K_cols)), shape=(K_dims[0], K_dims[1]))
@@ -165,40 +157,21 @@ Gamma_dims     = [12, 12, 8]
 Gamma_values   = [-20.0, -20.0, -1.0, -1.0, -2.0, -0.1, -0.1, 1, 1]
 Gamma_indexes  = [0, 4, 1, 1, 4, 0, 8, 4, 0, 9, 4, 4, 0, 5, 0, 10, 5, 1, 11, 5, 5, 0, 6, 0, 1, 7, 1]
 
-Gamma_values   = [-2.0, 1, -20, -1.0, -20.0, 1, -0.1, -1.0, -0.1]
-Gamma_indexes  = [0, 5, 0,
-                  0, 6, 0,
-                  1, 4, 0,
-                  8, 4, 0,
-                  0, 4, 1,
+Gamma_values   = [20.0, 2.0, 1, 20, 1, -2.0, -1.0, -0.2, -0.1]
+Gamma_indexes  = [0, 4, 1, 
+                  0, 5, 0, 
+                  0, 6, 0, 
+                  1, 4, 0, 
                   1, 7, 1,
-                  10, 5, 1,
-                  9, 4, 4,
-                  11, 5, 5]
-
-Gamma_values   = [-20.0, -2.0, 1, -20, 1, -1.0, -1.0, -0.1, -0.1]
-Gamma_indexes  = [4, 1, 0,
-                  5, 0, 0, 
-                  6, 0, 0, 
-                  4, 0, 1, 
-                  7, 1, 1,
-                  4, 0, 8, 
-                  4, 4, 9, 
-                  5, 1, 10, 
-                  5, 5, 11]
-
-
-""" Gamma_dims     = [12, 12, 12]
-Gamma_values   = [-20.0, -20, -1.0, -1.0, -2.0, -0.1, -0.1, 1, 1]
-Gamma_indexes  = [0, 1, 4, 
-                  1, 0, 4, 
-                  8, 0, 4,
+                  8, 4, 0, 
                   9, 4, 4, 
-                  0, 0, 5,
-                  10, 1, 5, 
-                  11, 5, 5,
-                  0, 0, 6, 
-                  1, 1, 7] """
+                  10, 5, 1, 
+                  11, 5, 5]
+      
+# Test Gamma            
+""" Gamma_values = [1, 1]
+Gamma_indices = [10, 0, 0,
+                 11, 1, 1] """
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = Gamma_dims)
 Gamma.val          = Gamma_values
@@ -207,8 +180,9 @@ vecGamma : list[coo_tensor] = [Gamma] * n
 
 
 Lambda_dims    = [12, 12, 8, 8]
-Lambda_values  = [120000.0]
+Lambda_values  = [-120000.0]
 Lambda_indexes = [1, 5, 1, 1]
+
 Lambda : coo_tensor = coo_tensor(dimensions_ = Lambda_dims)
 Lambda.val          = Lambda_values
 Lambda.indices      = Lambda_indexes
@@ -218,18 +192,20 @@ forcePattern    : np.ndarray = np.zeros(adjointSize)
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
 initialCondition    : np.ndarray = np.zeros(adjointSize)
+""" initialCondition[0] = 1.
+initialCondition[1] = 1. """
 initialCondition[2] = 1.
 initialCondition[3] = 1.
 vecInitialCondition : list[np.ndarray] = [initialCondition] * n
 
-Psi_dims    = [12, 12, 12, 12, 12]
+Psi_dims         = [12, 12, 8, 8, 8]
 Psi : coo_tensor = coo_tensor(dimensions_ = Psi_dims)
 Psi.val          = [1]
 Psi.indices      = [1,1,1,1,1]
 vecPsi : list[coo_tensor] = [Psi] * n
 
 
-""" start      = time.time()
+start      = time.time()
 pasif.setJacobian(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition, vecPsi)
 end        = time.time()
 
@@ -240,7 +216,11 @@ gradient = pasif.getGradient()
 end        = time.time()
 
 print("getGradient() overall time: ", end - start)
-print("Gradient: ", gradient) """
+print("Full gradient: ", gradient)
+
+print("Parameters gradient: ", gradient[8:])
+
+
 
 """ plt.plot(gradient[0], gradient[1], 'r')
 plt.plot(gradient[0], gradient[2], 'b')

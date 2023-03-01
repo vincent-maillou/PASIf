@@ -49,6 +49,7 @@
         K(nullptr), 
         Gamma(nullptr), 
         Lambda(nullptr), 
+        Psi(nullptr),
         ForcePattern(nullptr),
 
         h_QinitCond(nullptr),
@@ -88,6 +89,7 @@
         bwd_K(nullptr),
         bwd_Gamma(nullptr),
         bwd_Lambda(nullptr),
+        bwd_Psi(nullptr),
         bwd_ForcePattern(nullptr),
 
         d_bwd_QinitCond(nullptr),
@@ -172,6 +174,7 @@
     clearBwdK();
     clearBwdGamma();
     clearBwdLambda();
+    clearBwdPsi();
     clearBwdForcePattern();
     clearBwdInitialConditions();
     clearAdjointStatesVector();
@@ -305,6 +308,16 @@
     bwd_Lambda = new COOTensor4D(n_,
                                  values_,
                                  indices_);
+  }
+
+  void __GpuDriver::_setBwdPsi(std::array<uint, 5> n_,
+                               std::vector<reel>   values_,
+                               std::vector<uint>   indices_){
+    clearBwdPsi();
+
+    bwd_Psi = new COOTensor5D(n_,
+                              values_,
+                              indices_);
   }
 
   void __GpuDriver::_setBwdForcePattern(std::vector<reel> & forcePattern_){
@@ -505,8 +518,6 @@
 
 
     // 1. Compute the setPoints (chunks first step)
-    setComputeSystem(forward);
-
     size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs_fwd;
 
     h_trajectories.clear();
@@ -517,6 +528,7 @@
     CHECK_CUDA( cudaMemset(d_trajectories, 0, reservedTrajSize*sizeof(reel)) )
 
     // Compute the setpoints
+    setComputeSystem(forward);
     forwardRungeKutta(0, numsteps, 0, chunkSize);
 
     /* std::cout << "numsteps: " << numsteps << std::endl;
@@ -526,6 +538,9 @@
     std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
     std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl << std::endl; */
 
+    reel* h_fwd_setpoints = new reel[n_dofs_fwd];
+    reel* h_bwd_state     = new reel[n_dofs_bwd];
+    std::cout << std::setprecision(4);
 
     size_t startStep = 0;
     size_t endStep   = 0;
@@ -552,20 +567,44 @@
                                 1, 
                                 d_fwd_Q, 
                                 1) )
+      
+      CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+                             d_trajectories + (setpoint-1)*n_dofs_fwd,
+                             n_dofs_fwd*sizeof(reel),
+                             cudaMemcpyDeviceToHost) )
 
       setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint-1);
+
+      
+
 
       // 3. Compute backward the gradient on the current chunk
       setComputeSystem(backward);
       backwardRungeKutta(endStep, startStep, 0, setpoint-1);
 
+      CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
 
+
+      std::cout << " h_fwd_setpoints: ";
+      for(size_t i(0); i<n_dofs_fwd; ++i){
+        std::cout << h_fwd_setpoints[i] << " ";
+      }
+      std::cout << "   h_bwd_state: ";
+      for(size_t i(0); i<n_dofs_bwd; ++i){
+        std::cout << h_bwd_state[i] << " ";
+      }
+      std::cout << std::endl;
+      //if(setpoint == numSetpoints-1) break;
 
       /* std::cout << "setpoint: " << setpoint << " / ";
       std::cout << "startStep: " << startStep << " / ";
       std::cout << "endStep: " << endStep << std::endl; */
     }
+
+
+    delete[] h_fwd_setpoints;
+    delete[] h_bwd_state;
 
     clearTrajectories();
 
@@ -595,7 +634,7 @@
     CHECK_CUDA( cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId) )
 
     nThreadsPerBlock = 128;
-    nBlocks = numberOfSMs * 32;
+    nBlocks          = numberOfSMs * 32;
 
     // Spawn the streams
     streams = new cudaStream_t[nStreams];
@@ -703,17 +742,27 @@
     uint   m(0); // Modulation index
     uint   currentSetpoint(startSetpoint);
 
+    //std::cout << "tStart_ = " << tStart_ << " tEnd_ = " << tEnd_ << " startSetpoint = " << startSetpoint << std::endl;
+
     // Performe the rk4 steps
     for(uint t(tStart_); t>tEnd_ ; --t){
 
       for(int i(interpolationNumberOfPoints); i>=0; --i){
+
+        // CHECK_CUDA( cudaMemset(d_trajectories+currentSetpoint*n_dofs_fwd, 0, n_dofs*sizeof(reel)) )
         
         bwdStep(k, t, i, m, currentSetpoint);
+
+        //std::cout << "t = " << t << " i = " << i << " m = " << m << " currentSetpoint = " << currentSetpoint << " d_trajectories+currentSetpoint*n_dofs_fwd = " << (size_t)d_trajectories+currentSetpoint*n_dofs_fwd << std::endl;
+
 
         // Point to the next state vector stored in the trajectory buffer
         ++currentSetpoint;
       }
-    }   
+    }  
+
+    // Save the computed adjoint state in what will be the initial condition for the next backward run
+    CHECK_CUDA( cudaMemcpy(d_QinitCond, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
   }
 
   void __GpuDriver::bwdStep(uint k, 
@@ -743,7 +792,7 @@
 
   inline void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
                                        cusparseDnVecDescr_t q_desc,
-                                       reel*                pq_adjt, 
+                                       reel*                pq_fwd_state, 
                                        uint k, 
                                        uint t,
                                        uint i,
@@ -757,60 +806,76 @@
     CHECK_CUSPARSE( cusparseDnVecGetValues(m_desc, (void**)&pm) )
     CHECK_CUSPARSE( cusparseDnVecGetValues(q_desc, (void**)&pq) )
     //CHECK_CUSPARSE( cusparseDnVecGetValues(q_adjt_desc, (void**)&pq_adjt) )
-    if(pq_adjt == nullptr){
-      pq_adjt = pq;
+    if(pq_fwd_state == nullptr){
+      pq_fwd_state = pq;
     }
     
     // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k = B.d_ki
     cusparseSpMV(h_cusparse, 
-                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                  d_alpha, 
-                  B->sparseMat_desc, 
-                  q_desc,
-                  d_beta0, 
-                  m_desc, 
-                  CUDA_R_32F, 
-                  CUSPARSE_SPMV_ALG_DEFAULT, 
-                  B->d_buffer);
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+                 d_alpha, 
+                 B->sparseMat_desc, 
+                 q_desc,
+                 d_beta0, 
+                 m_desc, 
+                 CUDA_R_32F, 
+                 CUSPARSE_SPMV_ALG_DEFAULT, 
+                 B->d_buffer);
     
     // k += K.d_mi
     cusparseSpMV(h_cusparse, 
-                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                  d_alpha, 
-                  K->sparseMat_desc, 
-                  q_desc, 
-                  d_beta1, 
-                  m_desc, 
-                  CUDA_R_32F, 
-                  CUSPARSE_SPMV_ALG_DEFAULT, 
-                  K->d_buffer);
+                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+                 d_alpha, 
+                 K->sparseMat_desc, 
+                 q_desc, 
+                 d_beta1, 
+                 m_desc, 
+                 CUDA_R_32F, 
+                 CUSPARSE_SPMV_ALG_DEFAULT, 
+                 K->d_buffer);
     
     // k += Gamma.d_mi²
     SpT3dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
-                                                          Gamma->d_row, 
-                                                          Gamma->d_col,
-                                                          Gamma->d_slice, 
-                                                          Gamma->nzz, 
-                                                          pq_adjt,
-                                                          pq,
-                                                          pm);
+                                                         Gamma->d_slice,
+                                                         Gamma->d_row, 
+                                                         Gamma->d_col,
+                                                         Gamma->nzz, 
+                                                         pq,
+                                                         pq_fwd_state,
+                                                         pm);
     
     // k += Lambda.d_mi³
     SpT4dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
-                                                          Lambda->d_row, 
-                                                          Lambda->d_col,
-                                                          Lambda->d_slice, 
-                                                          Lambda->d_hyperslice,
-                                                          Lambda->nzz, 
-                                                          pq_adjt,
-                                                          pq,
-                                                          pq, 
-                                                          pm);
+                                                         Lambda->d_hyperslice,
+                                                         Lambda->d_slice, 
+                                                         Lambda->d_row, 
+                                                         Lambda->d_col,
+                                                         Lambda->nzz, 
+                                                         pq,
+                                                         pq_fwd_state,
+                                                         pq_fwd_state, 
+                                                         pm);
     
+    // k += Psi.d_mi⁴
+    if(Psi != nullptr){
+      SpT5dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Psi->d_val,
+                                                           Psi->d_hyperhyperslice,
+                                                           Psi->d_hyperslice,
+                                                           Psi->d_slice, 
+                                                           Psi->d_row, 
+                                                           Psi->d_col,
+                                                           Psi->nzz, 
+                                                           pq,
+                                                           pq_fwd_state,
+                                                           pq_fwd_state, 
+                                                           pq_fwd_state, 
+                                                           pm);
+    }
+
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
-    if(t < lengthOfeachExcitation && (pq == pq_adjt /* WOP: Just to ensure the fwd only for now*/ )){
+    if(t < lengthOfeachExcitation && (pq == pq_fwd_state /* WOP: Just to ensure the fwd only for now*/ )){
       // k += ForcePattern.d_ExcitationsSet
       modterpolator(pm, k, t, i, m);
     }
@@ -1021,6 +1086,7 @@
       K            = fwd_K;
       Gamma        = fwd_Gamma;
       Lambda       = fwd_Lambda;
+      Psi          = nullptr;
       ForcePattern = fwd_ForcePattern;
 
       h_QinitCond  = &h_fwd_QinitCond;
@@ -1043,6 +1109,7 @@
       K            = bwd_K;
       Gamma        = bwd_Gamma;
       Lambda       = bwd_Lambda;
+      Psi          = bwd_Psi;
       ForcePattern = bwd_ForcePattern;
 
       h_QinitCond  = &h_bwd_QinitCond;
@@ -1106,6 +1173,12 @@
       std::cout << "K:" << std::endl << *K << std::endl;
       std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
       std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
+      if(type_ == backward && Psi != nullptr){
+        std::cout << "Psi:" << std::endl << *Psi << std::endl;
+      }
+      else{
+        std::cout << "Psi:" << std::endl << "  No Psi tensor has been provided" << std::endl << std::endl;
+      }
       std::cout << "ForcePattern:" << std::endl << *ForcePattern << std::endl;
       std::cout << "QinitCond:" << std::endl << "  "; printVector(*h_QinitCond);
 
@@ -1373,10 +1446,11 @@
 
   void __GpuDriver::extendAdjoint(){
     // Extend each system to match the parallelismThroughExcitations to achieve
-    std::array<uint, 6> dofChecking = {bwd_B->extendTheSystem(parallelismThroughExcitations-1), 
+    std::array<uint, 7> dofChecking = {bwd_B->extendTheSystem(parallelismThroughExcitations-1), 
                                        bwd_K->extendTheSystem(parallelismThroughExcitations-1), 
                                        bwd_Gamma->extendTheSystem(parallelismThroughExcitations-1), 
-                                       bwd_Lambda->extendTheSystem(parallelismThroughExcitations-1), 
+                                       bwd_Lambda->extendTheSystem(parallelismThroughExcitations-1),
+                                       bwd_Psi->extendTheSystem(parallelismThroughExcitations-1), 
                                        bwd_ForcePattern->extendTheSystem(parallelismThroughExcitations-1),
                                        extendTheVector(h_bwd_QinitCond, parallelismThroughExcitations-1)};
 
@@ -1431,6 +1505,17 @@
     if(bwd_Lambda != nullptr){
       delete bwd_Lambda;
       bwd_Lambda = nullptr;
+    }
+  }
+
+  void __GpuDriver::clearBwdPsi(){
+    if(Psi == bwd_Psi){
+      Psi = nullptr;
+    }
+
+    if(bwd_Psi != nullptr){
+      delete bwd_Psi;
+      bwd_Psi = nullptr;
     }
   }
 

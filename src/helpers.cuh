@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <assert.h>
+#include <iomanip>
 
 #define reel float
 #define reel_eps  std::numeric_limits<reel>::epsilon()
@@ -189,6 +190,51 @@ enum problemType {forward, backward};
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_);
+
+
+
+/****************************************************
+ *              COO Tensor 5D
+ ****************************************************/
+
+  struct COOTensor5D{
+    COOTensor5D() {nzz = 0;};
+    COOTensor5D(std::array<uint, 5> n_,
+                std::vector<reel>   values_,
+                std::vector<uint>   indices_);
+    ~COOTensor5D();
+
+    uint   extendTheSystem(uint nTimes);
+    void   allocateOnGPU();
+    size_t memFootprint();
+
+    std::ostream& print(std::ostream& out) const;
+
+
+   // Host-side data
+    uint nzz;
+    std::array<uint, 5> n;
+    std::vector<reel>   val;
+    std::vector<uint>   hyperhyperslice;
+    std::vector<uint>   hyperslice;
+    std::vector<uint>   slice;
+    std::vector<uint>   row;
+    std::vector<uint>   col;
+    
+
+   // Device-side data
+    reel *d_val;
+    uint *d_hyperhyperslice;
+    uint *d_hyperslice;
+    uint *d_slice;
+    uint *d_row;
+    uint *d_col;
+    
+  };
+
+  std::ostream& operator<<(std::ostream& out, COOTensor5D const& tensor_);
+
+
 
 
 
