@@ -131,8 +131,8 @@
  void updateSlope(reel* rki, 
                   reel* q, 
                   reel* rk, 
-                  reel dt, 
-                  uint n);
+                  reel  dt, 
+                  uint  n);
 
 
 
@@ -146,7 +146,7 @@
                 reel* rk2, 
                 reel* rk3, 
                 reel* rk4, 
-                reel h6, 
-                uint n);
+                reel  h6, 
+                uint  n);
 
 

@@ -1,9 +1,9 @@
 NVCC := nvcc
 NVCCFLAGS := -std=c++11 -O3 -g -arch=sm_86 -Xcompiler -Wall
 NVCCLIB := -lcublas -lcusparse
-NVCCINCLUDE := -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.2/compilers/bin -L/opt/nvidia/hpc_sdk/Linux_x86_64/20.9/math_libs/lib64
+NVCCINCLUDE := -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/compilers/bin -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/math_libs/lib64
 
-PYBIND11 := -I/home/vincent-maillou/anaconda3/include/python3.9 -I/home/vincent-maillou/anaconda3/include/python3.9 -Iextern/pybind11/include
+PYBIND11 := -I/usr/include/python3.10 -Iextern/pybind11/include
 
 PBUILD := build/
 PSRC := src/
@@ -30,7 +30,7 @@ $(PBUILD)helpers.o: $(PSRC)helpers.cu $(PSRC)helpers.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC $(NVCCINCLUDE) $(NVCCLIB) -c -o $@ $<
 
 profile: all
-	nsys profile python3 testanddebug.py
+	nsys profile python3 FullInterfaceTesting.py
 	
 
 clean:

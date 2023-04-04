@@ -55,8 +55,8 @@ system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step',
 
 
 #   ----- Used for testing with the sound data -----   #
-""" 
-def buildSets(trainingDataFolder, numTrainingFiles, numTestFiles):
+
+""" def buildSets(trainingDataFolder, numTrainingFiles, numTestFiles):
     # Building the training set
     trainingSet = []
     for i in range(numTrainingFiles):
@@ -71,7 +71,7 @@ def buildSets(trainingDataFolder, numTrainingFiles, numTestFiles):
         
     return trainingSet, testSet
 
-trainingDataFolder = '/home/vincent-maillou/Documents/4_Travail/AMOLF_Internship/1_Code/Developpement/SpeechRecognition/Data/selection_v0.01/training/'
+trainingDataFolder = '/home/ipausers/maillou/Documents/Documents/4_Travail/AMOLF_Internship/1_Code/Developpement/SpeechRecognition/Data/selection_v0.01/training/'
 numTrainingFiles = 256 
 numTestFiles = 128 
 

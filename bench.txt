@@ -1,0 +1,3 @@
+nsys profile python3 FullInterfaceTesting.py
+nsys export --output=rep_name.sqlite -t sqlite report.nsys-rep
+nsys stats *.sqlite

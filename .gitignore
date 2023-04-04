@@ -8,6 +8,8 @@ data/*
 *nsys-rep
 *sqlite
 *.ipynb
+*.zip
+gardesouslamain/*
 
 # ---> C++
 # Prerequisites

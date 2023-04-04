@@ -18,11 +18,11 @@ from PASIfgpu import __GpuDriver
 # Standard libraries
 import numpy as np
 import copy  as cp
-from   dataclasses import dataclass
-from   typing      import Union
-from scipy.sparse        import coo_matrix
-from scipy.sparse        import dia_matrix
-from scipy.sparse.linalg import inv
+from   dataclasses         import dataclass
+from   typing              import Union
+from   scipy.sparse        import coo_matrix
+from   scipy.sparse        import dia_matrix
+from   scipy.sparse.linalg import inv
 
 
 @dataclass
@@ -625,19 +625,21 @@ class PASIf(__GpuDriver):
     
     def __systemPreprocessing(self):
         
-        self.system_M = -1*inv(self.system_M)
+        self.system_M = -1.*inv(self.system_M)
         self.system_B = coo_matrix(self.system_M.dot(self.system_B))
         self.system_K = coo_matrix(self.system_M.dot(self.system_K))
         
         self.system_Gamma.multiplyByDiagMatrix(self.system_M.data)
         self.system_Lambda.multiplyByDiagMatrix(self.system_M.data)
         
-        self.system_forcePattern *= -1*self.system_M.data
+        # print(self.system_M.data)
+        
+        self.system_forcePattern *= -1.*self.system_M.data
         
     def __jacobianPreprocessing(self):
         
-        #self.jacobian_M = -1*inv(self.jacobian_M)
-        self.jacobian_M = inv(self.jacobian_M)
+        self.jacobian_M = -1*inv(self.jacobian_M)
+        #self.jacobian_M = inv(self.jacobian_M)
         self.jacobian_B = coo_matrix(self.jacobian_M.dot(self.jacobian_B))
         self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))
         
@@ -710,5 +712,3 @@ class PASIf(__GpuDriver):
         self.jacobian_forcePattern      = np.append(self.system_forcePattern, self.jacobian_forcePattern)
         self.jacobian_initialConditions = np.append(self.system_initialConditions, self.jacobian_initialConditions)
         
-        
-            

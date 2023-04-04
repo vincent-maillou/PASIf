@@ -13,13 +13,13 @@ excitation : np.ndarray = np.ones(78001)
 for i in range(78001):
       excitation.append(i/78001) """
       
-n_excitations = 1430
+n_excitations = 1
 excitationSet : list[np.ndarray] = [excitation] * n_excitations 
       
 sampleRate = 16000
 
 displayCompute = True
-displaySystem  = False
+displaySystem  = True
 displaySolver  = True
 
 pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displaySolver)
@@ -27,33 +27,36 @@ pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displ
 # pasif.setExcitations(excitationSet, sampleRate)
 
 
-n = 1024
+n = 1
 
-systemSize = 8
+systemSize = 4
 
 from scipy.sparse import dia_matrix
-M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 1., 10., 1., 1.], [0]), shape=(systemSize, systemSize)) 
+M    : dia_matrix       = dia_matrix(([1., 1., 1., 1.], [0]), shape=(4, 4)) 
 vecM : list[dia_matrix] = [M] * n
 
 
+k = 1.
+b = 1.
+
 from scipy.sparse import coo_matrix
-B    : coo_matrix       = coo_matrix(([-1, -1, -1, -1, 1, 10], ([0, 1, 2, 3, 4, 5], [4, 5, 6, 7, 4, 5])), shape=(systemSize, systemSize))
+B    : coo_matrix       = coo_matrix(([-1., -1.], ([0, 1], [2, 3])), shape=(systemSize, systemSize))
 vecB : list[coo_matrix] = [B] * n
 
-K    : coo_matrix       = coo_matrix(([6, 10], ([4, 5], [0, 1])), shape=(systemSize, systemSize))
+K    : coo_matrix       = coo_matrix(([k, b], ([2, 2], [0, 2])), shape=(systemSize, systemSize))
 vecK : list[coo_matrix] = [K] * n
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize])
-Gamma.val          = [-10, -10, -1, -1]
-Gamma.indices      = [4,0,1 , 5,0,0 , 6,0,0, 7,1,1]
+Gamma.val          = [-1.]
+Gamma.indices      = [3, 0, 0]
 vecGamma : list[coo_tensor] = [Gamma] * n
 
 Lambda : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize, systemSize])
-Lambda.val          = [40000]
-Lambda.indices      = [5,1,1,1]
+Lambda.val          = [0]
+Lambda.indices      = [0,0,0,0]
 vecLambda : list[coo_tensor] = [Lambda] * n
 
-forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0.5, 0, 0, 0])
+forcePattern    : np.ndarray       = np.array([0., 0., 1., 0.])
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
 initialCondition    : np.ndarray = np.zeros(systemSize)
@@ -82,10 +85,10 @@ print("setSystems() overall time: ", end - start)
 
 intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
 
-#pasif.setInterpolationMatrix(intMat)
+# pasif.setInterpolationMatrix(intMat)
 
 # Modulation buffer
-#modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
+modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
 #modulationBuffer = np.array([0.5, 0.5, 0.5, 0.5])
 #modulationBuffer = np.array([0, 1, 0, 1])
 
@@ -101,7 +104,7 @@ results = pasif.getAmplitudes()
 end     = time.time()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
-#print("Amplitudes: ", results)
+print("Amplitudes: ", results)
 
 
 
@@ -119,19 +122,19 @@ plt.show() """
 from scipy.sparse import coo_matrix
 
 # From Theophile's example
-adjointSize = 12
+adjointSize = 6
 
 M_values  = np.ones(adjointSize)
 M    : dia_matrix       = dia_matrix((M_values, [0]), shape=(adjointSize, adjointSize)) 
 vecM : list[dia_matrix] = [M] * n
 
 
-B_dims    = [12, 12]
-B_values  = [1, 1, 1, 1]
-B_indexes = [4, 0, 
-             5, 1, 
-             6, 2, 
-             7, 3]
+B_dims    = [adjointSize, adjointSize]
+""" B_values  = [-1, -1]
+B_indexes = [2, 0,
+             3, 1] """
+B_values  = [-1]
+B_indexes = [2, 0]
 
 B_rows    = B_indexes[::2]
 B_cols    = B_indexes[1::2]
@@ -140,12 +143,10 @@ B    : coo_matrix       = coo_matrix((B_values, (B_rows, B_cols)), shape=(B_dims
 vecB : list[coo_matrix] = [B] * n
 
 
-K_dims    = [12, 12]
-K_values  = [-12.0, -2.0, -1, -1.0]
-K_indexes = [0, 4, 
-             4, 4, 
-             1, 5, 
-             5, 5]
+K_dims    = [adjointSize, adjointSize]
+K_values  = [k, b]
+K_indexes = [0, 2,
+             2, 2]
 
 K_rows    = K_indexes[::2]
 K_cols    = K_indexes[1::2]
@@ -153,25 +154,11 @@ K    : coo_matrix       = coo_matrix((K_values, (K_rows, K_cols)), shape=(K_dims
 vecK : list[coo_matrix] = [K] * n
 
 
-Gamma_dims     = [12, 12, 8]
-Gamma_values   = [-20.0, -20.0, -1.0, -1.0, -2.0, -0.1, -0.1, 1, 1]
-Gamma_indexes  = [0, 4, 1, 1, 4, 0, 8, 4, 0, 9, 4, 4, 0, 5, 0, 10, 5, 1, 11, 5, 5, 0, 6, 0, 1, 7, 1]
-
-Gamma_values   = [20.0, 2.0, 1, 20, 1, -2.0, -1.0, -0.2, -0.1]
-Gamma_indexes  = [0, 4, 1, 
-                  0, 5, 0, 
-                  0, 6, 0, 
-                  1, 4, 0, 
-                  1, 7, 1,
-                  8, 4, 0, 
-                  9, 4, 4, 
-                  10, 5, 1, 
-                  11, 5, 5]
-      
-# Test Gamma            
-""" Gamma_values = [1, 1]
-Gamma_indices = [10, 0, 0,
-                 11, 1, 1] """
+Gamma_dims     = [adjointSize, adjointSize, systemSize]
+Gamma_values   = [-2, 2, 1]
+Gamma_indexes  = [0, 1, 0,
+                  4, 2, 0,
+                  5, 2, 2]
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = Gamma_dims)
 Gamma.val          = Gamma_values
@@ -179,9 +166,9 @@ Gamma.indices      = Gamma_indexes
 vecGamma : list[coo_tensor] = [Gamma] * n
 
 
-Lambda_dims    = [12, 12, 8, 8]
-Lambda_values  = [-120000.0]
-Lambda_indexes = [1, 5, 1, 1]
+Lambda_dims    = [adjointSize, adjointSize, systemSize, systemSize]
+Lambda_values  = [0]
+Lambda_indexes = [0, 0, 0, 0]
 
 Lambda : coo_tensor = coo_tensor(dimensions_ = Lambda_dims)
 Lambda.val          = Lambda_values
@@ -192,33 +179,33 @@ forcePattern    : np.ndarray = np.zeros(adjointSize)
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
 initialCondition    : np.ndarray = np.zeros(adjointSize)
-# initialCondition[0] = 1.
-# initialCondition[1] = 1.
-initialCondition[2] = 1.
-initialCondition[3] = 1.
+#initialCondition[0] = 1.
+initialCondition[1] = 1.
+#initialCondition[2] = 1.
+#initialCondition[3] = 1.
 vecInitialCondition : list[np.ndarray] = [initialCondition] * n
 
-Psi_dims         = [12, 12, 8, 8, 8]
+Psi_dims         = [adjointSize, adjointSize, systemSize, systemSize, systemSize]
 Psi : coo_tensor = coo_tensor(dimensions_ = Psi_dims)
-Psi.val          = [1]
+Psi.val          = [0]
 Psi.indices      = [1,1,1,1,1]
 vecPsi : list[coo_tensor] = [Psi] * n
 
 
-""" start      = time.time()
+start      = time.time()
 pasif.setJacobian(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition, vecPsi)
 end        = time.time()
 
 print("setJacobian() overall time: ", end - start)
 
-start      = time.time()
+""" start      = time.time()
 gradient = pasif.getGradient()
 end        = time.time()
 
 print("getGradient() overall time: ", end - start)
 print("Full gradient: ", gradient)
 
-print("Parameters gradient: ", gradient[8:]) """
+print("Parameters gradient: ", gradient[4:]) """
 
 
 

@@ -15,7 +15,7 @@
 
 
 /** SpT3dV()
- * @brief Perform the coo sparse tensor - dense vector square multiplication
+ * @brief Perform the coo sparse tensor - dense vector quadratic contraction
  * 
  */
  __global__
@@ -125,8 +125,8 @@
 
 
 /** interpolateForces()
- * @brief Apply the interpolation matrix to the targeted excitation and add it to the
- * state vector.
+ * @brief Apply the interpolation matrix to the targeted excitation and add 
+ * it to the state vector.
  * 
  */
  __global__
@@ -164,6 +164,7 @@
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
+
   for(uint k = index; k<nzz; k += stride){
     selectedExcitation += d_indice[k]/systemStride;
 
@@ -182,8 +183,9 @@
 
 
 
- /** modulate()
- * @brief If the modulation buffer is not null, return the value at the given index
+/** modulate()
+ * @brief If the modulation buffer is not null, return the modulation 
+ * value at the given index
  * 
  */
  __device__
@@ -206,8 +208,8 @@
  void updateSlope(reel* rki, 
                   reel* q, 
                   reel* rk, 
-                  reel dt, 
-                  uint n){
+                  reel  dt, 
+                  uint  n){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
@@ -229,8 +231,8 @@
                 reel* rk2, 
                 reel* rk3, 
                 reel* rk4, 
-                reel h6, 
-                uint n){
+                reel  h6, 
+                uint  n){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
