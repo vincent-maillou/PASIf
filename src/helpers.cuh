@@ -43,8 +43,8 @@ enum problemType {forward, backward};
   {                                                                              \
       cudaError_t status = (func);                                               \
       if (status != cudaSuccess) {                                               \
-          printf("CUDA API failed at line %d with error: %s (%d)\n",             \
-                __LINE__, cudaGetErrorString(status), status);                   \
+          printf("CUDA API failed at line %d in %s with error: %s (%d)\n",             \
+                __LINE__, __FILE__, cudaGetErrorString(status), status);                   \
       }                                                                          \
   }
 

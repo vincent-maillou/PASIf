@@ -26,8 +26,8 @@ pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displ
 
 # pasif.setExcitations(excitationSet, sampleRate)
 
-
-n = 1024
+n = 1
+#n = 1024
 
 systemSize = 8
 

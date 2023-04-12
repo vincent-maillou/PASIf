@@ -446,6 +446,8 @@
       std::cout << "resultsQ.max_size() = " << resultsQ.max_size() << std::endl;
       std::cout << "numberOfSimulationToPerform = " << numberOfSimulationToPerform << std::endl; */
 
+      std::cout << "resultsQ.size() = " << resultsQ.size() << std::endl;
+
       // Copy the results of the performed simulation from the GPU to the CPU
       CHECK_CUDA( cudaMemcpy(resultsQ.data()+k*n_dofs, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToHost) )
       CHECK_CUDA( cudaDeviceSynchronize() )
@@ -531,12 +533,13 @@
     setComputeSystem(forward);
     forwardRungeKutta(0, numsteps, 0, chunkSize);
 
-    /* std::cout << "numsteps: " << numsteps << std::endl;
+    // DEBUG 
+    std::cout << "numsteps: " << numsteps << std::endl;
     std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
     std::cout << "numSetpoints: " << numSetpoints << std::endl;
     std::cout << "chunkSize: " << chunkSize << std::endl;
     std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
-    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl << std::endl; */
+    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl << std::endl;
 
     reel* h_fwd_setpoints = new reel[n_dofs_fwd];
     reel* h_bwd_state     = new reel[n_dofs_bwd];
@@ -546,7 +549,7 @@
     size_t endStep   = 0;
     size_t startBwdSetpoint = 0;
 
-    for(size_t setpoint(numSetpoints-1); setpoint>=0; --setpoint){
+    for(size_t setpoint(numSetpoints-1); setpoint>0; --setpoint){
       startStep = setpoint*chunkSize;
 
       if(setpoint == numSetpoints-1){
@@ -555,7 +558,7 @@
         startBwdSetpoint = setpoint + lastChunkSize;
       }
       else{
-        endStep          = startStep+chunkSize;
+        endStep          = startStep + chunkSize;
         startBwdSetpoint = setpoint + chunkSize;
       }
 
@@ -571,16 +574,37 @@
                                 d_fwd_Q, 
                                 1) )
       
-      CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                             d_trajectories + setpoint*n_dofs_fwd,
-                             n_dofs_fwd*sizeof(reel),
-                             cudaMemcpyDeviceToHost) )
+
+      if(setpoint == numSetpoints-1){
+
+        std::cout << "setpoint = " << setpoint << std::endl;
+
+        CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+                              d_trajectories + 278*n_dofs_fwd,
+                              n_dofs_fwd*sizeof(reel),
+                              cudaMemcpyDeviceToHost) )
+        std::cout << "before Fwd RK h_fwd_setpoints: ";
+        for(size_t i(0); i<n_dofs_fwd; ++i){
+          std::cout << h_fwd_setpoints[i] << " ";
+        }
+      }
 
       setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint);
 
-      
 
+      if(setpoint == numSetpoints-1){
+        CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+                              d_trajectories + 278*n_dofs_fwd,
+                              n_dofs_fwd*sizeof(reel),
+                              cudaMemcpyDeviceToHost) )
+
+        std::cout << "after Fwd RK h_fwd_setpoints: ";
+        for(size_t i(0); i<n_dofs_fwd; ++i){
+          std::cout << h_fwd_setpoints[i] << " ";
+        }
+        std::cout << std::endl;
+      }
 
       // 3. Compute backward the gradient on the current chunk
       setComputeSystem(backward);
@@ -760,17 +784,19 @@
 
       for(int i(interpolationNumberOfPoints); i>=0; --i){
 
-        if(t+i >= 77998){
+        if(t+i >= 77990){
           CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                                  d_trajectories + currentSetpoint*n_dofs_fwd,
-                                  n_dofs_fwd*sizeof(reel),
-                                  cudaMemcpyDeviceToHost) )
+                                 d_trajectories + currentSetpoint*n_dofs_fwd,
+                                 n_dofs_fwd*sizeof(reel),
+                                 cudaMemcpyDeviceToHost) )
           CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
           std::cout << "step: " << t+i << " cSetP: " << currentSetpoint << " / ";
+
           std::cout << " h_fwd_setpoints: ";
           for(size_t i(0); i<n_dofs_fwd; ++i){
             std::cout << h_fwd_setpoints[i] << " ";
           }
+
           std::cout << "   h_bwd_state: ";
           for(size_t j(0); j<n_dofs_bwd; ++j){
             std::cout << h_bwd_state[j] << " ";
@@ -1002,9 +1028,13 @@
     size_t totalGpuSpace(0);
     CHECK_CUDA( cudaMemGetInfo(&freeGpuSpace, &totalGpuSpace) )
 
+    // std::cout << "free space = " << freeGpuSpace << " total space = " << totalGpuSpace << std::endl;
+
     size_t memFootprint(0);
     memFootprint  = getSystemMemFootprint();
     memFootprint += getAdjointMemFootprint();
+
+    // std::cout << "memFootprint = " << memFootprint << std::endl;
 
     parallelismThroughExcitations = (0.8*freeGpuSpace) / memFootprint;
     
@@ -1029,6 +1059,13 @@
         extendAdjoint();
       }
     }
+
+
+    /* memFootprint  = getSystemMemFootprint(); // LM
+    memFootprint += getAdjointMemFootprint();
+
+    std::cout << "memFootprint = " << memFootprint << std::endl; */
+
   }
 
   size_t __GpuDriver::getSystemMemFootprint(){

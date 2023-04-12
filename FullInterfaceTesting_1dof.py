@@ -36,6 +36,12 @@ M    : dia_matrix       = dia_matrix(([1., 1., 1., 1.], [0]), shape=(4, 4))
 vecM : list[dia_matrix] = [M] * n
 
 
+""" To follow "test_1DOFProbe.ipynb"
+k = 12.
+b = 2. 
+"""
+
+# But here follow "example copy.ipynb"
 k = 1.
 b = 1.
 
@@ -59,7 +65,7 @@ vecLambda : list[coo_tensor] = [Lambda] * n
 forcePattern    : np.ndarray       = np.array([0., 0., 1., 0.])
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
-initialCondition    : np.ndarray = np.zeros(systemSize)
+initialCondition    : np.ndarray       = np.zeros(systemSize)
 vecInitialCondition : list[np.ndarray] = [initialCondition] * n
 
 
@@ -198,14 +204,14 @@ end        = time.time()
 
 print("setJacobian() overall time: ", end - start)
 
-""" start      = time.time()
+start      = time.time()
 gradient = pasif.getGradient()
 end        = time.time()
 
 print("getGradient() overall time: ", end - start)
 print("Full gradient: ", gradient)
 
-print("Parameters gradient: ", gradient[4:]) """
+print("Parameters gradient: ", gradient[4:])
 
 
 
