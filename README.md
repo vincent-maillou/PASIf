@@ -2,7 +2,7 @@
 
 ## 1. Compilation
 
-To comnpile the code using the Makefile you'll need to fulfill the following requirments:
+To compile the code using the Makefile you'll need to fulfill the following requirments:
 
 - __build-essential__ package with a gcc version <= 11.x
 - __python-dev__ package, make sure to match the dev package version with your python version. (3.10 have been used during the development)
@@ -14,7 +14,7 @@ To comnpile the code using the Makefile you'll need to fulfill the following req
   Make sure in the Makefile to make the __PYBIND11__ macro to match you'r installed version.
 
 - To compile the CUDA code you'll need the Nvidia compiler __nvcc__. This come in the __NVIDIA HPC SDK__: https://developer.nvidia.com/hpc-sdk  
-  This is installed by default in /opt/nvidia/, make sure to add the path to the compiler in you're Linux Path:
+  This is installed by default in /opt/nvidia/, make sure to add the path to the compiler in your Linux Path:
 
         export PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/*version*/compilers/bin:$PATH
 
