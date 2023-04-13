@@ -1,6 +1,8 @@
 # Import Springtronics
 import sys
 sys.path.append('../')
+sys.path.append('../build')
+sys.path.append('../../')
 
 import Springtronics as spr
 

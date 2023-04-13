@@ -10,6 +10,7 @@ data/*
 *.ipynb
 *.zip
 gardesouslamain/*
+reports/*
 
 # ---> C++
 # Prerequisites
