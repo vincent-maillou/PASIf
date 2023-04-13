@@ -7,7 +7,7 @@ temp/*
 data/*
 *nsys-rep
 *sqlite
-*.ipynb
+.ipynb
 *.zip
 gardesouslamain/*
 reports/*
