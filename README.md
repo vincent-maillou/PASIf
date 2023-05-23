@@ -20,6 +20,12 @@ To compile the code using the Makefile you'll need to fulfill the following requ
 
   Then make sure to match the __NVCCINCLUDE__ macro in the Makefile with your installed version of the HPC SDK.
 
+
+- To compile, just run:
+
+        mkdir build
+        make
+
 ### Other comments on the Makefile
 
 Depending on the hardware targeted during the compilation make sure that the _-arch_ flag match the architecture of your hardware. This to get the best performances.  
