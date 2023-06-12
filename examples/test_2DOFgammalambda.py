@@ -12,13 +12,34 @@ import numpy as np
 import time
 
 
-system = spr.MechanicalSystem()
-m = 2
-b = 2
-k = 6
-force = 1
+USE_SOUND_FILE=True
 
+system = spr.MechanicalSystem()
+if USE_SOUND_FILE:
+    m = 2
+    k = (2*3000*np.pi)**2*m
+    b = 3*2*np.sqrt(k*m)
+    m_cant = 10
+    k_cant = (2*50*np.pi)**2*m_cant
+    b_cant = .75*2*np.sqrt(k_cant*m_cant)
+
+else:    
+    m = 2
+    b = 2
+    k = 6
+    m_cant = 10
+    b_cant = 10
+    k_cant = 5
+
+gamma  = 10
+duffing  = 100000 #lambda
+gamma=0
+#duffing=0
+
+
+force = 1
 filelength = 78001
+numSteps=filelength
 sr = 16000
 x  = np.linspace(0, filelength/sr, filelength)
 
@@ -27,11 +48,7 @@ system.degreesOfFreedom[f'{dofName}'] = spr.ParametricVariable(m)
 system.interactionPotentials[f'{dofName}_K'] =  spr.IntegerPotential(k)
 system.interactionPotentials[f'{dofName}_K'].degreesOfFreedom[dofName] = 2
 system.interactionPotentials[f'{dofName}_B'] =  spr.LocalDamping(dofName, b)
-m_cant = 10
-b_cant = 10
-k_cant = 5
-gamma  = 10
-duffing  = 10000 #lambda
+
 
 dofName = 'cantilever'
 system.degreesOfFreedom[f'{dofName}'] = spr.ParametricVariable(m_cant)
@@ -51,45 +68,23 @@ system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].degreesOf
 system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].degreesOfFreedom[mechanicalDOF] = 1
 #optomechanical coupling (gamma)
 
-system.excitationSources['step'] = spr.DirectCInjectionSource(force)
-system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1.0)
+if not USE_SOUND_FILE:
+    system.excitationSources['step'] = spr.DirectCInjectionSource(force)
+    system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1.0)
+else:
+    trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2500']
+    numTrainingFiles = 1
+    sr = 16000*16
+    excitationFileLength = 78001
+    numSteps= 153600
 
-
-
-#   ----- Used for testing with the sound data -----   #
-
-""" def buildSets(trainingDataFolder, numTrainingFiles, numTestFiles):
-    # Building the training set
-    trainingSet = []
-    for i in range(numTrainingFiles):
-        trainingSet.append(f'{trainingDataFolder}soundfile_{i*4+1}')
-        trainingSet.append(f'{trainingDataFolder}soundfile_{i*4+2}')
-        
-    # Building the test set
-    testSet = []
-    for i in range(numTestFiles):
-        testSet.append(f'{trainingDataFolder}soundfile_{(i+numTrainingFiles)*4+1}')
-        testSet.append(f'{trainingDataFolder}soundfile_{(i+numTrainingFiles)*4+2}')
-        
-    return trainingSet, testSet
-
-trainingDataFolder = '/home/ipausers/maillou/Documents/Documents/4_Travail/AMOLF_Internship/1_Code/Developpement/SpeechRecognition/Data/selection_v0.01/training/'
-numTrainingFiles = 256 
-numTestFiles = 128 
-
-trainingSet, testSet = buildSets(trainingDataFolder, numTrainingFiles, numTestFiles)
-excitationFileLength = 76800
-
-system.excitationSources['soundData2'] = spr.BinaryFileSource(fileList=trainingSet,
-                                                  fileLength=excitationFileLength,
-                                                  fileDataType='double',
-                                                  modulationFrequency=10500.0,
-                                                  log2Upsampling=2)
-system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 1.0) """
-
-
-
-
+    system.excitationSources['soundData2'] = spr.BinaryFileSource(fileList=trainingSet,
+                                                    fileLength=excitationFileLength,
+                                                    fileDataType='double',
+                                                    #modulationFrequency=10502.56,
+                                                    modulationFrequency=None,
+                                                    log2Upsampling=2)
+    system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 10)
 
 # Probe string
 system.probes['system_output'] = spr.WindowedA2Probe(opticalDOF,
@@ -107,18 +102,12 @@ system.probes['cant_output'] = spr.WindowedA2Probe(mechanicalDOF,
 # Define an adjoint source (used to compute the gradient efficiently: https://en.wikipedia.org/wiki/Adjoint_state_method)
 system.interactionPotentials['adjoint_source'] = system.probes['cant_output'].makeAdjointSource()
 
-cppEnvironment = spr.CPPEnvironment(numSteps = filelength,
+cppEnvironment = spr.CPPEnvironment(numSteps = numSteps,
                          timeStep = 1.0/sr,
                          numSweepSteps = 1,
                          numThreads=1)
                       
 cppTrajectory = cppEnvironment.getTrajectories(system, initialConditions=np.zeros(2), deleteTemp=False)
-
-
-
-
-
-
 
 # From now CUDA Env testing
 vecSystem = [system]
@@ -126,23 +115,25 @@ displayCompute = True
 displaySystem  = True
 displaySolver  = True
 cudaEnvironment = spr.CUDAEnvironment(vecSystem, 
-                                      numSteps  = filelength, 
-                                      timeStep  = 1.0/sr,
+                                      numSteps  = int(filelength), 
+                                      timeStep  = 1/sr,
                                       dCompute_ = displayCompute,
                                       dSystem_  = displaySystem,
                                       dSolver_  = displaySolver)
 
-excitation = []
-for i in range(filelength):
-    excitation.append(1)
-excitationSet = [excitation]
+if not USE_SOUND_FILE:
+    excitation = []
+    for i in range(filelength):
+        excitation.append(1*force)
+    excitationSet = [excitation]
 
-cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
+    cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
+else:
+    cudaEnvironment.setModulationBuffer(10*10500/(1/2*sr), 10)
 
-""" cudaEnvironment.setModulationBuffer(8, 195) """
+    intMat = np.array([[0, 0.25, 0.5, 0.75], [1, .75, .5, .25]])
 
-""" intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
-cudaEnvironment.setInterpolationMatrix(intMat) """
+    cudaEnvironment.setInterpolationMatrix(intMat)
 
 
 print("---------------------------------------------------")
@@ -154,13 +145,39 @@ print(f'Total getAmplitude() time: {stop-start} s')
 print("Probes amplitudes: ", amplitudes)
 
 start = time.time()
-gpuTrajectory = cudaEnvironment.getTrajectory(vecSystem)
+gpuTrajectory = cudaEnvironment.getTrajectory(vecSystem, saveSteps_=1)
 stop = time.time()
 print(f'Total getTrajectory() time: {stop-start} s')
 
 
+cpp_oscilatorProbeEnergy        = round(cppTrajectory[-1, -2], 20)
+cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 20)
+gpu_oscilatorProbeEnergy        = round(amplitudes[0], 20)
+gpu_stringCantileverProbeEnergy = round(amplitudes[1], 20)
+
+print("CPU Oscilator probe energy: ", cpp_oscilatorProbeEnergy)
+print("GPU Oscilator probe energy: ", gpu_oscilatorProbeEnergy)
+print(f"Oscilator probe energy relative error: {100*np.abs(cpp_oscilatorProbeEnergy-gpu_oscilatorProbeEnergy)/cpp_oscilatorProbeEnergy}")
+
+print("CPU cantilever probe energy: ", cpp_stringCantileverProbeEnergy)
+print("GPU cantilever probe energy: ", gpu_stringCantileverProbeEnergy)
+
+
+print()
+print(f'GPU trajectory shape: {gpuTrajectory.shape}')
+print(f'CPU trajectory shape: {cppTrajectory.shape}')
 
 #   ----- Plotting -----   #
+if gpuTrajectory.shape[1]!=cppTrajectory.shape[0]:
+    new_gpu_traj = []
+    new_x = np.linspace(0, gpuTrajectory[0,-1], cppTrajectory.shape[0])
+    for i in range(gpuTrajectory.shape[0]):
+        new_gpu_traj.append(np.interp(new_x, gpuTrajectory[0,:], gpuTrajectory[i, :]))
+
+    gpuTrajectory = np.array(new_gpu_traj)
+
+
+
 
 fig, axs = plt.subplots(3, constrained_layout=True)
 fig.suptitle('Oscilator trajectory', fontsize=16)
@@ -178,9 +195,7 @@ axs[2].set_title('Error')
 axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[1]-cppTrajectory[:,0]))
 axs[2].set_xlabel('time (s)')
 axs[2].set_ylabel('amplitude')
-# plt.show()   
 fig.savefig(f"Oscilator_trajectory.png")
-
 
 fig, axs = plt.subplots(3, constrained_layout=True)
 fig.suptitle('String cantilever trajectory', fontsize=16)
@@ -198,17 +213,6 @@ axs[2].set_title('Error')
 axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[2]-cppTrajectory[:,1]))
 axs[2].set_xlabel('time (s)')
 axs[2].set_ylabel('amplitude')
-# plt.show()   
+plt.show()   
 fig.savefig(f"StringCantilever_trajectory.png")
 
-
-
-cpp_oscilatorProbeEnergy        = round(cppTrajectory[-1, -2], 8)
-cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 8)
-gpu_oscilatorProbeEnergy        = round(amplitudes[0], 8)
-gpu_stringCantileverProbeEnergy = round(amplitudes[1], 8)
-
-print("CPU Oscilator probe energy: ", cpp_oscilatorProbeEnergy)
-print("GPU Oscilator probe energy: ", gpu_oscilatorProbeEnergy)
-print("CPU String cantilever probe energy: ", cpp_stringCantileverProbeEnergy)
-print("GPU String cantilever probe energy: ", gpu_stringCantileverProbeEnergy)
