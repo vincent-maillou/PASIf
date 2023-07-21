@@ -11,7 +11,9 @@ os.system("make")
 
 # Path to the compiled CUDA module
 import sys
-sys.path.append('./build')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(f'{dir_path}/build')
+
 
 from PASIfgpu import __GpuDriver
 
@@ -23,7 +25,6 @@ from   typing              import Union
 from   scipy.sparse        import coo_matrix
 from   scipy.sparse        import dia_matrix
 from   scipy.sparse.linalg import inv
-
 
 @dataclass
 class coo_tensor:
@@ -244,13 +245,15 @@ class PASIf(__GpuDriver):
 
 
         # Convert the Column-major COO system to Row-major COO system
+
         dataB = [x for _, x in sorted(zip(self.system_B.row, self.system_B.data))]
         rowB  = [x for x, _ in sorted(zip(self.system_B.row, self.system_B.col))]
         colB  = [x for _, x in sorted(zip(self.system_B.row, self.system_B.col))]
         
-        dataK = [x for _, x in sorted(zip(self.system_K.row, self.system_K.data))]
-        rowK  = [x for x, _ in sorted(zip(self.system_K.row, self.system_K.col))]
-        colK  = [x for _, x in sorted(zip(self.system_K.row, self.system_K.col))]
+        idx = np.argsort(self.system_K.row)
+        dataK = self.system_K.data[idx]
+        rowK = self.system_K.row[idx]
+        colK = self.system_K.col[idx]
         
         self._setFwdB(self.system_B.shape,
                       dataB, 
@@ -260,6 +263,7 @@ class PASIf(__GpuDriver):
                       dataK, 
                       rowK, 
                       colK)
+
         self._setFwdGamma(self.system_Gamma.dimensions, 
                           self.system_Gamma.val, 
                           self.system_Gamma.indices)
