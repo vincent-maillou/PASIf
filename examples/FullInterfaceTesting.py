@@ -25,92 +25,105 @@ excitation : np.ndarray = np.ones(78001)
 for i in range(78001):
       excitation.append(i/78001) """
       
-n_excitations = 1430
+n_excitations = 50
 excitationSet : list[np.ndarray] = [excitation] * n_excitations 
       
 sampleRate = 16000
 
-displayCompute = True
+displayCompute = False
 displaySystem  = False
-displaySolver  = True
+displaySolver  = False
 
 pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displaySolver)
 
 # pasif.setExcitations(excitationSet, sampleRate)
 
-n = 1
-#n = 1024
+compute_time = []
+equivalent_dofs = []
 
-systemSize = 8
+for j in range(13):
+      n = 2**j
+      #n = 1024
 
-from scipy.sparse import dia_matrix
-M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 1., 10., 1., 1.], [0]), shape=(systemSize, systemSize)) 
-vecM : list[dia_matrix] = [M] * n
+      systemSize = 8
 
-
-from scipy.sparse import coo_matrix
-B    : coo_matrix       = coo_matrix(([-1, -1, -1, -1, 1, 10], ([0, 1, 2, 3, 4, 5], [4, 5, 6, 7, 4, 5])), shape=(systemSize, systemSize))
-vecB : list[coo_matrix] = [B] * n
-
-K    : coo_matrix       = coo_matrix(([6, 10], ([4, 5], [0, 1])), shape=(systemSize, systemSize))
-vecK : list[coo_matrix] = [K] * n
-
-Gamma : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize])
-Gamma.val          = [-10, -10, -1, -1]
-Gamma.indices      = [4,0,1 , 5,0,0 , 6,0,0, 7,1,1]
-vecGamma : list[coo_tensor] = [Gamma] * n
-
-Lambda : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize, systemSize])
-Lambda.val          = [40000]
-Lambda.indices      = [5,1,1,1]
-vecLambda : list[coo_tensor] = [Lambda] * n
-
-forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0.5, 0, 0, 0])
-vecForcePattern : list[np.ndarray] = [forcePattern] * n
-
-initialCondition    : np.ndarray = np.zeros(systemSize)
-vecInitialCondition : list[np.ndarray] = [initialCondition] * n
+      from scipy.sparse import dia_matrix
+      M    : dia_matrix       = dia_matrix(([1., 1., 1., 1., 1., 10., 1., 1.], [0]), shape=(systemSize, systemSize)) 
+      vecM : list[dia_matrix] = [M] * n
 
 
-""" print("M: \n", M.todense())
-print("B: \n", B.todense())
-print("K: \n", K.todense())
-print("Gamma: ", Gamma)
-print("Lambda: ", Lambda)
-print("Force Pattern: ", forcePattern)
-print("Initial Condition: ", initialCondition) """
+      from scipy.sparse import coo_matrix
+      B    : coo_matrix       = coo_matrix(([-1, -1, -1, -1, 1, 10], ([0, 1, 2, 3, 4, 5], [4, 5, 6, 7, 4, 5])), shape=(systemSize, systemSize))
+      vecB : list[coo_matrix] = [B] * n
+
+      K    : coo_matrix       = coo_matrix(([6, 10], ([4, 5], [0, 1])), shape=(systemSize, systemSize))
+      vecK : list[coo_matrix] = [K] * n
+
+      Gamma : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize])
+      Gamma.val          = [-10, -10, -1, -1]
+      Gamma.indices      = [4,0,1 , 5,0,0 , 6,0,0, 7,1,1]
+      vecGamma : list[coo_tensor] = [Gamma] * n
+
+      Lambda : coo_tensor = coo_tensor(dimensions_ = [systemSize, systemSize, systemSize, systemSize])
+      Lambda.val          = [40000]
+      Lambda.indices      = [5,1,1,1]
+      vecLambda : list[coo_tensor] = [Lambda] * n
+
+      forcePattern    : np.ndarray = np.array([0, 0, 0, 0, 0.5, 0, 0, 0])
+      vecForcePattern : list[np.ndarray] = [forcePattern] * n
+
+      initialCondition    : np.ndarray = np.zeros(systemSize)
+      vecInitialCondition : list[np.ndarray] = [initialCondition] * n
 
 
-start = time.time()
-pasif.setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
-end = time.time()
-
-print("setSystems() overall time: ", end - start)
-
-
-# Interpolation matrix
-""" intMat = np.array([[2/10, 4/10, 3/10, 1/10], 
-                   [1/10, 3/10, 4/10, 2/10]]) """
-
-intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
-
-#pasif.setInterpolationMatrix(intMat)
-
-# Modulation buffer
-#modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
-#modulationBuffer = np.array([0.5, 0.5, 0.5, 0.5])
-#modulationBuffer = np.array([0, 1, 0, 1])
-
-# Fill the modulation buffer with a sine wave of period 1Hz and amplitude 1
-#modulationBuffer = np.sin(2*np.pi*1*np.linspace(0, 1, 1000))
+      """ print("M: \n", M.todense())
+      print("B: \n", B.todense())
+      print("K: \n", K.todense())
+      print("Gamma: ", Gamma)
+      print("Lambda: ", Lambda)
+      print("Force Pattern: ", forcePattern)
+      print("Initial Condition: ", initialCondition) """
 
 
-#pasif.setModulationBuffer(modulationBuffer)
+      start = time.time()
+      pasif.setSystems(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, vecInitialCondition)
+      end = time.time()
+
+      print("setSystems() overall time: ", end - start)
 
 
-start   = time.time()
-results = pasif.getAmplitudes()
-end     = time.time()
+      # Interpolation matrix
+      """ intMat = np.array([[2/10, 4/10, 3/10, 1/10], 
+                        [1/10, 3/10, 4/10, 2/10]]) """
+
+      intMat = np.array([[2/10, 3/10, 3/10, 2/10]])
+
+      #pasif.setInterpolationMatrix(intMat)
+
+      # Modulation buffer
+      #modulationBuffer = np.array([1.0, 1.0, 1.0, 1.0])
+      #modulationBuffer = np.array([0.5, 0.5, 0.5, 0.5])
+      #modulationBuffer = np.array([0, 1, 0, 1])
+
+      # Fill the modulation buffer with a sine wave of period 1Hz and amplitude 1
+      #modulationBuffer = np.sin(2*np.pi*1*np.linspace(0, 1, 1000))
+
+
+      #pasif.setModulationBuffer(modulationBuffer)
+
+
+      start   = time.time()
+      results = pasif.getAmplitudes()
+      end     = time.time()
+
+      compute_time.append(end-start)
+      equivalent_dofs.append(n*systemSize*n_excitations)
+#np.save("benchmark_CSR.npy", compute_time)
+# np.save("equivalent_dofs.npy", equivalent_dofs)
+
+# plt.figure()
+# plt.semilogx(equivalent_dofs, compute_time)
+# plt.show()
 
 print("setMatrix() + getAmplitude() overall time: ", end - start)
 #print("Amplitudes: ", results)

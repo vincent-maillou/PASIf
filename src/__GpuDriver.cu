@@ -195,26 +195,26 @@
 
   void __GpuDriver::_setFwdB(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
-                             std::vector<uint>   row_,
-                             std::vector<uint>   col_){
+                             std::vector<uint>   indices_,
+                             std::vector<uint>   indptr_){
     clearFwdB();
 
-    fwd_B = new COOMatrix(n_,
+    fwd_B = new CSRMatrix(n_,
                           values_,
-                          row_,
-                          col_);
+                          indices_,
+                          indptr_);
   }
 
   void __GpuDriver::_setFwdK(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
-                             std::vector<uint>   row_,
-                             std::vector<uint>   col_){
+                             std::vector<uint>   indices_,
+                             std::vector<uint>   indptr_){
     clearFwdK();
 
-    fwd_K = new COOMatrix(n_,
+    fwd_K = new CSRMatrix(n_,
                           values_,
-                          row_,
-                          col_);
+                          indices_,
+                          indptr_);
   }
 
   void __GpuDriver::_setFwdGamma(std::array<uint, 3> n_,
@@ -268,26 +268,26 @@
 
   void __GpuDriver::_setBwdB(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
-                             std::vector<uint>   row_,
-                             std::vector<uint>   col_){
+                             std::vector<uint>   indices_,
+                             std::vector<uint>   indptr_){
     clearBwdB();
 
-    bwd_B = new COOMatrix(n_,
+    bwd_B = new CSRMatrix(n_,
                           values_,
-                          row_,
-                          col_);
+                          indices_,
+                          indptr_);
   }
 
   void __GpuDriver::_setBwdK(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
-                             std::vector<uint>   row_,
-                             std::vector<uint>   col_){
+                             std::vector<uint>   indices_,
+                             std::vector<uint>   indptr_){
     clearBwdK();
 
-    bwd_K = new COOMatrix(n_,
+    bwd_K = new CSRMatrix(n_,
                           values_,
-                          row_,
-                          col_);
+                          indices_,
+                          indptr_);
   }
 
   void __GpuDriver::_setBwdGamma(std::array<uint, 3> n_,
@@ -456,8 +456,6 @@
 
     }
     auto end = std::chrono::high_resolution_clock::now();
-
-
 
     std::chrono::duration<double> elapsed_seconds = end-begin;
     std::cout << "CUDA getAmplitudes() execution time: " << elapsed_seconds.count() << "s" << std::endl;

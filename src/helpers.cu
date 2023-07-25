@@ -15,26 +15,26 @@
 
 
 /****************************************************
- *              COO Matrix
+ *              CSR Matrix
  ****************************************************/
   /**
-  * @brief Construct a new COOMatrix::COOMatrix object
+  * @brief Construct a new CSRMatrix::CSRMatrix object
   * 
   * @param denseMatrix 
   * @param scaleMatrix 
   */
-    COOMatrix::COOMatrix(std::array<uint,2> n_,
+    CSRMatrix::CSRMatrix(std::array<uint,2> n_,
                          std::vector<reel>  values_,
-                         std::vector<uint>  row_,
-                         std::vector<uint>  col_):
+                         std::vector<uint>  indices_,
+                         std::vector<uint>  indptr_):
       n(n_),
       alpha(1),
       beta(1){
 
       // Set device pointer to nullprt
       d_val = nullptr;
-      d_row = nullptr;
-      d_col = nullptr;
+      d_indices = nullptr;
+      d_indptr = nullptr;
 
       d_buffer = nullptr;
       bufferSize = 0;
@@ -43,11 +43,11 @@
       d_beta = nullptr;
 
       for(size_t i(0); i<values_.size(); ++i){
-        if(std::abs(values_[i]) > reel_eps){
-          val.push_back(values_[i]);
-          row.push_back(row_[i]);
-          col.push_back(col_[i]);
-        }
+        val.push_back(values_[i]);
+        indices.push_back(indices_[i]);
+      }
+      for(size_t i(0); i<n[0]+1; ++i){
+        indptr.push_back(indptr_[i]);
       }
       nzz = val.size();
 
@@ -70,18 +70,18 @@
 
 
   /**
-  * @brief Destroy the COOMatrix::COOMatrix object
+  * @brief Destroy the CSRMatrix::CSRMatrix object
   * 
   */
-    COOMatrix::~COOMatrix(){
+    CSRMatrix::~CSRMatrix(){
       if(d_val != nullptr){
         CHECK_CUDA( cudaFree(d_val) );
       }
-      if(d_row != nullptr){
-        CHECK_CUDA( cudaFree(d_row) );
+      if(d_indices != nullptr){
+        CHECK_CUDA( cudaFree(d_indices) );
       }
-      if(d_col != nullptr){
-        CHECK_CUDA( cudaFree(d_col) );
+      if(d_indptr != nullptr){
+        CHECK_CUDA( cudaFree(d_indptr) );
       }
       if(d_buffer != nullptr){
         CHECK_CUDA( cudaFree(d_buffer) );
@@ -101,18 +101,20 @@
    * 
    * @param n 
    */
-    uint COOMatrix::extendTheSystem(uint nTimes){
+    uint CSRMatrix::extendTheSystem(uint nTimes){
       // Return the highest dimmention of the matrix
       // after the extension
       if(nTimes == 0){
         return n[0];
       }
-      
+
       for(uint i(0); i<nTimes; ++i){
         for(uint j(0); j<nzz; ++j){
-          row.push_back(row[j]+(i+1)*n[0]);
-          col.push_back(col[j]+(i+1)*n[1]);
+          indices.push_back(indices[j]+(i+1)*n[1]);
           val.push_back(val[j]);
+        }
+        for(uint j(1); j<n[0]+1; ++j){
+          indptr.push_back(indptr[j]+(i+1)*nzz);
         }
       }
 
@@ -126,30 +128,31 @@
 
 
   /**
-   * @brief Construct a new COOMatrix::allocateOnGPU object
+   * @brief Construct a new CSRMatrix::allocateOnGPU object
    * 
    */
-    void COOMatrix::allocateOnGPU(cusparseHandle_t     & handle, 
+    void CSRMatrix::allocateOnGPU(cusparseHandle_t     & handle, 
                                   cusparseDnVecDescr_t & vecX, 
                                   cusparseDnVecDescr_t & vecY){
       // Allocate memory on the device
-      CHECK_CUDA( cudaMalloc((void**)&d_row, nzz*sizeof(uint)) );
-      CHECK_CUDA( cudaMalloc((void**)&d_col, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_indices, nzz*sizeof(uint)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_indptr, (n[0]+1)*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );
 
       // Copy the data to the device
-      CHECK_CUDA( cudaMemcpy(d_row, row.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
-      CHECK_CUDA( cudaMemcpy(d_col, col.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_indices, indices.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_indptr, indptr.data(), (n[0]+1)*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
 
       // Create the sparse matrix descriptor and allocate the needed buffer
-      CHECK_CUSPARSE( cusparseCreateCoo(&sparseMat_desc, 
+      CHECK_CUSPARSE( cusparseCreateCsr(&sparseMat_desc, 
                                         n[0], 
                                         n[1], 
                                         nzz, 
-                                        d_row, 
-                                        d_col, 
+                                        d_indptr, 
+                                        d_indices, 
                                         d_val, 
+                                        CUSPARSE_INDEX_32I,
                                         CUSPARSE_INDEX_32I, 
                                         CUSPARSE_INDEX_BASE_ZERO, 
                                         CUDA_R_32F) )
@@ -165,48 +168,53 @@
                                               &d_beta, 
                                               vecY, 
                                               CUDA_R_32F, 
-                                              CUSPARSE_SPMV_ALG_DEFAULT, 
+                                              CUSPARSE_SPMV_CSR_ALG1, 
                                               &bufferSize) )
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
     }
 
-    size_t COOMatrix::memFootprint(){
+    size_t CSRMatrix::memFootprint(){
       // Return the number of bytes needed to store this element on the GPU
       size_t memFootprint;
 
-      memFootprint = bufferSize + 2*nzz*sizeof(uint) + nzz*sizeof(reel); 
+      memFootprint = bufferSize + (nzz + n[0]+1)*sizeof(uint) + nzz*sizeof(reel); 
 
       return memFootprint;
     }
   
-    std::ostream& COOMatrix::print(std::ostream& out) const{
+    std::ostream& CSRMatrix::print(std::ostream& out) const{
       // Print the sparse COO matrix in a readable format
       if(nzz == 0){
         out << "Empty matrix" << std::endl;
         return out;
       }
 
-      out << "  ";
-      size_t k(0);
-      for(size_t i(0); i<n[0]; ++i){
-        for(size_t j(0); j<n[1]; ++j){
-          if(col[k] == j && row[k] == i){
-            out << val[k] << " ";
-            ++k;
+      size_t index(0); // Keep track of the column index
+      // Loop through each row
+      for (size_t row(0); row < n[0]; ++row) {
+          size_t row_start(indptr[row]);
+          size_t row_end(indptr[row + 1]);
+
+          // Loop through each column of the current row
+          for (size_t col(0); col < n[1]; ++col) {
+              if (index>=row_start && index < row_end && indices[index] == col) {
+                  // The current position has a non-zero element
+                  out << val[index] << " ";
+                  index++; // Move to the next non-zero element
+              } else {
+                  // The current position has a zero element
+                  out << "- ";
+              }
           }
-          else{
-            out << "_ ";
-          }
-        } 
-        out << std::endl << "  ";
+          out << "\n"; // Move to the next row
       }
       out << std::endl;
       
       return out;
     }
 
-    std::ostream& operator<<(std::ostream& out, COOMatrix const& mat){
+    std::ostream& operator<<(std::ostream& out, CSRMatrix const& mat){
       return mat.print(out);
     }   
 

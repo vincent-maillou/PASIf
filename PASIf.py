@@ -141,10 +141,6 @@ class coo_tensor:
         for i in range(len(self.indices)):
             if i % len(self.dimensions) == targetDim_:
                 self.indices[i] += offset_
-            
-        
-
-
 
 class PASIf(__GpuDriver):
     def __init__(self, 
@@ -171,6 +167,7 @@ class PASIf(__GpuDriver):
         self.globalAdjointSize  = 0 # Number of adjoint DOFs
         self.interpolSize = 0
         self.saveSteps    = 1
+        self.n_excitations = len(excitationSet)
         
         self.systemSet       : bool = False
         self.numberOfSystems : int  = 0
@@ -246,23 +243,19 @@ class PASIf(__GpuDriver):
 
         # Convert the Column-major COO system to Row-major COO system
 
-        dataB = [x for _, x in sorted(zip(self.system_B.row, self.system_B.data))]
-        rowB  = [x for x, _ in sorted(zip(self.system_B.row, self.system_B.col))]
-        colB  = [x for _, x in sorted(zip(self.system_B.row, self.system_B.col))]
-        
-        idx = np.argsort(self.system_K.row)
-        dataK = self.system_K.data[idx]
-        rowK = self.system_K.row[idx]
-        colK = self.system_K.col[idx]
+        csr_B = self.system_B.tocsr()
+        csr_K = self.system_K.tocsr()
+        csr_B.sort_indices()
+        csr_K.sort_indices()
         
         self._setFwdB(self.system_B.shape,
-                      dataB, 
-                      rowB, 
-                      colB)
+                      csr_B.data, 
+                      csr_B.indices, 
+                      csr_B.indptr)
         self._setFwdK(self.system_K.shape,
-                      dataK, 
-                      rowK, 
-                      colK)
+                      csr_K.data, 
+                      csr_K.indices, 
+                      csr_K.indptr)
 
         self._setFwdGamma(self.system_Gamma.dimensions, 
                           self.system_Gamma.val, 
@@ -336,19 +329,15 @@ class PASIf(__GpuDriver):
         print("jacob initialConditions: \n", self.jacobian_initialConditions)
         print("jacob psi: \n", self.jacobian_Psi) """
         
-        # Convert the Column-major COO system to Row-major COO system
-        dataB = [x for _, x in sorted(zip(self.jacobian_B.row, self.jacobian_B.data))]
-        rowB  = [x for x, _ in sorted(zip(self.jacobian_B.row, self.jacobian_B.col))]
-        colB  = [x for _, x in sorted(zip(self.jacobian_B.row, self.jacobian_B.col))]
-        
-        dataK = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.data))]
-        rowK  = [x for x, _ in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
-        colK  = [x for _, x in sorted(zip(self.jacobian_K.row, self.jacobian_K.col))]
-        
+        jac_csr_B = self.jacobian_B.tocsr()
+        jac_csr_K = self.jacobian_K.tocsr()
+        jac_csr_B.sort_indices()
+        jac_csr_K.sort_indices()
+
         self._setBwdB(self.jacobian_B.shape,
-                      dataB, 
-                      rowB, 
-                      colB)
+                      jac_csr_B.data, 
+                      jac_csr_B.indices, 
+                      jac_csr_B.indptr)
         self._setBwdK(self.jacobian_K.shape,
                       dataK, 
                       rowK, 
@@ -560,6 +549,8 @@ class PASIf(__GpuDriver):
             
             self.system_Gamma  = cp.deepcopy(inputVecGamma[0])
             self.system_Lambda = cp.deepcopy(inputVecLambda[0])
+
+        self.globalSystemSize *= self.n_excitations
             
         self.system_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
         self.system_initialConditions = cp.deepcopy(inputVecInitialConditions[0])

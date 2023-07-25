@@ -72,13 +72,13 @@ enum problemType {forward, backward};
  *              COO Matrix
  ****************************************************/
   
-  struct COOMatrix{
-    COOMatrix() {};
-    COOMatrix(std::array<uint,2> n_,
+  struct CSRMatrix{
+    CSRMatrix() {};
+    CSRMatrix(std::array<uint,2> n_,
               std::vector<reel>  values_,
-              std::vector<uint>  row_,
-              std::vector<uint>  col_);
-    ~COOMatrix();
+              std::vector<uint>  indices_,
+              std::vector<uint>  indptr_);
+    ~CSRMatrix();
 
     uint   extendTheSystem(uint nTimes);
     void   allocateOnGPU(cusparseHandle_t     & handle, 
@@ -94,13 +94,13 @@ enum problemType {forward, backward};
     uint                nzz;
     std::array<uint, 2> n;
     std::vector<reel>   val;
-    std::vector<uint>   row;
-    std::vector<uint>   col;
+    std::vector<uint>   indices;
+    std::vector<uint>   indptr;
 
    // Device-side data
     reel *d_val;
-    uint *d_row;
-    uint *d_col;
+    uint *d_indices;
+    uint *d_indptr;
 
     cusparseSpMatDescr_t sparseMat_desc;
     void*  d_buffer;
@@ -110,7 +110,7 @@ enum problemType {forward, backward};
     reel  beta;  reel *d_beta;
   };
 
-  std::ostream& operator<<(std::ostream& out, COOMatrix const& mat);
+  std::ostream& operator<<(std::ostream& out, CSRMatrix const& mat);
 
 
 

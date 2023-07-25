@@ -30,7 +30,7 @@ else:
     b_cant = 10
     k_cant = 5
 
-gamma  = 10
+gamma  = 1000
 duffing  = 100000 #lambda
 
 force = 1
@@ -70,7 +70,6 @@ if not USE_SOUND_FILE:
 else:
     trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2500']
 
-    numTrainingFiles = 1
     sr = 16000*16
     excitationFileLength = 78001
     numSteps= 153600
@@ -100,7 +99,7 @@ system.interactionPotentials['adjoint_source'] = system.probes['cant_output'].ma
 
 cppEnvironment = spr.CPPEnvironment(numSteps = int(numSteps),
                          timeStep = 1.0/sr,
-                         numSweepSteps = 1,
+                         numSweepSteps = 2,
                          numThreads=1)
                       
 cppTrajectory = cppEnvironment.getTrajectories(system, initialConditions=np.zeros(2), deleteTemp=False)
@@ -141,13 +140,12 @@ gpuTrajectory = cudaEnvironment.getTrajectory(vecSystem, saveSteps_=1)
 stop = time.time()
 print(f'Total getTrajectory() time: {stop-start} s')
 
-
 cpp_oscilatorProbeEnergy        = round(cppTrajectory[-1, -2], 20)
 cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 20)
-gpu_oscilatorProbeEnergy        = round(amplitudes[0], 20)
+gpu_oscilatorProbeEnergy        = round(amplitudes[0][0], 20)
 gpu_oscilatorProbeEnergy        = round(gpuTrajectory[7, -1], 20)
 
-gpu_stringCantileverProbeEnergy = round(amplitudes[1], 20)
+gpu_stringCantileverProbeEnergy = round(amplitudes[0][1], 20)
 
 print("CPU Oscilator probe energy: ", cpp_oscilatorProbeEnergy)
 print("GPU Oscilator probe energy: ", gpu_oscilatorProbeEnergy)
@@ -186,7 +184,6 @@ axs[2].set_title('Error')
 axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[1]-cppTrajectory[:,0]))
 axs[2].set_xlabel('time (s)')
 axs[2].set_ylabel('amplitude')
-fig.savefig(f"Oscilator_trajectory.png")
 
 fig, axs = plt.subplots(3, constrained_layout=True)
 fig.suptitle('String cantilever trajectory', fontsize=16)
@@ -205,5 +202,4 @@ axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[2]-cppTrajectory[:,1]))
 axs[2].set_xlabel('time (s)')
 axs[2].set_ylabel('amplitude')
 plt.show()   
-fig.savefig(f"StringCantilever_trajectory.png")
 

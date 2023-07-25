@@ -30,12 +30,12 @@ class __GpuDriver{
   //            Forward system interface 
   void _setFwdB(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
-                std::vector<uint>   row_,
-                std::vector<uint>   col_); 
+                std::vector<uint>   indices_,
+                std::vector<uint>   indptr_); 
   void _setFwdK(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
-                std::vector<uint>   row_,
-                std::vector<uint>   col_);
+                std::vector<uint>   indices_,
+                std::vector<uint>   indptr_);
   void _setFwdGamma(std::array<uint, 3> n_,
                     std::vector<reel>   values_,
                     std::vector<uint>   indices_);
@@ -51,12 +51,12 @@ class __GpuDriver{
   //            Backward system interface 
   void _setBwdB(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
-                std::vector<uint>   row_,
-                std::vector<uint>   col_); 
+                std::vector<uint>   indices_,
+                std::vector<uint>   indptr_); 
   void _setBwdK(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
-                std::vector<uint>   row_,
-                std::vector<uint>   col_);
+                std::vector<uint>   indices_,
+                std::vector<uint>   indptr_);
   void _setBwdGamma(std::array<uint, 3> n_,
                     std::vector<reel>   values_,
                     std::vector<uint>   indices_);
@@ -168,8 +168,8 @@ class __GpuDriver{
   //            Compute system related data
   uint n_dofs;
 
-  COOMatrix*   B;
-  COOMatrix*   K;
+  CSRMatrix*   B;
+  CSRMatrix*   K;
   COOTensor3D* Gamma;
   COOTensor4D* Lambda;
   COOTensor5D* Psi;
@@ -193,8 +193,8 @@ class __GpuDriver{
   //            Forward system related data
   uint n_dofs_fwd;
 
-  COOMatrix*   fwd_B;
-  COOMatrix*   fwd_K;
+  CSRMatrix*   fwd_B;
+  CSRMatrix*   fwd_K;
   COOTensor3D* fwd_Gamma;
   COOTensor4D* fwd_Lambda;
   COOVector*   fwd_ForcePattern;
@@ -225,8 +225,8 @@ class __GpuDriver{
   //            Adjoint system related data
   uint n_dofs_bwd;
 
-  COOMatrix*   bwd_B;
-  COOMatrix*   bwd_K;
+  CSRMatrix*   bwd_B;
+  CSRMatrix*   bwd_K;
   COOTensor3D* bwd_Gamma;
   COOTensor4D* bwd_Lambda;
   COOTensor5D* bwd_Psi;
