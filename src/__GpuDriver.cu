@@ -552,12 +552,12 @@
 
       if(setpoint == numSetpoints-1){
         // Avoid to overflow the allocated traj memory
-        endStep          = totalNumsteps;
-        startBwdSetpoint = setpoint + lastChunkSize;
+        endStep          = totalNumsteps-1;
+        startBwdSetpoint = setpoint + lastChunkSize-2;
       }
       else{
         endStep          = startStep + chunkSize;
-        startBwdSetpoint = setpoint + chunkSize;
+        startBwdSetpoint = setpoint + chunkSize-1;
       }
 
       if(setpoint == save){
@@ -567,66 +567,19 @@
       // 2. Compute the current chunk
       CHECK_CUBLAS( cublasScopy(h_cublas,
                                 n_dofs_fwd, 
-                                d_trajectories + setpoint*n_dofs_fwd, 
+                                d_trajectories + (setpoint)*n_dofs_fwd, 
                                 1, 
                                 d_fwd_Q, 
                                 1) )
       
 
-      if(setpoint == numSetpoints-1){
-
-        std::cout << "setpoint = " << setpoint << std::endl;
-
-        CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                              d_trajectories + 278*n_dofs_fwd,
-                              n_dofs_fwd*sizeof(reel),
-                              cudaMemcpyDeviceToHost) )
-        std::cout << "before Fwd RK h_fwd_setpoints: ";
-        for(size_t i(0); i<n_dofs_fwd; ++i){
-          std::cout << h_fwd_setpoints[i] << " ";
-        }
-      }
-
       setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint);
-
-
-      if(setpoint == numSetpoints-1){
-        CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                              d_trajectories + 278*n_dofs_fwd,
-                              n_dofs_fwd*sizeof(reel),
-                              cudaMemcpyDeviceToHost) )
-
-        std::cout << "after Fwd RK h_fwd_setpoints: ";
-        for(size_t i(0); i<n_dofs_fwd; ++i){
-          std::cout << h_fwd_setpoints[i] << " ";
-        }
-        std::cout << std::endl;
-      }
 
       // 3. Compute backward the gradient on the current chunk
       setComputeSystem(backward);
       backwardRungeKutta(endStep, startStep, 0, startBwdSetpoint);
 
-
-      /* CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
-      std::cout << "startStep: " << startStep << " / ";
-      std::cout << " h_fwd_setpoints: ";
-      for(size_t i(0); i<n_dofs_fwd; ++i){
-        std::cout << h_fwd_setpoints[i] << " ";
-      }
-      std::cout << "   h_bwd_state: ";
-      for(size_t i(0); i<n_dofs_bwd; ++i){
-        std::cout << h_bwd_state[i] << " ";
-      }
-      std::cout << std::endl; */
-
-
-      //if(setpoint == numSetpoints-1) break;
-
-      /* std::cout << "setpoint: " << setpoint << " / ";
-      std::cout << "startStep: " << startStep << " / ";
-      std::cout << "endStep: " << endStep << std::endl; */
     }
 
 
@@ -724,7 +677,6 @@
                                     1, 
                                     d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
                                     1) )
-          // std::cout << "trajSaveIndex = " << trajSaveIndex << std::endl;                          
           ++trajSaveIndex;
         }
         
@@ -740,6 +692,7 @@
                             uint t,
                             uint i,
                             uint m){
+
 
     // Compute the derivatives
     derivatives(d_m1_desc, d_Q_desc, nullptr, k, t, i, m);
@@ -758,7 +711,8 @@
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
-  }
+    }
+
 
   void __GpuDriver::backwardRungeKutta(uint  tStart_, 
                                        uint  tEnd_,
@@ -768,31 +722,24 @@
     uint   m(0); // Modulation index
     uint   currentSetpoint(startSetpoint);
 
-
-
-
     reel* h_bwd_state     = new reel[n_dofs_bwd];
     reel* h_fwd_setpoints = new reel[n_dofs_fwd];
-
-
-    //std::cout << "tStart_ = " << tStart_ << " tEnd_ = " << tEnd_ << " startSetpoint = " << startSetpoint << std::endl;
 
     // Performe the rk4 steps
     for(uint t(tStart_); t>tEnd_ ; --t){
 
       for(int i(interpolationNumberOfPoints); i>=0; --i){
-
-        if(t+i >= 77990){
+      if(t+i >= 10000){
           CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
                                  d_trajectories + currentSetpoint*n_dofs_fwd,
                                  n_dofs_fwd*sizeof(reel),
                                  cudaMemcpyDeviceToHost) )
           CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
-          std::cout << "step: " << t+i << " cSetP: " << currentSetpoint << " / ";
+          std::cout << "in backward RK step: " << t+i << " cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
 
           std::cout << " h_fwd_setpoints: ";
-          for(size_t i(0); i<n_dofs_fwd; ++i){
-            std::cout << h_fwd_setpoints[i] << " ";
+          for(size_t j(0); j<n_dofs_fwd; ++j){
+            std::cout << h_fwd_setpoints[j] << " ";
           }
 
           std::cout << "   h_bwd_state: ";
@@ -802,12 +749,9 @@
           std::cout << std::endl; 
         }
         
-
-        // CHECK_CUDA( cudaMemset(d_trajectories+currentSetpoint*n_dofs_fwd, 0, n_dofs*sizeof(reel)) )
         
         bwdStep(k, t, i, m, currentSetpoint);
 
-        //std::cout << "t = " << t << " i = " << i << " m = " << m << " currentSetpoint = " << currentSetpoint << " d_trajectories+currentSetpoint*n_dofs_fwd = " << (size_t)d_trajectories+currentSetpoint*n_dofs_fwd << std::endl;
 
 
         // Point to the previous state vector stored in the trajectory buffer
@@ -845,6 +789,7 @@
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+
   }
 
   inline void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
@@ -1168,7 +1113,7 @@
       d_m4 = d_fwd_m4; d_m4_desc = d_fwd_m4_desc;
 
       // Set the initial conditions to the states vectors
-      resetStatesVectors();
+      // resetStatesVectors();
     }
     else if(type_ == backward){
       n_dofs       = n_dofs_bwd;
