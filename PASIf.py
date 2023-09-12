@@ -339,30 +339,24 @@ class PASIf(__GpuDriver):
                       jac_csr_B.indices, 
                       jac_csr_B.indptr)
         self._setBwdK(self.jacobian_K.shape,
-                      dataK, 
-                      rowK, 
-                      colK)
+                      jac_csr_K.data, 
+                      jac_csr_K.indices, 
+                      jac_csr_K.indptr)
+
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 
                           self.jacobian_Gamma.indices)
+
         self._setBwdLambda(self.jacobian_Lambda.dimensions,
                            self.jacobian_Lambda.val,
                            self.jacobian_Lambda.indices)
+        
         self._setBwdForcePattern(self.jacobian_forcePattern)
         self._setBwdInitialConditions(self.jacobian_initialConditions)
         
-        
-        """ psi_dim     = [12, 12, 8, 8, 8]
-        psi_val     = [1]
-        psi_indices = [0, 0, 0, 0, 0]
-        self._setBwdPsi(psi_dim,
-                        psi_val,
-                        psi_indices) """
-        
-        
-        #self._setPsi(self.jacobian_Psi.dimensions,
-        #             self.jacobian_Psi.val,
-        #             self.jacobian_Psi.indices)
+        self._setBwdPsi(self.jacobian_Psi.dimensions,
+                    self.jacobian_Psi.val,
+                    self.jacobian_Psi.indices)
         self.jacobianSet = True
         
         # Load the system on the GPU
@@ -632,19 +626,13 @@ class PASIf(__GpuDriver):
         self.system_forcePattern *= -1.*self.system_M.data
         
     def __jacobianPreprocessing(self):
-        
         self.jacobian_M = -1*inv(self.jacobian_M)
-        #self.jacobian_M = inv(self.jacobian_M)
         self.jacobian_B = coo_matrix(self.jacobian_M.dot(self.jacobian_B))
-        self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))
-        
+        self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))        
         self.jacobian_Gamma.multiplyByDiagMatrix(self.jacobian_M.data)
         self.jacobian_Lambda.multiplyByDiagMatrix(self.jacobian_M.data)
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
-        
-        self.jacobian_forcePattern *= -1*self.jacobian_M.data
-    
-    
+        #self.jacobian_forcePattern *= -1*self.jacobian_M.data
     
     ###             DEPRECATED              ###        
         

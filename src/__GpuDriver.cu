@@ -579,7 +579,7 @@
       // 3. Compute backward the gradient on the current chunk
       setComputeSystem(backward);
       backwardRungeKutta(endStep, startStep, 0, startBwdSetpoint);
-
+      
     }
 
 
@@ -729,25 +729,25 @@
     for(uint t(tStart_); t>tEnd_ ; --t){
 
       for(int i(interpolationNumberOfPoints); i>=0; --i){
-      if(t+i >= 10000){
-          CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                                 d_trajectories + currentSetpoint*n_dofs_fwd,
-                                 n_dofs_fwd*sizeof(reel),
-                                 cudaMemcpyDeviceToHost) )
-          CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
-          std::cout << "in backward RK step: " << t+i << " cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
+      // if(t+i >= 0){
+      //     CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+      //                            d_trajectories + currentSetpoint*n_dofs_fwd,
+      //                            n_dofs_fwd*sizeof(reel),
+      //                            cudaMemcpyDeviceToHost) )
+      //     CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
+      //     std::cout << "in backward RK step: " << t+i << " cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
 
-          std::cout << " h_fwd_setpoints: ";
-          for(size_t j(0); j<n_dofs_fwd; ++j){
-            std::cout << h_fwd_setpoints[j] << " ";
-          }
+      //     std::cout << " h_fwd_setpoints: ";
+      //     for(size_t j(0); j<n_dofs_fwd; ++j){
+      //       std::cout << h_fwd_setpoints[j] << " ";
+      //     }
 
-          std::cout << "   h_bwd_state: ";
-          for(size_t j(0); j<n_dofs_bwd; ++j){
-            std::cout << h_bwd_state[j] << " ";
-          }
-          std::cout << std::endl; 
-        }
+      //     std::cout << "   h_bwd_state: ";
+      //     for(size_t j(0); j<n_dofs_bwd; ++j){
+      //       std::cout << h_bwd_state[j] << " ";
+      //     }
+      //     std::cout << std::endl; 
+      //   }
         
         
         bwdStep(k, t, i, m, currentSetpoint);
@@ -859,7 +859,7 @@
                                                          pq_fwd_state, 
                                                          pm);
     
-    // k += Psi.d_mi⁴
+    // // k += Psi.d_mi⁴
     if(Psi != nullptr){
       SpT5dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Psi->d_val,
                                                            Psi->d_hyperhyperslice,
@@ -1123,6 +1123,7 @@
       Gamma        = bwd_Gamma;
       Lambda       = bwd_Lambda;
       Psi          = bwd_Psi;
+
       ForcePattern = bwd_ForcePattern;
 
       h_QinitCond  = &h_bwd_QinitCond;
@@ -1429,6 +1430,8 @@
     bwd_Gamma->allocateOnGPU();
 
     bwd_Lambda->allocateOnGPU();
+
+    bwd_Psi->allocateOnGPU();
 
     bwd_ForcePattern->allocateOnGPU();
   }
