@@ -131,7 +131,7 @@ class __GpuDriver{
 
 
   //            GPU work distribution
-  void   parallelizeThroughExcitations();
+  void   parallelizeThroughExcitations(bool bwd_setting);
   size_t getSystemMemFootprint();
   size_t getAdjointMemFootprint(); 
 

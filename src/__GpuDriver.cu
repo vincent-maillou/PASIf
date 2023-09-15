@@ -253,7 +253,7 @@
 
   void __GpuDriver::_allocateSystemOnDevice(){
     // Extend the systems to exploit the GPU memory
-    parallelizeThroughExcitations();
+    parallelizeThroughExcitations(0);
 
     // Allocate the rk4 vectors on the GPU
     allocateDeviceSystemStatesVector();
@@ -336,7 +336,7 @@
 
   void __GpuDriver::_allocateAdjointOnDevice(){
     // Extend the systems to exploit the GPU memory
-    parallelizeThroughExcitations();
+    parallelizeThroughExcitations(1);
 
     // Allocate the rk4 vectors on the GPU
     allocateDeviceAdjointStatesVector();
@@ -512,13 +512,13 @@
     displaySimuInfos(forward);
     displaySimuInfos(backward);
 
-    numSetpoints  = std::sqrt(totalNumsteps);
-    chunkSize     = std::ceil((reel)totalNumsteps/(reel)numSetpoints);
-    lastChunkSize = chunkSize - (numSetpoints*chunkSize)%totalNumsteps;
+    numSetpoints  = std::sqrt(numsteps);
+    chunkSize     = std::ceil((reel)numsteps/(reel)numSetpoints);
+    lastChunkSize = chunkSize - (numSetpoints*chunkSize)%numsteps;
 
 
     // 1. Compute the setPoints (chunks first step)
-    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs_fwd;
+    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*(interpolationNumberOfPoints+1)*n_dofs_fwd;
 
     h_trajectories.clear();
     h_trajectories.resize(reservedTrajSize);
@@ -552,17 +552,14 @@
 
       if(setpoint == numSetpoints-1){
         // Avoid to overflow the allocated traj memory
-        endStep          = totalNumsteps-1;
-        startBwdSetpoint = setpoint + lastChunkSize-2;
+        endStep          = numsteps;
+        startBwdSetpoint = setpoint + (lastChunkSize-1)*(interpolationNumberOfPoints+1)+interpolationNumberOfPoints;
       }
       else{
         endStep          = startStep + chunkSize;
-        startBwdSetpoint = setpoint + chunkSize-1;
+        startBwdSetpoint = setpoint + (chunkSize-1)*(interpolationNumberOfPoints+1)+interpolationNumberOfPoints;
       }
 
-      if(setpoint == save){
-        break;
-      }
 
       // 2. Compute the current chunk
       CHECK_CUBLAS( cublasScopy(h_cublas,
@@ -579,9 +576,11 @@
       // 3. Compute backward the gradient on the current chunk
       setComputeSystem(backward);
       backwardRungeKutta(endStep, startStep, 0, startBwdSetpoint);
-      
-    }
 
+      if(setpoint == save){
+        break;
+      }
+    }
 
     delete[] h_fwd_setpoints;
     delete[] h_bwd_state;
@@ -670,7 +669,8 @@
       for(uint i(0); i<=interpolationNumberOfPoints; ++i){
         fwdStep(k, t, i, m);
 
-        if(d_trajectories != nullptr && (t*(interpolationNumberOfPoints+1)+i)%saveSteps==0){
+        if(d_trajectories != nullptr && (t%saveSteps==0) && (i==0 || saveSteps==1)){
+          //only save non interpolated steps  
           CHECK_CUBLAS( cublasScopy(h_cublas,
                                     n_dofs, 
                                     d_Q, 
@@ -711,8 +711,7 @@
 
     // Compute next state vector Q
     integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
-    }
-
+  }
 
   void __GpuDriver::backwardRungeKutta(uint  tStart_, 
                                        uint  tEnd_,
@@ -721,42 +720,37 @@
 
     uint   m(0); // Modulation index
     uint   currentSetpoint(startSetpoint);
-
     reel* h_bwd_state     = new reel[n_dofs_bwd];
     reel* h_fwd_setpoints = new reel[n_dofs_fwd];
 
     // Performe the rk4 steps
-    for(uint t(tStart_); t>tEnd_ ; --t){
+    for(uint t(tStart_-1); t>=tEnd_ ; --t){
 
       for(int i(interpolationNumberOfPoints); i>=0; --i){
-      // if(t+i >= 0){
-      //     CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-      //                            d_trajectories + currentSetpoint*n_dofs_fwd,
-      //                            n_dofs_fwd*sizeof(reel),
-      //                            cudaMemcpyDeviceToHost) )
-      //     CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) )
-      //     std::cout << "in backward RK step: " << t+i << " cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
+      
+          // CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+          //                        d_trajectories + currentSetpoint*n_dofs_fwd,
+          //                        n_dofs_fwd*sizeof(reel),
+          //                        cudaMemcpyDeviceToHost) );
+          // CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
+          // std::cout << "in backward RK step: " << t << " interpolation: "<<i<<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
 
-      //     std::cout << " h_fwd_setpoints: ";
-      //     for(size_t j(0); j<n_dofs_fwd; ++j){
-      //       std::cout << h_fwd_setpoints[j] << " ";
-      //     }
+          // std::cout << " h_fwd_setpoints: ";
+          // for(size_t j(0); j<n_dofs_fwd; ++j){
+          //   std::cout << h_fwd_setpoints[j] << " ";
+          // }
 
-      //     std::cout << "   h_bwd_state: ";
-      //     for(size_t j(0); j<n_dofs_bwd; ++j){
-      //       std::cout << h_bwd_state[j] << " ";
-      //     }
-      //     std::cout << std::endl; 
-      //   }
-        
-        
+          // std::cout << "   h_bwd_state: ";
+          // for(size_t j(0); j<n_dofs_bwd; ++j){
+          //   std::cout << h_bwd_state[j] << " ";
+          // }
+          // std::cout << std::endl;
+      
         bwdStep(k, t, i, m, currentSetpoint);
-
-
-
         // Point to the previous state vector stored in the trajectory buffer
         --currentSetpoint;
       }
+      if(t==0){break;}
     }  
 
     delete[] h_fwd_setpoints;
@@ -824,7 +818,6 @@
                  CUDA_R_32F, 
                  CUSPARSE_SPMV_ALG_DEFAULT, 
                  B->d_buffer);
-    
     // k += K.d_mi
     cusparseSpMV(h_cusparse, 
                  CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -836,7 +829,7 @@
                  CUDA_R_32F, 
                  CUSPARSE_SPMV_ALG_DEFAULT, 
                  K->d_buffer);
-    
+
     // k += Gamma.d_mi²
     SpT3dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
                                                          Gamma->d_slice,
@@ -966,7 +959,7 @@
 
 /*                    GPU work distribution                    */
 
-  void __GpuDriver::parallelizeThroughExcitations(){
+  void __GpuDriver::parallelizeThroughExcitations(bool bwd_setting){
     size_t freeGpuSpace(0); 
     size_t totalGpuSpace(0);
     CHECK_CUDA( cudaMemGetInfo(&freeGpuSpace, &totalGpuSpace) )
@@ -995,10 +988,10 @@
     }
 
     if(parallelismThroughExcitations > 1){
-      if(n_dofs_fwd > 0){
+      if(n_dofs_fwd > 0 && !bwd_setting){
         extendSystem();
       }
-      if(n_dofs_bwd > 0){
+      if(n_dofs_bwd > 0 && bwd_setting){
         extendAdjoint();
       }
     }

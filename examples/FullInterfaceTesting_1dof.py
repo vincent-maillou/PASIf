@@ -31,9 +31,9 @@ excitationSet : list[np.ndarray] = [excitation] * n_excitations
       
 sampleRate = 16000
 
-displayCompute = True
-displaySystem  = True
-displaySolver  = True
+displayCompute = False
+displaySystem  = False
+displaySolver  = False
 
 pasif = PASIf(excitationSet, sampleRate, 0, displayCompute, displaySystem, displaySolver)
 
@@ -128,13 +128,13 @@ print("Amplitudes: ", results)
 
 
 
-""" start      = time.time()
+start      = time.time()
 trajectory = pasif.getTrajectory(saveSteps = 1)
 end        = time.time()
 
 print("getTrajectories() overall time: ", end - start)
 plt.plot(trajectory[0], trajectory[1])
-plt.show() """
+plt.show() 
 
 
 
@@ -152,32 +152,26 @@ B_dims    = [adjointSize, adjointSize]
 """ B_values  = [-1, -1]
 B_indexes = [2, 0,
              3, 1] """
-B_values  = [-1]
-B_indexes = [2, 0]
-
-B_rows    = B_indexes[::2]
-B_cols    = B_indexes[1::2]
+B_values  = [-1, -1]
+B_rows    = [1, 2]
+B_cols    = [4, 5]
 
 B    : coo_matrix       = coo_matrix((B_values, (B_rows, B_cols)), shape=(B_dims[0], B_dims[1]))
 vecB : list[coo_matrix] = [B] * n
 
 
 K_dims    = [adjointSize, adjointSize]
-K_values  = [k, b]
-K_indexes = [0, 2,
-             2, 2]
+K_values  = []
+K_rows    = []
+K_cols    = []
 
-K_rows    = K_indexes[::2]
-K_cols    = K_indexes[1::2]
 K    : coo_matrix       = coo_matrix((K_values, (K_rows, K_cols)), shape=(K_dims[0], K_dims[1]))
 vecK : list[coo_matrix] = [K] * n
 
 
 Gamma_dims     = [adjointSize, adjointSize, systemSize]
-Gamma_values   = [-2, 2, 1]
-Gamma_indexes  = [0, 1, 0,
-                  4, 2, 0,
-                  5, 2, 2]
+Gamma_values   = []
+Gamma_indexes  = []
 
 Gamma : coo_tensor = coo_tensor(dimensions_ = Gamma_dims)
 Gamma.val          = Gamma_values
@@ -186,8 +180,8 @@ vecGamma : list[coo_tensor] = [Gamma] * n
 
 
 Lambda_dims    = [adjointSize, adjointSize, systemSize, systemSize]
-Lambda_values  = [0]
-Lambda_indexes = [0, 0, 0, 0]
+Lambda_values  = [-1, -1]
+Lambda_indexes = [4, 0, 0, 0, 5, 0, 1, 1]
 
 Lambda : coo_tensor = coo_tensor(dimensions_ = Lambda_dims)
 Lambda.val          = Lambda_values
@@ -198,8 +192,8 @@ forcePattern    : np.ndarray = np.zeros(adjointSize)
 vecForcePattern : list[np.ndarray] = [forcePattern] * n
 
 initialCondition    : np.ndarray = np.zeros(adjointSize)
-#initialCondition[0] = 1.
-initialCondition[1] = 1.
+initialCondition[0] = 1.
+#initialCondition[1] = 1.
 #initialCondition[2] = 1.
 #initialCondition[3] = 1.
 vecInitialCondition : list[np.ndarray] = [initialCondition] * n
@@ -223,39 +217,34 @@ end        = time.time()
 
 print("getGradient() overall time: ", end - start)
 print("Full gradient: ", gradient)
+print(f'Amplitude" {results}')
 
-print("Parameters gradient: ", gradient[4:])
+# plt.plot(gradient[0], gradient[1], 'r')
+# plt.plot(gradient[0], gradient[2], 'b')
+# plt.show() 
 
+# for i in range(len(gradient)-1):
+#     plt.plot(gradient[0], gradient[i+1])
+# plt.show() 
 
+pos= [] 
+from tqdm import trange
 
-""" plt.plot(gradient[0], gradient[1], 'r')
-plt.plot(gradient[0], gradient[2], 'b')
-plt.show() """
+for save in trange(5):
+    gradient = pasif.getGradient(279-save)
 
-""" for i in range(len(gradient)-1):
-    plt.plot(gradient[0], gradient[i+1])
-plt.show() """
+    pasif.setJacobian(vecM, vecB, vecK, vecGamma, vecLambda, vecForcePattern, [np.array(gradient)], vecPsi)
+    pos.append(gradient[0])
 
+fig, axs = plt.subplots(2, constrained_layout=True)
+fig.suptitle('Chunk computation process', fontsize=16)
+axs[0].set_title('Complete Trajectory')
+axs[0].plot(trajectory[0], trajectory[1])
+axs[0].set_xlabel('time (s)')
+axs[0].set_ylabel('amplitude')
 
-
-""" for save in range(279):
-      gradient = pasif.getGradient(279-save)
-      pasif.setJacobian(extendedVecM, extendedVecB, extendedVecK, extendedVecGamma, extendedVecLambda, extendedForcePattern, extendedInitialCondition, extendedVecPsi)
-      
-
-      fig, axs = plt.subplots(2, constrained_layout=True)
-      fig.suptitle('Chunk computation process', fontsize=16)
-      axs[0].set_title('Complete Trajectory')
-      axs[0].plot(trajectory[0], trajectory[1])
-      axs[0].set_xlabel('time (s)')
-      axs[0].set_ylabel('amplitude')
-
-      axs[1].set_title('Reverse forward chunk computation')
-      axs[1].plot(gradient[1])
-      axs[1].set_xlabel(f"current setpoint: {save}")
-      axs[1].set_ylabel('amplitude')
-
-      i = 0
-      fig.savefig(f"fig/plt_{save}.png") """
-
-
+axs[1].set_title('Reverse forward chunk computation')
+axs[1].plot(np.flip(pos))
+axs[1].set_xlabel(f"current setpoint: {save}")
+axs[1].set_ylabel('amplitude')
+plt.show()

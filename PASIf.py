@@ -320,15 +320,6 @@ class PASIf(__GpuDriver):
         self.__jacobianPreprocessing() 
         self.jacobianSet = True     
 
-        """ print("jacob M: \n", self.jacobian_M.todense())
-        print("jacob B: \n", self.jacobian_B.todense())
-        print("jacob K: \n", self.jacobian_K.todense())
-        print("jacob Gamma: \n", self.jacobian_Gamma)
-        print("jacob Lambda: \n", self.jacobian_Lambda)
-        print("jacob forcePattern: \n", self.jacobian_forcePattern)
-        print("jacob initialConditions: \n", self.jacobian_initialConditions)
-        print("jacob psi: \n", self.jacobian_Psi) """
-        
         jac_csr_B = self.jacobian_B.tocsr()
         jac_csr_K = self.jacobian_K.tocsr()
         jac_csr_B.sort_indices()
@@ -346,7 +337,6 @@ class PASIf(__GpuDriver):
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 
                           self.jacobian_Gamma.indices)
-
         self._setBwdLambda(self.jacobian_Lambda.dimensions,
                            self.jacobian_Lambda.val,
                            self.jacobian_Lambda.indices)
@@ -361,7 +351,7 @@ class PASIf(__GpuDriver):
         
         # Load the system on the GPU
         self._allocateAdjointOnDevice()
- 
+
     def setInterpolationMatrix(self, 
                                interpolationMatrix_: list[np.ndarray]):
         # Verify that each row of the interpolation matrix are even and of the same size
@@ -415,31 +405,11 @@ class PASIf(__GpuDriver):
     
         return unwrappedTrajectory
     
-    def getGradient(self, save_ = 0):
+    def getGradient(self,):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
-        
-        gradient = self._getGradient(save_)
-        
-        """ chunkSize    = 280
-        numSetpoints = 279
-        
-        # re-arrange the computed trajectory in a plotable way.
-        #numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/chunkSize)
-        numOfSavedSteps = numSetpoints + chunkSize - 2 
-        unwrappedGradient = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalAdjointSize + 1)])
-        
-        for t in range(numOfSavedSteps):
-            # first row always contain time
-            unwrappedGradient[0][t] = t*numSetpoints/(self.sampleRate*(self.interpolSize+1))
-            for i in range(self.globalAdjointSize):
-                unwrappedGradient[i+1][t] = gradient[t*self.globalAdjointSize + i]
-    
-        return unwrappedGradient """
-        
-        return gradient
 
-
+        return self._getGradient(0)
 
     ############################################################# 
     #                      Private methods
@@ -548,8 +518,7 @@ class PASIf(__GpuDriver):
             
         self.system_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
         self.system_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
-        
-        
+ 
     def __unfoldJacobians(self,
                           inputVecM                 : list[dia_matrix], 
                           inputVecB                 : list[coo_matrix], 
