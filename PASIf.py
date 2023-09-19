@@ -7,13 +7,12 @@ from __future__  import annotations
 # Ensure that the code has been compiled withe the
 # latest version of the CUDA module. Lunch make.
 import os
-os.system("make")
+#os.system("make")
 
 # Path to the compiled CUDA module
 import sys
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(f'{dir_path}/build')
-
 
 from PASIfgpu import __GpuDriver
 

@@ -1,8 +1,3 @@
-# Import Springtronics
-import sys
-sys.path.append('/home/louvet/Documents/02_code')
-
-
 import Springtronics as spr
 
 # Standard library imports
@@ -11,7 +6,7 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=True
+USE_SOUND_FILE=False
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
