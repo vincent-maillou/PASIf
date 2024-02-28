@@ -24,11 +24,15 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
+             uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
              reel* X1,
              reel* X2, 
              reel* Y);
 
-            
+
           
 
 /** SpT4dV()
@@ -42,6 +46,11 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
+             uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
+             uint n3,
              reel* X1,
              reel* X2,
              reel* X3,  
@@ -62,6 +71,12 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
+             uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
+             uint n3,
+             uint n4,
              reel* X1,
              reel* X2,
              reel* X3,  

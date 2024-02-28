@@ -273,25 +273,8 @@
    * @param nTimes 
    */
     uint COOTensor3D::extendTheSystem(uint nTimes){
-      if(nTimes == 0){
-        return n[0];
-      }
-
-      for(uint i(0); i<nTimes; ++i){
-        for(uint j(0); j<nzz; ++j){
-          slice.push_back(slice[j]+(i+1)*n[0]);
-          row.push_back(row[j]+(i+1)*n[1]);
-          col.push_back(col[j]+(i+1)*n[2]);
-          val.push_back(val[j]);
-        }
-      }
-
-      n[0] += nTimes*n[0];
-      n[1] += nTimes*n[1];
-      n[2] += nTimes*n[2];
-      nzz = val.size();
-
-      return n[0];
+      ntimes = nTimes+1;
+      return nTimes*n[0];
     }
 
   /**
@@ -415,26 +398,8 @@
    * @param nTimes 
    */
     uint COOTensor4D::extendTheSystem(uint nTimes){
-      if(nTimes == 0){
-        return n[0];
-      }
-
-      for(uint i(0); i<nTimes; ++i){
-        for(uint j(0); j<nzz; ++j){
-          val.push_back(val[j]);
-          hyperslice.push_back(hyperslice[j]+(i+1)*n[0]);
-          slice.push_back(slice[j]+(i+1)*n[1]);
-          row.push_back(row[j]+(i+1)*n[2]);
-          col.push_back(col[j]+(i+1)*n[3]);
-        }
-      }
-      n[0] += nTimes*n[0];
-      n[1] += nTimes*n[1];
-      n[2] += nTimes*n[2];
-      n[3] += nTimes*n[3];
-      nzz = val.size();
-
-      return n[0];
+      ntimes = nTimes+1;
+      return nTimes*n[0];
     }
 
   /**
@@ -570,28 +535,8 @@
    * @param nTimes 
    */
     uint COOTensor5D::extendTheSystem(uint nTimes){
-      if(nTimes == 0){
-        return n[0];
-      }
-
-      for(uint i(0); i<nTimes; ++i){
-        for(uint j(0); j<nzz; ++j){
-          val.push_back(val[j]);
-          hyperhyperslice.push_back(hyperhyperslice[j]+(i+1)*n[0]);
-          hyperslice.push_back(hyperslice[j]+(i+1)*n[1]);
-          slice.push_back(slice[j]+(i+1)*n[2]);
-          row.push_back(row[j]+(i+1)*n[3]);
-          col.push_back(col[j]+(i+1)*n[4]);
-        }
-      }
-      n[0] += nTimes*n[0];
-      n[1] += nTimes*n[1];
-      n[2] += nTimes*n[2];
-      n[3] += nTimes*n[3];
-      n[4] += nTimes*n[4];
-      nzz   = val.size();
-
-      return n[0];
+      ntimes = nTimes+1;
+      return nTimes*n[0];
     }
 
   /**

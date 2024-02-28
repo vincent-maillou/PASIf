@@ -22,8 +22,12 @@
  void SpT3dV(reel *d_val, 
              uint *d_slice,
              uint *d_row, 
-             uint *d_col, 
+             uint *d_col,
              uint  nzz,
+             uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
              reel* X1,
              reel* X2, 
              reel* Y){
@@ -31,8 +35,11 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_slice[k]], d_val[k] * X1[d_row[k]] * X2[d_col[k]]);
+
+  for(uint l=0; l<ntimes; l+=1){
+    for(uint k = index; k < nzz; k += stride){
+      atomicAdd(&Y[d_slice[k]+l*n0], d_val[k] * X1[d_row[k]+l*n1] * X2[d_col[k]+l*n2]);
+    }
   }
  }
 
@@ -49,6 +56,11 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
+             uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
+             uint n3,
              reel* X1,
              reel* X2,
              reel* X3, 
@@ -57,8 +69,10 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_hyperslice[k]], d_val[k] * X1[d_slice[k]] * X2[d_row[k]] * X3[d_col[k]]);
+  for(uint l=0; l<ntimes; l+=1){
+    for(uint k = index; k < nzz; k += stride){
+      atomicAdd(&Y[d_hyperslice[k]+l*n0], d_val[k] * X1[d_slice[k]+l*n1] * X2[d_row[k]+l*n2] * X3[d_col[k]+l*n3]);
+    }
   }
  }
 
@@ -76,6 +90,12 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
+            uint ntimes,
+             uint n0,
+             uint n1,
+             uint n2,
+             uint n3,
+             uint n4,
              reel* X1,
              reel* X2,
              reel* X3,  
@@ -85,8 +105,10 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k < nzz; k += stride){
-    atomicAdd(&Y[d_hyperhyperslice[k]], d_val[k] * X1[d_hyperslice[k]] * X2[d_slice[k]] * X3[d_row[k]] * X4[d_col[k]]);
+  for(uint l=0; l<ntimes; l+=1){
+    for(uint k = index; k < nzz; k += stride){
+      atomicAdd(&Y[d_hyperhyperslice[k]+l*n0], d_val[k] * X1[d_hyperslice[k]+l*n1] * X2[d_slice[k]+l*n2] * X3[d_row[k]+l*n3] * X4[d_col[k]+l*n4]);
+    }
   }
  }
 

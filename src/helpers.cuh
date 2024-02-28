@@ -134,6 +134,7 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint nzz;
+    uint ntimes;
     std::array<uint, 3> n;
     std::vector<reel>   val;
     std::vector<uint>   slice;
@@ -172,6 +173,7 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint nzz;
+    uint ntimes;
     std::array<uint, 4> n;
     std::vector<reel>   val;
     std::vector<uint>   hyperslice;
@@ -186,7 +188,7 @@ enum problemType {forward, backward};
     uint *d_slice;
     uint *d_row;
     uint *d_col;
-    
+
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_);
@@ -213,6 +215,7 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint nzz;
+    uint ntimes;
     std::array<uint, 5> n;
     std::vector<reel>   val;
     std::vector<uint>   hyperhyperslice;

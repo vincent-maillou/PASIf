@@ -394,13 +394,13 @@ class PASIf(__GpuDriver):
     
         # re-arrange the computed trajectory in a plotable way.
         numOfSavedSteps = int(self.numsteps*(self.interpolSize+1)/self.saveSteps)
-        unwrappedTrajectory = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalSystemSize + 1)])
+        unwrappedTrajectory = np.array([np.zeros(numOfSavedSteps) for i in range(self.globalSystemSize*self.n_excitations + 1)])
     
         for t in range(numOfSavedSteps):
             # first row always contain time
             unwrappedTrajectory[0][t] = t*self.saveSteps/(self.sampleRate*(self.interpolSize+1))
-            for i in range(self.globalSystemSize):
-                unwrappedTrajectory[i+1][t] = trajectory[t*self.globalSystemSize + i]
+            for i in range(self.globalSystemSize*self.n_excitations):
+                unwrappedTrajectory[i+1][t] = trajectory[t*self.globalSystemSize*self.n_excitations + i]
     
         return unwrappedTrajectory
     
@@ -513,8 +513,9 @@ class PASIf(__GpuDriver):
             self.system_Gamma  = cp.deepcopy(inputVecGamma[0])
             self.system_Lambda = cp.deepcopy(inputVecLambda[0])
 
-        self.globalSystemSize *= self.n_excitations
-            
+        #self.globalSystemSize *= self.n_excitations
+        #TODO: check here
+
         self.system_forcePattern      = cp.deepcopy(inputVecForcePattern[0])
         self.system_initialConditions = cp.deepcopy(inputVecInitialConditions[0])
  

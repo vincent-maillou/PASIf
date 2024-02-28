@@ -835,7 +835,11 @@
                                                          Gamma->d_slice,
                                                          Gamma->d_row, 
                                                          Gamma->d_col,
-                                                         Gamma->nzz, 
+                                                         Gamma->nzz,
+                                                         Gamma->ntimes,
+                                                         Gamma->n[0],
+                                                         Gamma->n[1],
+                                                         Gamma->n[2],
                                                          pq,
                                                          pq_fwd_state,
                                                          pm);
@@ -847,6 +851,11 @@
                                                          Lambda->d_row, 
                                                          Lambda->d_col,
                                                          Lambda->nzz, 
+                                                         Lambda->ntimes,
+                                                         Lambda->n[0],
+                                                         Lambda->n[1],
+                                                         Lambda->n[2],
+                                                         Lambda->n[3],
                                                          pq,
                                                          pq_fwd_state,
                                                          pq_fwd_state, 
@@ -860,7 +869,13 @@
                                                            Psi->d_slice, 
                                                            Psi->d_row, 
                                                            Psi->d_col,
-                                                           Psi->nzz, 
+                                                           Psi->nzz,
+                                                           Psi->ntimes,
+                                                           Psi->n[0],
+                                                           Psi->n[1],
+                                                           Psi->n[2],
+                                                           Psi->n[3],
+                                                           Psi->n[4],
                                                            pq,
                                                            pq_fwd_state,
                                                            pq_fwd_state, 
@@ -972,6 +987,9 @@
 
     // std::cout << "memFootprint = " << memFootprint << std::endl;
 
+    //TODO: Look at the new memory footprint of the system
+    //Do multi GPU parallelization here?
+
     parallelismThroughExcitations = (0.8*freeGpuSpace) / memFootprint;
     
     if(parallelismThroughExcitations >= numberOfExcitations){
@@ -987,13 +1005,11 @@
       }
     }
 
-    if(parallelismThroughExcitations > 1){
-      if(n_dofs_fwd > 0 && !bwd_setting){
-        extendSystem();
-      }
-      if(n_dofs_bwd > 0 && bwd_setting){
-        extendAdjoint();
-      }
+    if(n_dofs_fwd > 0 && !bwd_setting){
+      extendSystem();
+    }
+    if(n_dofs_bwd > 0 && bwd_setting){
+      extendAdjoint();
     }
 
 
@@ -1267,7 +1283,7 @@
 
   void __GpuDriver::extendSystem(){
     // Extend each system to match the parallelismThroughExcitations to achieve
-    std::array<uint, 6> dofChecking = {fwd_B->extendTheSystem(parallelismThroughExcitations-1), 
+    std::array<uint, 6> dofChecking = {fwd_B->extendTheSystem     (parallelismThroughExcitations-1), 
                                        fwd_K->extendTheSystem(parallelismThroughExcitations-1), 
                                        fwd_Gamma->extendTheSystem(parallelismThroughExcitations-1), 
                                        fwd_Lambda->extendTheSystem(parallelismThroughExcitations-1), 
