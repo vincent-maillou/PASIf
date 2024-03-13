@@ -242,15 +242,9 @@ class PASIf(__GpuDriver):
 
         # Convert the Column-major COO system to Row-major COO system
 
-        csr_B = self.system_B.tocsr()
-        csr_K = self.system_K.tocsr()
-        csr_B.sort_indices()
+        csr_K = (self.system_B + self.system_K).tocsr()
         csr_K.sort_indices()
-        
-        self._setFwdB(self.system_B.shape,
-                      csr_B.data, 
-                      csr_B.indices, 
-                      csr_B.indptr)
+
         self._setFwdK(self.system_K.shape,
                       csr_K.data, 
                       csr_K.indices, 
@@ -319,15 +313,8 @@ class PASIf(__GpuDriver):
         self.__jacobianPreprocessing() 
         self.jacobianSet = True     
 
-        jac_csr_B = self.jacobian_B.tocsr()
-        jac_csr_K = self.jacobian_K.tocsr()
-        jac_csr_B.sort_indices()
+        jac_csr_K = (self.jacobian_B+self.jacobian_K).tocsr()
         jac_csr_K.sort_indices()
-
-        self._setBwdB(self.jacobian_B.shape,
-                      jac_csr_B.data, 
-                      jac_csr_B.indices, 
-                      jac_csr_B.indptr)
         self._setBwdK(self.jacobian_K.shape,
                       jac_csr_K.data, 
                       jac_csr_K.indices, 

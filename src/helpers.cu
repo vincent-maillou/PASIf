@@ -35,6 +35,8 @@
       d_val = nullptr;
       d_indices = nullptr;
       d_indptr = nullptr;
+      d_vec = nullptr;
+      d_res = nullptr;
 
       d_buffer = nullptr;
       bufferSize = 0;
@@ -92,9 +94,13 @@
       if(d_beta != nullptr){
         CHECK_CUDA( cudaFree(d_beta) );
       }
+      if(d_vec != nullptr){
+        CHECK_CUDA( cudaFree(d_vec) );
+      }
+      if(d_res != nullptr){
+        CHECK_CUDA( cudaFree(d_res) );
+      }
     }
-
-
 
   /**
    * @brief Extend the COO Matrix by appending n times the same matrix
@@ -104,25 +110,15 @@
     uint CSRMatrix::extendTheSystem(uint nTimes){
       // Return the highest dimmention of the matrix
       // after the extension
-      if(nTimes == 0){
-        return n[0];
+      ntimes = nTimes;
+
+      for(uint l=0; l<ntimes; l+=1){
+          for(uint i=0; i<n[0]; i+=1){
+            vec.push_back(0);
+          }
       }
 
-      for(uint i(0); i<nTimes; ++i){
-        for(uint j(0); j<nzz; ++j){
-          indices.push_back(indices[j]+(i+1)*n[1]);
-          val.push_back(val[j]);
-        }
-        for(uint j(1); j<n[0]+1; ++j){
-          indptr.push_back(indptr[j]+(i+1)*nzz);
-        }
-      }
-
-      nzz   = val.size();
-      n[0] += nTimes*n[0];
-      n[1] += nTimes*n[1];
-
-      return n[0];
+      return n[0]*ntimes;
     }
 
 
@@ -138,11 +134,15 @@
       CHECK_CUDA( cudaMalloc((void**)&d_indices, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_indptr, (n[0]+1)*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_val, nzz*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_vec, ntimes*n[0]*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_res, ntimes*n[0]*sizeof(reel)) );
 
       // Copy the data to the device
       CHECK_CUDA( cudaMemcpy(d_indices, indices.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_indptr, indptr.data(), (n[0]+1)*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_val, val.data(), nzz*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_vec, vec.data(), ntimes*n[0]*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_res, vec.data(), ntimes*n[0]*sizeof(reel), cudaMemcpyHostToDevice) );      
 
       // Create the sparse matrix descriptor and allocate the needed buffer
       CHECK_CUSPARSE( cusparseCreateCsr(&sparseMat_desc, 
@@ -156,19 +156,36 @@
                                         CUSPARSE_INDEX_32I, 
                                         CUSPARSE_INDEX_BASE_ZERO, 
                                         CUDA_R_32F) )
+
+      CHECK_CUSPARSE( cusparseCreateDnMat(&denseMat_desc, 
+                                        n[0], 
+                                        ntimes, 
+                                        n[0], 
+                                        d_vec, 
+                                        CUDA_R_32F, 
+                                        CUSPARSE_ORDER_COL) )
+
+      CHECK_CUSPARSE( cusparseCreateDnMat(&resMat_desc, 
+                                        n[0], 
+                                        ntimes, 
+                                        n[0], 
+                                        d_vec, 
+                                        CUDA_R_32F,
+                                        CUSPARSE_ORDER_COL) )
       
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) );
       CHECK_CUDA( cudaMalloc((void**)&d_beta,  sizeof(reel)) );
 
-      CHECK_CUSPARSE( cusparseSpMV_bufferSize(handle, 
+      CHECK_CUSPARSE( cusparseSpMM_bufferSize(handle, 
+                                              CUSPARSE_OPERATION_NON_TRANSPOSE,
                                               CUSPARSE_OPERATION_NON_TRANSPOSE,
                                               &d_alpha, 
                                               sparseMat_desc, 
-                                              vecX, 
+                                              denseMat_desc, 
                                               &d_beta, 
-                                              vecY, 
+                                              resMat_desc, 
                                               CUDA_R_32F, 
-                                              CUSPARSE_SPMV_CSR_ALG1, 
+                                              CUSPARSE_SPMM_CSR_ALG1, 
                                               &bufferSize) )
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
@@ -178,7 +195,7 @@
       // Return the number of bytes needed to store this element on the GPU
       size_t memFootprint;
 
-      memFootprint = bufferSize + (nzz + n[0]+1)*sizeof(uint) + nzz*sizeof(reel); 
+      memFootprint = bufferSize + (nzz + n[0]+1)*sizeof(uint) + nzz*sizeof(reel) + n[0]*ntimes*sizeof(reel)*2;
 
       return memFootprint;
     }
@@ -273,8 +290,8 @@
    * @param nTimes 
    */
     uint COOTensor3D::extendTheSystem(uint nTimes){
-      ntimes = nTimes+1;
-      return nTimes*n[0];
+      ntimes = nTimes;
+      return ntimes*n[0];
     }
 
   /**
@@ -398,8 +415,8 @@
    * @param nTimes 
    */
     uint COOTensor4D::extendTheSystem(uint nTimes){
-      ntimes = nTimes+1;
-      return nTimes*n[0];
+      ntimes = nTimes;
+      return ntimes*n[0];
     }
 
   /**
@@ -535,8 +552,8 @@
    * @param nTimes 
    */
     uint COOTensor5D::extendTheSystem(uint nTimes){
-      ntimes = nTimes+1;
-      return nTimes*n[0];
+      ntimes = nTimes;
+      return ntimes*n[0];
     }
 
   /**
@@ -771,7 +788,3 @@
     }
     return vec.size();
   }
-
-
-
-  

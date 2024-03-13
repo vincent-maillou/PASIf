@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/home/louvet/Documents/02_code/Springtronics/')
+
 import Springtronics as spr
 
 # Standard library imports
@@ -6,7 +9,7 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=False
+USE_SOUND_FILE=True
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -129,9 +132,7 @@ if not USE_SOUND_FILE:
         excitation.append(1*force)
     excitationSet = [excitation]
     cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
-else:
-    f=20
-    #cudaEnvironment.setModulationBuffer(8*2*f, 195*f) 
+ 
 
 print("---------------------------------------------------")
 
@@ -142,7 +143,7 @@ print(f'Total getAmplitude() time: {stop-start} s')
 print("Probes amplitudes: ", amplitudes)
 
 start = time.time()
-gpuTrajectory = cudaEnvironment.getTrajectory(vecSystem, saveSteps_=1)
+gpuTrajectory = cudaEnvironment.getTrajectories(vecSystem, saveSteps_=1)
 stop = time.time()
 print(f'Total getTrajectory() time: {stop-start} s')
 

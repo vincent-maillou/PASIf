@@ -28,10 +28,6 @@ class __GpuDriver{
 
 
   //            Forward system interface 
-  void _setFwdB(std::array<uint, 2> n_,
-                std::vector<reel>   values_,
-                std::vector<uint>   indices_,
-                std::vector<uint>   indptr_); 
   void _setFwdK(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
                 std::vector<uint>   indices_,
@@ -49,10 +45,6 @@ class __GpuDriver{
 
 
   //            Backward system interface 
-  void _setBwdB(std::array<uint, 2> n_,
-                std::vector<reel>   values_,
-                std::vector<uint>   indices_,
-                std::vector<uint>   indptr_); 
   void _setBwdK(std::array<uint, 2> n_,
                 std::vector<reel>   values_,
                 std::vector<uint>   indices_,
@@ -157,7 +149,6 @@ class __GpuDriver{
   reel h6;
 
   reel alpha; reel* d_alpha;
-  reel beta1; reel* d_beta1;
   reel beta0; reel* d_beta0;
 
   bool dCompute;
@@ -168,7 +159,6 @@ class __GpuDriver{
   //            Compute system related data
   uint n_dofs;
 
-  CSRMatrix*   B;
   CSRMatrix*   K;
   COOTensor3D* Gamma;
   COOTensor4D* Lambda;
@@ -193,7 +183,6 @@ class __GpuDriver{
   //            Forward system related data
   uint n_dofs_fwd;
 
-  CSRMatrix*   fwd_B;
   CSRMatrix*   fwd_K;
   COOTensor3D* fwd_Gamma;
   COOTensor4D* fwd_Lambda;
@@ -213,7 +202,6 @@ class __GpuDriver{
   void  allocateDeviceSystemStatesVector();
   void  extendSystem();
 
-  void  clearFwdB();
   void  clearFwdK();
   void  clearFwdGamma();
   void  clearFwdLambda();
@@ -225,7 +213,6 @@ class __GpuDriver{
   //            Adjoint system related data
   uint n_dofs_bwd;
 
-  CSRMatrix*   bwd_B;
   CSRMatrix*   bwd_K;
   COOTensor3D* bwd_Gamma;
   COOTensor4D* bwd_Lambda;
@@ -246,7 +233,6 @@ class __GpuDriver{
   void  allocateDeviceAdjointStatesVector();
   void  extendAdjoint();
 
-  void  clearBwdB();
   void  clearBwdK();
   void  clearBwdGamma();
   void  clearBwdLambda();

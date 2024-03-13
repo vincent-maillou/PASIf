@@ -118,7 +118,7 @@ for j in range(13):
 
       compute_time.append(end-start)
       equivalent_dofs.append(n*systemSize*n_excitations)
-#np.save("benchmark_CSR.npy", compute_time)
+np.save("benchmark_reduced_bandwidth.npy", compute_time)
 # np.save("equivalent_dofs.npy", equivalent_dofs)
 
 # plt.figure()

@@ -34,7 +34,6 @@
         totalNumsteps(numsteps),
 
         alpha(1.0), d_alpha(nullptr),
-        beta1(1.0), d_beta1(nullptr),
         beta0(0.0), d_beta0(nullptr),
 
         dCompute(dCompute_),
@@ -45,7 +44,6 @@
         //            Compute system related data
         n_dofs(0),
 
-        B(nullptr), 
         K(nullptr), 
         Gamma(nullptr), 
         Lambda(nullptr), 
@@ -66,7 +64,6 @@
         //            Forward system related data
         n_dofs_fwd(0),
 
-        fwd_B(nullptr),
         fwd_K(nullptr),
         fwd_Gamma(nullptr),
         fwd_Lambda(nullptr),
@@ -85,7 +82,6 @@
         //            Adjoint system related data
         n_dofs_bwd(0),
 
-        bwd_B(nullptr),
         bwd_K(nullptr),
         bwd_Gamma(nullptr),
         bwd_Lambda(nullptr),
@@ -138,10 +134,8 @@
     
       // Put on the device alpha and beta values for the cuSPARSE API
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) )
-      CHECK_CUDA( cudaMalloc((void**)&d_beta1, sizeof(reel)) )
       CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
       CHECK_CUDA( cudaMemcpy(d_alpha, &alpha,  sizeof(reel), cudaMemcpyHostToDevice) )
-      CHECK_CUDA( cudaMemcpy(d_beta1, &beta1,  sizeof(reel), cudaMemcpyHostToDevice) )
       CHECK_CUDA( cudaMemcpy(d_beta0, &beta0,  sizeof(reel), cudaMemcpyHostToDevice) )
 
       _loadExcitationsSet(excitationSet_,
@@ -160,7 +154,6 @@
 
 
     //            Forward system destructor
-    clearFwdB();
     clearFwdK();
     clearFwdGamma();
     clearFwdLambda();
@@ -170,7 +163,6 @@
 
 
     //            Backward system destructor
-    clearBwdB();
     clearBwdK();
     clearBwdGamma();
     clearBwdLambda();
@@ -192,18 +184,6 @@
 
 
 /*                    Forward system interface                    */
-
-  void __GpuDriver::_setFwdB(std::array<uint, 2> n_,
-                             std::vector<reel>   values_,
-                             std::vector<uint>   indices_,
-                             std::vector<uint>   indptr_){
-    clearFwdB();
-
-    fwd_B = new CSRMatrix(n_,
-                          values_,
-                          indices_,
-                          indptr_);
-  }
 
   void __GpuDriver::_setFwdK(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
@@ -266,17 +246,6 @@
 
 /*                    Backward system interface                    */
 
-  void __GpuDriver::_setBwdB(std::array<uint, 2> n_,
-                             std::vector<reel>   values_,
-                             std::vector<uint>   indices_,
-                             std::vector<uint>   indptr_){
-    clearBwdB();
-
-    bwd_B = new CSRMatrix(n_,
-                          values_,
-                          indices_,
-                          indptr_);
-  }
 
   void __GpuDriver::_setBwdK(std::array<uint, 2> n_,
                              std::vector<reel>   values_,
@@ -806,29 +775,21 @@
       pq_fwd_state = pq;
     }
     
-    // k = B.d_ki + K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
-    // k = B.d_ki
-    cusparseSpMV(h_cusparse, 
-                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                 d_alpha, 
-                 B->sparseMat_desc, 
-                 q_desc,
-                 d_beta0, 
-                 m_desc, 
-                 CUDA_R_32F, 
-                 CUSPARSE_SPMV_ALG_DEFAULT, 
-                 B->d_buffer);
+    // k = K.d_mi + Gamma.d_mi² + Lambda.d_mi³ + ForcePattern.d_ExcitationsSet
     // k += K.d_mi
-    cusparseSpMV(h_cusparse, 
-                 CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                 d_alpha, 
-                 K->sparseMat_desc, 
-                 q_desc, 
-                 d_beta1, 
-                 m_desc, 
-                 CUDA_R_32F, 
-                 CUSPARSE_SPMV_ALG_DEFAULT, 
-                 K->d_buffer);
+    CHECK_CUSPARSE(cusparseDnMatSetValues(K->denseMat_desc, pq))
+    CHECK_CUSPARSE(cusparseDnMatSetValues(K->resMat_desc, pm))
+    CHECK_CUSPARSE(cusparseSpMM(h_cusparse, 
+                                CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                d_alpha, 
+                                K->sparseMat_desc,
+                                K->denseMat_desc,
+                                d_beta0,
+                                K->resMat_desc,
+                                CUDA_R_32F, 
+                                CUSPARSE_SPMM_CSR_ALG1, 
+                                K->d_buffer));
 
     // k += Gamma.d_mi²
     SpT3dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
@@ -1027,7 +988,6 @@
 
     size_t memFootprint(0);
 
-    memFootprint += fwd_B->memFootprint();
     memFootprint += fwd_K->memFootprint();
     memFootprint += fwd_Gamma->memFootprint();
     memFootprint += fwd_Lambda->memFootprint();
@@ -1046,7 +1006,6 @@
 
     size_t memFootprint(0);
 
-    memFootprint += bwd_B->memFootprint();
     memFootprint += bwd_K->memFootprint();
     memFootprint += bwd_Gamma->memFootprint();
     memFootprint += bwd_Lambda->memFootprint();
@@ -1104,7 +1063,6 @@
     if(type_ == forward){
       n_dofs       = n_dofs_fwd;
 
-      B            = fwd_B;
       K            = fwd_K;
       Gamma        = fwd_Gamma;
       Lambda       = fwd_Lambda;
@@ -1127,7 +1085,6 @@
     else if(type_ == backward){
       n_dofs       = n_dofs_bwd;
 
-      B            = bwd_B;
       K            = bwd_K;
       Gamma        = bwd_Gamma;
       Lambda       = bwd_Lambda;
@@ -1192,7 +1149,6 @@
       }
 
       std::cout << "Here is the assembled system" << std::endl;
-      std::cout << "B:" << std::endl << *B << std::endl;
       std::cout << "K:" << std::endl << *K << std::endl;
       std::cout << "Gamma:" << std::endl << *Gamma << std::endl;
       std::cout << "Lambda:" << std::endl << *Lambda << std::endl;
@@ -1240,11 +1196,7 @@
 
 
 /*                    Forward system private methods                    */
-
   void __GpuDriver::allocateDeviceSystem(){
-    fwd_B->allocateOnGPU(h_cusparse,
-                         d_fwd_mi_desc, 
-                         d_fwd_Q_desc);
 
     fwd_K->allocateOnGPU(h_cusparse, 
                          d_fwd_mi_desc, 
@@ -1283,32 +1235,22 @@
 
   void __GpuDriver::extendSystem(){
     // Extend each system to match the parallelismThroughExcitations to achieve
-    std::array<uint, 6> dofChecking = {fwd_B->extendTheSystem     (parallelismThroughExcitations-1), 
-                                       fwd_K->extendTheSystem(parallelismThroughExcitations-1), 
-                                       fwd_Gamma->extendTheSystem(parallelismThroughExcitations-1), 
-                                       fwd_Lambda->extendTheSystem(parallelismThroughExcitations-1), 
+    std::array<uint, 5> dofChecking = {
+                                       fwd_K->extendTheSystem(parallelismThroughExcitations), 
+                                       fwd_Gamma->extendTheSystem(parallelismThroughExcitations), 
+                                       fwd_Lambda->extendTheSystem(parallelismThroughExcitations), 
                                        fwd_ForcePattern->extendTheSystem(parallelismThroughExcitations-1),
                                        extendTheVector(h_fwd_QinitCond, parallelismThroughExcitations-1)};
 
     // Checking that each system is of the same size
     for(uint i = 0; i < dofChecking.size(); i++){
+      // std::cout<<"Dof checking ["<<i<<"]: "<<dofChecking[i]<<std::endl;
       if(dofChecking[i] != dofChecking[0]){
         std::cout << "[Error] __GpuDriver: The number of DOFs is not the same for all System matrix after system extension." << std::endl;
       }
     }
 
     n_dofs_fwd = dofChecking[0];
-  }
-
-  void __GpuDriver::clearFwdB(){
-    if(B == fwd_B){
-      B = nullptr;
-    }
-
-    if(fwd_B != nullptr){
-      delete fwd_B;
-      fwd_B = nullptr;
-    }
   }
 
   void __GpuDriver::clearFwdK(){
@@ -1428,10 +1370,6 @@
 /*                    Adjoint system private methods                    */
 
   void __GpuDriver::allocateDeviceAdjointSystem(){
-    bwd_B->allocateOnGPU(h_cusparse,
-                         d_bwd_mi_desc, 
-                         d_bwd_Q_desc);
-
     bwd_K->allocateOnGPU(h_cusparse, 
                          d_bwd_mi_desc, 
                          d_bwd_Q_desc);
@@ -1471,13 +1409,13 @@
 
   void __GpuDriver::extendAdjoint(){
     // Extend each system to match the parallelismThroughExcitations to achieve
-    std::array<uint, 7> dofChecking = {bwd_B->extendTheSystem(parallelismThroughExcitations-1), 
-                                       bwd_K->extendTheSystem(parallelismThroughExcitations-1), 
-                                       bwd_Gamma->extendTheSystem(parallelismThroughExcitations-1), 
-                                       bwd_Lambda->extendTheSystem(parallelismThroughExcitations-1),
-                                       bwd_Psi->extendTheSystem(parallelismThroughExcitations-1), 
-                                       bwd_ForcePattern->extendTheSystem(parallelismThroughExcitations-1),
-                                       extendTheVector(h_bwd_QinitCond, parallelismThroughExcitations-1)};
+    std::array<uint, 6> dofChecking = {
+                                       bwd_K->extendTheSystem(parallelismThroughExcitations), 
+                                       bwd_Gamma->extendTheSystem(parallelismThroughExcitations), 
+                                       bwd_Lambda->extendTheSystem(parallelismThroughExcitations),
+                                       bwd_Psi->extendTheSystem(parallelismThroughExcitations), 
+                                       bwd_ForcePattern->extendTheSystem(parallelismThroughExcitations),
+                                       extendTheVector(h_bwd_QinitCond, parallelismThroughExcitations)};
 
     // Checking that each system is of the same size
     for(uint i = 0; i < dofChecking.size(); i++){
@@ -1487,17 +1425,6 @@
     }
 
     n_dofs_bwd = dofChecking[0];
-  }
-
-  void __GpuDriver::clearBwdB(){
-    if(B == bwd_B){
-      B = nullptr;
-    }
-
-    if(bwd_B != nullptr){
-      delete bwd_B;
-      bwd_B = nullptr;
-    }
   }
 
   void __GpuDriver::clearBwdK(){

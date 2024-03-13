@@ -92,16 +92,22 @@ enum problemType {forward, backward};
 
    // Host-side data
     uint                nzz;
+    uint                ntimes;
     std::array<uint, 2> n;
     std::vector<reel>   val;
     std::vector<uint>   indices;
     std::vector<uint>   indptr;
+    std::vector<uint>   vec;
 
    // Device-side data
     reel *d_val;
     uint *d_indices;
     uint *d_indptr;
+    reel *d_vec;
+    reel *d_res;
 
+    cusparseDnMatDescr_t denseMat_desc;
+    cusparseDnMatDescr_t resMat_desc;
     cusparseSpMatDescr_t sparseMat_desc;
     void*  d_buffer;
     size_t bufferSize;
@@ -285,6 +291,8 @@ enum problemType {forward, backward};
 
   void printVector(std::vector<reel> & vec);
   uint extendTheVector(std::vector<reel> & vec, uint nTimes);
+
+  cusparseSpMatDescr_t vectorToMatrix(uint ntimes, std::vector<reel> & data);
 
 
 
