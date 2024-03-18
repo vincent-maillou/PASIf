@@ -112,7 +112,7 @@
       // after the extension
       ntimes = nTimes;
 
-      for(uint l=0; l<ntimes; l+=1){
+      for(uint l=1; l<ntimes; l+=1){
           for(uint i=0; i<n[0]; i+=1){
             vec.push_back(0);
           }

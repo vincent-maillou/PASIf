@@ -22,7 +22,8 @@ class __GpuDriver{
               uint numsteps_,
               bool dCompute_ = false,
               bool dSystem_  = false,
-              bool dSolver_  = false);
+              bool dSolver_  = false,
+              uint GPUId_ = 0);
 
   ~__GpuDriver();
 
@@ -307,7 +308,6 @@ class __GpuDriver{
 
 /*
 - [ ] cuda API crash when using more than 1.6M DOF
-- [ ] Merge B and K in a single matrix
 */
 
 

@@ -23,13 +23,14 @@ PYBIND11_MODULE(PASIfgpu, m) {
   m.doc() = "Parallel Accelerated Solver Interface";
 
   py::class_<__GpuDriver>(m, "__GpuDriver")
-    .def(py::init<std::vector<std::vector<double>>, uint, uint, bool, bool, bool>(),
+    .def(py::init<std::vector<std::vector<double>>, uint, uint, bool, bool, bool, uint>(),
       py::arg("excitationSet_"),
       py::arg("sampleRate_"),
       py::arg("numsteps_"),
       py::arg("dCompute_") = false,
       py::arg("dSystem_")  = false,
-      py::arg("dSolver_")  = false)
+      py::arg("dSolver_")  = false,
+      py::arg("GPUId_") = 0)
       
 
     //            Forward system interface

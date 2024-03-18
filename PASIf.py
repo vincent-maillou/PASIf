@@ -24,6 +24,10 @@ from   typing              import Union
 from   scipy.sparse        import coo_matrix
 from   scipy.sparse        import dia_matrix
 from   scipy.sparse.linalg import inv
+from mpi4py import MPI
+
+COMM = MPI.COMM_WORLD
+RANK = COMM.Get_rank()
 
 @dataclass
 class coo_tensor:
@@ -159,7 +163,8 @@ class PASIf(__GpuDriver):
                          self.numsteps,
                          dCompute_,
                          dSystem_,
-                         dSolver_)
+                         dSolver_,
+                         RANK)
 
         self.sampleRate   = sampleRate
         self.globalSystemSize   = 0 # Number of DOFs

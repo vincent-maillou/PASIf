@@ -27,7 +27,8 @@
                              uint numsteps_,
                              bool dCompute_,
                              bool dSystem_,
-                             bool dSolver_) : 
+                             bool dSolver_,
+                             uint GPUId_) : 
         //            Simulation related data
         d_ExcitationsSet(nullptr),
         numsteps(numsteps_),
@@ -123,7 +124,7 @@
         numberOfSimulationToPerform(0),
         exceedingSimulations(0),
 
-        deviceId(0),
+        deviceId(GPUId_),
         numberOfSMs(0),
         nBlocks(0),
         nThreadsPerBlock(0),
@@ -132,6 +133,8 @@
         h_cusparse(nullptr)
         {
     
+      setCUDA(nStreams);
+
       // Put on the device alpha and beta values for the cuSPARSE API
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) )
       CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
@@ -141,7 +144,6 @@
       _loadExcitationsSet(excitationSet_,
                           sampleRate_);
 
-      setCUDA(nStreams);
     }
 
   __GpuDriver::~__GpuDriver(){
@@ -394,7 +396,6 @@
   std::vector<reel> __GpuDriver::_getAmplitudes(){
     setComputeSystem(forward);
     displaySimuInfos(forward);
-
     std::vector<reel> resultsQ;
     resultsQ.resize(n_dofs*numberOfSimulationToPerform);
 
@@ -406,14 +407,14 @@
 
       forwardRungeKutta(0, numsteps, k);
 
-      /* std::cout << "k = " << k << std::endl;
-      std::cout << "n_doofs = " << n_dofs << std::endl;
-      std::cout << "numsteps = " << numsteps << std::endl;
-      std::cout << "d_Q = " << d_Q << std::endl;
-      std::cout << "d_fwd_Q = " << d_fwd_Q << std::endl;
-      std::cout << "sizeof(reel) = " << sizeof(reel) << std::endl;
-      std::cout << "resultsQ.max_size() = " << resultsQ.max_size() << std::endl;
-      std::cout << "numberOfSimulationToPerform = " << numberOfSimulationToPerform << std::endl; */
+      // std::cout << "k = " << k << std::endl;
+      // std::cout << "n_doofs = " << n_dofs << std::endl;
+      // std::cout << "numsteps = " << numsteps << std::endl;
+      // std::cout << "d_Q = " << d_Q << std::endl;
+      // std::cout << "d_fwd_Q = " << d_fwd_Q << std::endl;
+      // std::cout << "sizeof(reel) = " << sizeof(reel) << std::endl;
+      // std::cout << "resultsQ.max_size() = " << resultsQ.max_size() << std::endl;
+      // std::cout << "numberOfSimulationToPerform = " << numberOfSimulationToPerform << std::endl;
 
       std::cout << "resultsQ.size() = " << resultsQ.size() << std::endl;
 
@@ -578,6 +579,7 @@
     CHECK_CUDA( cudaGetDeviceCount(&nDevices) ) */
 
     // Query the device parameters
+    CHECK_CUDA( cudaSetDevice(deviceId))
     CHECK_CUDA( cudaGetDevice(&deviceId) )
     CHECK_CUDA( cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId) )
 
@@ -952,8 +954,7 @@
     //Do multi GPU parallelization here?
 
     parallelismThroughExcitations = (0.8*freeGpuSpace) / memFootprint;
-    
-    if(parallelismThroughExcitations >= numberOfExcitations){
+    if(parallelismThroughExcitations >= 1){
       parallelismThroughExcitations = numberOfExcitations;
       numberOfSimulationToPerform   = 1;
       exceedingSimulations          = 0;
@@ -972,7 +973,6 @@
     if(n_dofs_bwd > 0 && bwd_setting){
       extendAdjoint();
     }
-
 
     /* memFootprint  = getSystemMemFootprint(); // LM
     memFootprint += getAdjointMemFootprint();
