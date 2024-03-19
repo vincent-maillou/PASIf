@@ -50,6 +50,7 @@
       }
       for(size_t i(0); i<n[0]+1; ++i){
         indptr.push_back(indptr_[i]);
+        vec.push_back(0);
       }
       nzz = val.size();
 

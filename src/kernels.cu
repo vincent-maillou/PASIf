@@ -37,32 +37,33 @@
             reel* X2,
             reel* X3,
             reel* Y){
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
+      
+    uint k = threadIdx.x;
+    uint l = blockIdx.x;
 
-
-  for(uint k = index; k <nzz_G; k += stride){
-    uint slice_idx = d_slice_G[k];
-    reel val = d_val_G[k];
-    uint row_idx = d_row_G[k];
-    uint col_idx = d_col_G[k];
-
-    for(uint l=0; l<ntimes; l+=1){
-      atomicAdd(&Y[slice_idx+l*n0], val*X1[row_idx+l*n0] * X2[col_idx+l*nlast]);
+    while (k <nzz_G){
+      uint slice_idx = d_slice_G[k];
+      reel val = d_val_G[k];
+      uint row_idx = d_row_G[k];
+      uint col_idx = d_col_G[k];
+      if(l<ntimes){
+        atomicAdd(&Y[slice_idx+l*n0], __fmul_rn(__fmul_rn(val, X1[row_idx+l*n0]), X2[col_idx+l*nlast]));
+      k += 512;//in case there are more non zero elements than thread possibles
     }
   }
 
-  for(uint k = index; k <nzz_L; k += stride){
-    uint hyperslice_idx = d_hyperslice_L[k];
-    uint slice_idx = d_slice_L[k];
-    reel val = d_val_L[k];
-    uint row_idx = d_row_L[k];
-    uint col_idx = d_col_L[k];
-
-    for(uint l=0; l<ntimes; l+=1){
-      atomicAdd(&Y[hyperslice_idx+l*n0], val* X1[slice_idx+l*n0] * X2[row_idx+l*n0] * X3[col_idx+l*nlast]);
+    while (k <nzz_L){
+      uint hyperslice_idx = d_hyperslice_L[k];
+      uint slice_idx = d_slice_L[k];
+      reel val = d_val_L[k];
+      uint row_idx = d_row_L[k];
+      uint col_idx = d_col_L[k];
+      if(l<ntimes){
+        atomicAdd(&Y[hyperslice_idx+l*n0], __fmul_rn(__fmul_rn(__fmul_rn(val, X1[slice_idx+l*n0]), X2[row_idx+l*n0]), X3[col_idx+l*nlast]));
+      }
+      k+= 512;
     }
-  }
+
  }
 
 

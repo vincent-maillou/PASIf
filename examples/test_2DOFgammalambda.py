@@ -104,21 +104,25 @@ system.probes['cant_output'] = spr.WindowedA2Probe(mechanicalDOF,
 # Define an adjoint source (used to compute the gradient efficiently: https://en.wikipedia.org/wiki/Adjoint_state_method)
 system.interactionPotentials['adjoint_source'] = system.probes['cant_output'].makeAdjointSource()
 
-# cppEnvironment = spr.CPPEnvironment(numSteps = int(numSteps),
-#                          timeStep = 1.0/sr,
-#                          numSweepSteps = 1,
-#                          numThreads=1)
-                      
-# cppTrajectory = cppEnvironment.getTrajectories(system)
-# cppAmplitude = cppEnvironment.getAmplitudes(system)
-
-# cppGrad = np.array(cppEnvironment.getGradients(system, deleteTemp=False))
+cppEnvironment = spr.CPPEnvironment(numSteps = int(numSteps),
+                         timeStep = 1.0/sr,
+                         numSweepSteps = 1,
+                         numThreads=1)
+start  = time.time()
+cppTrajectory = cppEnvironment.getTrajectories(system)
+print(f'CPP trajectory time is {time.time()-start}')
+start  = time.time()
+cppAmplitude = cppEnvironment.getAmplitudes(system)
+print(f'CPP amplitude time is {time.time()-start}')
+start  = time.time()
+cppGrad = np.array(cppEnvironment.getGradients(system, deleteTemp=False))
+print(f'CPP grad time is {time.time()-start}')
 
 # From now CUDA Env testing
 vecSystem = [system]
-displayCompute = True
-displaySystem  = True
-displaySolver  = True
+displayCompute = False
+displaySystem  = False
+displaySolver  = False
 cudaEnvironment = spr.CUDAEnvironment(vecSystem, 
                                       numSteps  = int(numSteps/2) if USE_SOUND_FILE else numSteps, 
                                       timeStep  = 2/sr if USE_SOUND_FILE else 1/sr,
@@ -142,73 +146,73 @@ stop = time.time()
 print(f'Total getAmplitude() time: {stop-start} s')
 print("Probes amplitudes: ", amplitudes)
 
-# start = time.time()
-# gpuTrajectory = cudaEnvironment.getTrajectories(vecSystem, saveSteps_=1)
-# stop = time.time()
-# print(f'Total getTrajectory() time: {stop-start} s')
+start = time.time()
+gpuTrajectory = cudaEnvironment.getTrajectories(vecSystem, saveSteps_=1)
+stop = time.time()
+print(f'Total getTrajectory() time: {stop-start} s')
 
-# start = time.time()
-# gpuGrad = cudaEnvironment.getGradients([system])
-# stop = time.time()
-# print(f'Total getGradients() time: {stop-start} s')
+start = time.time()
+gpuGrad = cudaEnvironment.getGradients([system])
+stop = time.time()
+print(f'Total getGradients() time: {stop-start} s')
 
-# cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 20)
-# gpu_stringCantileverProbeEnergy = round(amplitudes[0][0], 20)
-
-
-# print(cppAmplitude)
-# print(amplitudes)
-# print("CPU cantilever probe energy: ", cpp_stringCantileverProbeEnergy)
-# print("GPU cantilever probe energy: ", gpu_stringCantileverProbeEnergy)
-# print(f"Cantilever probe energy relative error: {100*np.abs(cpp_stringCantileverProbeEnergy-gpu_stringCantileverProbeEnergy)/cpp_stringCantileverProbeEnergy}")
-# print()
-# print(f"CPU gradient: {cppGrad}")
-# print(f"GPU gradient: {gpuGrad}")
-# print(f"Relative error {np.abs(cppGrad-gpuGrad)/np.abs(cppGrad)*100} %")
-
-# #   ----- Plotting -----   #
-# if gpuTrajectory.shape[1]!=cppTrajectory.shape[0]:
-#     new_gpu_traj = []
-#     new_x = np.linspace(0, gpuTrajectory[0,-1], cppTrajectory.shape[0])
-#     for i in range(gpuTrajectory.shape[0]):
-#         new_gpu_traj.append(np.interp(new_x, gpuTrajectory[0,:], gpuTrajectory[i, :]))
-
-#     gpuTrajectory = np.array(new_gpu_traj)
+cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 20)
+gpu_stringCantileverProbeEnergy = round(amplitudes[0][0], 20)
 
 
+print(cppAmplitude)
+print(amplitudes)
+print("CPU cantilever probe energy: ", cpp_stringCantileverProbeEnergy)
+print("GPU cantilever probe energy: ", gpu_stringCantileverProbeEnergy)
+print(f"Cantilever probe energy relative error: {100*np.abs(cpp_stringCantileverProbeEnergy-gpu_stringCantileverProbeEnergy)/cpp_stringCantileverProbeEnergy}")
+print()
+print(f"CPU gradient: {cppGrad}")
+print(f"GPU gradient: {gpuGrad}")
+print(f"Relative error {np.abs(cppGrad-gpuGrad)/np.abs(cppGrad)*100} %")
+
+#   ----- Plotting -----   #
+if gpuTrajectory.shape[1]!=cppTrajectory.shape[0]:
+    new_gpu_traj = []
+    new_x = np.linspace(0, gpuTrajectory[0,-1], cppTrajectory.shape[0])
+    for i in range(gpuTrajectory.shape[0]):
+        new_gpu_traj.append(np.interp(new_x, gpuTrajectory[0,:], gpuTrajectory[i, :]))
+
+    gpuTrajectory = np.array(new_gpu_traj)
 
 
-# fig, axs = plt.subplots(3, constrained_layout=True)
-# fig.suptitle('Oscilator trajectory', fontsize=16)
-# axs[0].set_title('CPP Trajectory')
-# axs[0].plot(gpuTrajectory[0], cppTrajectory[:,0])
-# axs[0].set_xlabel('time (s)')
-# axs[0].set_ylabel('amplitude')
 
-# axs[1].set_title('CUDA Trajectory')
-# axs[1].plot(gpuTrajectory[0], gpuTrajectory[1])
-# axs[1].set_xlabel('time (s)')
-# axs[1].set_ylabel('amplitude')
 
-# axs[2].set_title('Error')
-# axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[1]-cppTrajectory[:,0]))
-# axs[2].set_xlabel('time (s)')
-# axs[2].set_ylabel('amplitude')
+fig, axs = plt.subplots(3, constrained_layout=True)
+fig.suptitle('Oscilator trajectory', fontsize=16)
+axs[0].set_title('CPP Trajectory')
+axs[0].plot(gpuTrajectory[0], cppTrajectory[:,0])
+axs[0].set_xlabel('time (s)')
+axs[0].set_ylabel('amplitude')
 
-# fig, axs = plt.subplots(3, constrained_layout=True)
-# fig.suptitle('String cantilever trajectory', fontsize=16)
-# axs[0].set_title('CPP Trajectory')
-# axs[0].plot(gpuTrajectory[0], cppTrajectory[:,1])
-# axs[0].set_xlabel('time (s)')
-# axs[0].set_ylabel('amplitude')
+axs[1].set_title('CUDA Trajectory')
+axs[1].plot(gpuTrajectory[0], gpuTrajectory[1])
+axs[1].set_xlabel('time (s)')
+axs[1].set_ylabel('amplitude')
 
-# axs[1].set_title('CUDA Trajectory')
-# axs[1].plot(gpuTrajectory[0], gpuTrajectory[2])
-# axs[1].set_xlabel('time (s)')
-# axs[1].set_ylabel('amplitude')
+axs[2].set_title('Error')
+axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[1]-cppTrajectory[:,0]))
+axs[2].set_xlabel('time (s)')
+axs[2].set_ylabel('amplitude')
 
-# axs[2].set_title('Error')
-# axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[2]-cppTrajectory[:,1]))
-# axs[2].set_xlabel('time (s)')
-# axs[2].set_ylabel('amplitude')
-# plt.show()   
+fig, axs = plt.subplots(3, constrained_layout=True)
+fig.suptitle('String cantilever trajectory', fontsize=16)
+axs[0].set_title('CPP Trajectory')
+axs[0].plot(gpuTrajectory[0], cppTrajectory[:,1])
+axs[0].set_xlabel('time (s)')
+axs[0].set_ylabel('amplitude')
+
+axs[1].set_title('CUDA Trajectory')
+axs[1].plot(gpuTrajectory[0], gpuTrajectory[2])
+axs[1].set_xlabel('time (s)')
+axs[1].set_ylabel('amplitude')
+
+axs[2].set_title('Error')
+axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[2]-cppTrajectory[:,1]))
+axs[2].set_xlabel('time (s)')
+axs[2].set_ylabel('amplitude')
+plt.show()   

@@ -793,8 +793,9 @@
                                 CUDA_R_32F, 
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
-
-    SpTdV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
+    
+    uint nThreads = min(max(Lambda->nzz,Gamma->nzz), 512);
+    SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
                                                         Gamma->d_slice,
                                                         Gamma->d_row, 
                                                         Gamma->d_col,
@@ -1401,11 +1402,12 @@
                                        bwd_Gamma->extendTheSystem(parallelismThroughExcitations), 
                                        bwd_Lambda->extendTheSystem(parallelismThroughExcitations),
                                        bwd_Psi->extendTheSystem(parallelismThroughExcitations), 
-                                       bwd_ForcePattern->extendTheSystem(parallelismThroughExcitations),
-                                       extendTheVector(h_bwd_QinitCond, parallelismThroughExcitations)};
+                                       bwd_ForcePattern->extendTheSystem(parallelismThroughExcitations-1),
+                                       extendTheVector(h_bwd_QinitCond, parallelismThroughExcitations-1)};
 
     // Checking that each system is of the same size
     for(uint i = 0; i < dofChecking.size(); i++){
+      // std::cout<<"Dof checking ["<<i<<"]: "<<dofChecking[i]<<std::endl;
       if(dofChecking[i] != dofChecking[0]){
         std::cout << "[Error] __GpuDriver: The number of DOFs is not the same for all System matrix after system extension." << std::endl;
       }
