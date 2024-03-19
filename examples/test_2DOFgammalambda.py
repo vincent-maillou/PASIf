@@ -9,7 +9,7 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=True
+USE_SOUND_FILE=False
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -142,15 +142,15 @@ stop = time.time()
 print(f'Total getAmplitude() time: {stop-start} s')
 print("Probes amplitudes: ", amplitudes)
 
-start = time.time()
-gpuTrajectory = cudaEnvironment.getTrajectories(vecSystem, saveSteps_=1)
-stop = time.time()
-print(f'Total getTrajectory() time: {stop-start} s')
+# start = time.time()
+# gpuTrajectory = cudaEnvironment.getTrajectories(vecSystem, saveSteps_=1)
+# stop = time.time()
+# print(f'Total getTrajectory() time: {stop-start} s')
 
-start = time.time()
-gpuGrad = cudaEnvironment.getGradients([system])
-stop = time.time()
-print(f'Total getGradients() time: {stop-start} s')
+# start = time.time()
+# gpuGrad = cudaEnvironment.getGradients([system])
+# stop = time.time()
+# print(f'Total getGradients() time: {stop-start} s')
 
 # cpp_stringCantileverProbeEnergy = round(cppTrajectory[-1, -1], 20)
 # gpu_stringCantileverProbeEnergy = round(amplitudes[0][0], 20)

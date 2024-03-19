@@ -19,59 +19,48 @@
  * 
  */
  __global__
- void SpT3dV(reel *d_val, 
-             uint *d_slice,
-             uint *d_row, 
-             uint *d_col,
-             uint  nzz,
-             uint ntimes,
-             uint n0,
-             uint n1,
-             uint n2,
-             reel* X1,
-             reel* X2, 
-             reel* Y){
-
+ void SpTdV(reel *d_val_G, 
+            uint *d_slice_G, 
+            uint *d_row_G, 
+            uint *d_col_G, 
+            uint  nzz_G,
+            reel *d_val_L, 
+            uint *d_hyperslice_L, 
+            uint *d_slice_L, 
+            uint *d_row_L, 
+            uint *d_col_L, 
+            uint  nzz_L,
+            uint ntimes,
+            uint n0,
+            uint nlast,
+            reel* X1,
+            reel* X2,
+            reel* X3,
+            reel* Y){
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
 
-  for(uint l=0; l<ntimes; l+=1){
-    for(uint k = index; k < nzz; k += stride){
-      atomicAdd(&Y[d_slice[k]+l*n0], d_val[k] * X1[d_row[k]+l*n1] * X2[d_col[k]+l*n2]);
+  for(uint k = index; k <nzz_G; k += stride){
+    uint slice_idx = d_slice_G[k];
+    reel val = d_val_G[k];
+    uint row_idx = d_row_G[k];
+    uint col_idx = d_col_G[k];
+
+    for(uint l=0; l<ntimes; l+=1){
+      atomicAdd(&Y[slice_idx+l*n0], val*X1[row_idx+l*n0] * X2[col_idx+l*nlast]);
     }
   }
- }
 
+  for(uint k = index; k <nzz_L; k += stride){
+    uint hyperslice_idx = d_hyperslice_L[k];
+    uint slice_idx = d_slice_L[k];
+    reel val = d_val_L[k];
+    uint row_idx = d_row_L[k];
+    uint col_idx = d_col_L[k];
 
-
- /** SpT4dV()
- * @brief Perform the coo sparse tensor 4d - dense vector multiplication (order 3)
- * 
- */
- __global__
- void SpT4dV(reel *d_val,
-             uint *d_hyperslice, 
-             uint *d_slice, 
-             uint *d_row, 
-             uint *d_col, 
-             uint  nzz,
-             uint ntimes,
-             uint n0,
-             uint n1,
-             uint n2,
-             uint n3,
-             reel* X1,
-             reel* X2,
-             reel* X3, 
-             reel* Y){
-
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint l=0; l<ntimes; l+=1){
-    for(uint k = index; k < nzz; k += stride){
-      atomicAdd(&Y[d_hyperslice[k]+l*n0], d_val[k] * X1[d_slice[k]+l*n1] * X2[d_row[k]+l*n2] * X3[d_col[k]+l*n3]);
+    for(uint l=0; l<ntimes; l+=1){
+      atomicAdd(&Y[hyperslice_idx+l*n0], val* X1[slice_idx+l*n0] * X2[row_idx+l*n0] * X3[col_idx+l*nlast]);
     }
   }
  }
@@ -90,7 +79,7 @@
              uint *d_row, 
              uint *d_col, 
              uint  nzz,
-            uint ntimes,
+             uint ntimes,
              uint n0,
              uint n1,
              uint n2,
@@ -105,8 +94,8 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint l=0; l<ntimes; l+=1){
-    for(uint k = index; k < nzz; k += stride){
+  for(uint k = index; k < nzz; k += stride){
+      for(uint l=0; l<ntimes; l+=1){
       atomicAdd(&Y[d_hyperhyperslice[k]+l*n0], d_val[k] * X1[d_hyperslice[k]+l*n1] * X2[d_slice[k]+l*n2] * X3[d_row[k]+l*n3] * X4[d_col[k]+l*n4]);
     }
   }

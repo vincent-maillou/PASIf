@@ -171,7 +171,7 @@
                                         n[0], 
                                         d_vec, 
                                         CUDA_R_32F,
-                                        CUSPARSE_ORDER_COL) )
+                                        CUSPARSE_ORDER_COL) );
       
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) );
       CHECK_CUDA( cudaMalloc((void**)&d_beta,  sizeof(reel)) );
@@ -187,6 +187,18 @@
                                               CUDA_R_32F, 
                                               CUSPARSE_SPMM_CSR_ALG1, 
                                               &bufferSize) )
+
+      CHECK_CUSPARSE(cusparseSpMM_preprocess(handle,
+                                            CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                            CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                            &d_alpha,
+                                            sparseMat_desc,
+                                            denseMat_desc,
+                                            &d_beta,
+                                            resMat_desc,
+                                            CUDA_R_32F,
+                                            CUSPARSE_SPMM_CSR_ALG1,
+                                            &d_buffer));
 
       CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
     }

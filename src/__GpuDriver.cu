@@ -584,6 +584,7 @@
     CHECK_CUDA( cudaDeviceGetAttribute(&numberOfSMs, cudaDevAttrMultiProcessorCount, deviceId) )
 
     nThreadsPerBlock = 128;
+
     nBlocks          = numberOfSMs * 32;
 
     // Spawn the streams
@@ -793,37 +794,23 @@
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
 
-    // k += Gamma.d_mi²
-    SpT3dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
-                                                         Gamma->d_slice,
-                                                         Gamma->d_row, 
-                                                         Gamma->d_col,
-                                                         Gamma->nzz,
-                                                         Gamma->ntimes,
-                                                         Gamma->n[0],
-                                                         Gamma->n[1],
-                                                         Gamma->n[2],
-                                                         pq,
-                                                         pq_fwd_state,
-                                                         pm);
-    
-    // k += Lambda.d_mi³
-    SpT4dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Lambda->d_val,
-                                                         Lambda->d_hyperslice,
-                                                         Lambda->d_slice, 
-                                                         Lambda->d_row, 
-                                                         Lambda->d_col,
-                                                         Lambda->nzz, 
-                                                         Lambda->ntimes,
-                                                         Lambda->n[0],
-                                                         Lambda->n[1],
-                                                         Lambda->n[2],
-                                                         Lambda->n[3],
-                                                         pq,
-                                                         pq_fwd_state,
-                                                         pq_fwd_state, 
-                                                         pm);
-    
+    SpTdV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
+                                                        Gamma->d_slice,
+                                                        Gamma->d_row, 
+                                                        Gamma->d_col,
+                                                        Gamma->nzz,          Lambda->d_val,
+                                                        Lambda->d_hyperslice,
+                                                        Lambda->d_slice, 
+                                                        Lambda->d_row, 
+                                                        Lambda->d_col,
+                                                        Lambda->nzz,
+                                                        Gamma->ntimes,
+                                                        Gamma->n[0],
+                                                        Gamma->n[2],
+                                                        pq,
+                                                        pq_fwd_state,
+                                                        pq_fwd_state,
+                                                        pm); 
     // // k += Psi.d_mi⁴
     if(Psi != nullptr){
       SpT5dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Psi->d_val,
