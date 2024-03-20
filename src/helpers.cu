@@ -146,7 +146,7 @@
       CHECK_CUDA( cudaMemcpy(d_res, vec.data(), ntimes*n[0]*sizeof(reel), cudaMemcpyHostToDevice) );      
 
       // Create the sparse matrix descriptor and allocate the needed buffer
-      CHECK_CUSPARSE( cusparseCreateCsr(&sparseMat_desc, 
+      CHECK_CUSPARSE( cusparseCreateConstCsr(&sparseMat_desc, 
                                         n[0], 
                                         n[1], 
                                         nzz, 
@@ -189,6 +189,8 @@
                                               CUSPARSE_SPMM_CSR_ALG1, 
                                               &bufferSize) )
 
+      CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
+
       CHECK_CUSPARSE(cusparseSpMM_preprocess(handle,
                                             CUSPARSE_OPERATION_NON_TRANSPOSE,
                                             CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -199,9 +201,9 @@
                                             resMat_desc,
                                             CUDA_R_32F,
                                             CUSPARSE_SPMM_CSR_ALG1,
-                                            &d_buffer));
+                                            d_buffer));
 
-      CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
+
     }
 
     size_t CSRMatrix::memFootprint(){

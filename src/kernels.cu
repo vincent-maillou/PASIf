@@ -51,18 +51,19 @@
       k += 512;//in case there are more non zero elements than thread possibles
     }
   }
+  k = threadIdx.x;
 
-    while (k <nzz_L){
-      uint hyperslice_idx = d_hyperslice_L[k];
-      uint slice_idx = d_slice_L[k];
-      reel val = d_val_L[k];
-      uint row_idx = d_row_L[k];
-      uint col_idx = d_col_L[k];
-      if(l<ntimes){
-        atomicAdd(&Y[hyperslice_idx+l*n0], __fmul_rn(__fmul_rn(__fmul_rn(val, X1[slice_idx+l*n0]), X2[row_idx+l*n0]), X3[col_idx+l*nlast]));
-      }
-      k+= 512;
+  while (k <nzz_L){
+    uint hyperslice_idx = d_hyperslice_L[k];
+    uint slice_idx = d_slice_L[k];
+    reel val = d_val_L[k];
+    uint row_idx = d_row_L[k];
+    uint col_idx = d_col_L[k];
+    if(l<ntimes){
+      atomicAdd(&Y[hyperslice_idx+l*n0], __fmul_rn(__fmul_rn(__fmul_rn(val, X1[slice_idx+l*n0]), X2[row_idx+l*n0]), X3[col_idx+l*nlast]));
     }
+    k+= 512;
+  }
 
  }
 

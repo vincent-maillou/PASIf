@@ -9,7 +9,7 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=False
+USE_SOUND_FILE=True
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:

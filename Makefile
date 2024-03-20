@@ -1,7 +1,7 @@
 NVCC := nvcc
-NVCCFLAGS := -std=c++11 -O3 -g -arch=sm_86 -Xcompiler -Wall
+NVCCFLAGS := -std=c++11 -O3 -g -arch=sm_86 -Xcompiler -Wall #-lineinfo
 NVCCLIB := -lcublas -lcusparse
-NVCCINCLUDE := -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/compilers/bin -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/math_libs/lib64
+NVCCINCLUDE := -I/usr/local/cuda-12.3/bin -L/usr/local/cuda-12.3/lib64/
 
 PYBIND11 := -I/usr/include/python3.10 -Iextern/pybind11/include
 

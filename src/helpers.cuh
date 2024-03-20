@@ -45,6 +45,7 @@ enum problemType {forward, backward};
       if (status != cudaSuccess) {                                               \
           printf("CUDA API failed at line %d in %s with error: %s (%d)\n",             \
                 __LINE__, __FILE__, cudaGetErrorString(status), status);                   \
+            std::exit(0);                \
       }                                                                          \
   }
 
@@ -108,7 +109,7 @@ enum problemType {forward, backward};
 
     cusparseDnMatDescr_t denseMat_desc;
     cusparseDnMatDescr_t resMat_desc;
-    cusparseSpMatDescr_t sparseMat_desc;
+    cusparseConstSpMatDescr_t sparseMat_desc;
     void*  d_buffer;
     size_t bufferSize;
 
