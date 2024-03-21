@@ -45,29 +45,33 @@
             reel* Y){
       
     uint k = threadIdx.x;
+    //K is the index of the non-linear element
     uint l = blockIdx.x;
+    //l is the index of the execitation
 
+    //index variables
     uint hyperhyperslice_idx = 0;
     uint hyperslice_idx = 0;
     uint slice_idx = 0;
     reel val = 0;
     uint row_idx = 0;
     uint col_idx = 0;
-    int shift = 0;
+    int shift = l*n0;
 
     //Tensor 3D element
-    while (k <nzz_G){
+    while (k <nzz_G){//While pointing to a tensor elemnt
       slice_idx = d_slice_G[k];
       val = d_val_G[k];
       row_idx = d_row_G[k];
       col_idx = d_col_G[k];
-      if(l<ntimes){
-        shift = l*n0;
-        atomicAdd(&Y[slice_idx+shift], __fmul_rn(__fmul_rn(val, X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
-      k += 512;//in case there are more non zero elements than thread possibles
+      //getting C00 indexes
+      atomicAdd(&Y[slice_idx+shift], __fmul_rn(__fmul_rn(val, X0[row_idx+shift]), Xlast[col_idx+l*nlast]));//Tensor contraction
+      k += blockDim.x;//in case there are more non zero elements than thread possibles
     }
-  }
-  k = threadIdx.x;
+
+  k = blockDim.x - threadIdx.x;
+  //For the 4D tensor we start from the back
+  //This avoids the first few threads to take care of all non linear elements
 
   //Tensor 4D element
   while (k <nzz_L){
@@ -76,13 +80,12 @@
     val = d_val_L[k];
     row_idx = d_row_L[k];
     col_idx = d_col_L[k];
-    if(l<ntimes){
-      atomicAdd(&Y[hyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
-    }
-    k+= 512;
+    atomicAdd(&Y[hyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
+    k+= blockDim.x;
   }
 
-  k = threadIdx.x;
+  k = threadIdx.x+nzz_G;
+  //For Psi we start in the middle, with an offset
 
   //Tensor 5D element
   while (k <nzz_P){
@@ -95,7 +98,7 @@
     if(l<ntimes){
       atomicAdd(&Y[hyperhyperslice_idx+shift], __fmul_rn(X0[hyperhyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast])));
     }
-    k+= 512;
+    k+= blockDim.x;
   }
  }
 

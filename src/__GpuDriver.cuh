@@ -111,9 +111,9 @@ class __GpuDriver{
                uint m,
                uint startSetpoint);                        
 
-  void derivatives(cusparseDnVecDescr_t m_desc, 
-                   cusparseDnVecDescr_t q_desc,
-                   reel*                pq_fwd_state, 
+  void derivatives(reel* pm, 
+                   reel* pq,
+                   reel* pq_fwd_state, 
                    uint k, 
                    uint t,
                    uint i,
@@ -172,12 +172,12 @@ class __GpuDriver{
   std::vector<reel>* h_QinitCond; 
   reel*              d_QinitCond; 
   
-  reel* d_Q;  cusparseDnVecDescr_t d_Q_desc;
-  reel* d_mi; cusparseDnVecDescr_t d_mi_desc;
-  reel* d_m1; cusparseDnVecDescr_t d_m1_desc;
-  reel* d_m2; cusparseDnVecDescr_t d_m2_desc;
-  reel* d_m3; cusparseDnVecDescr_t d_m3_desc;
-  reel* d_m4; cusparseDnVecDescr_t d_m4_desc;
+  reel* d_Q;
+  reel* d_mi;
+  reel* d_m1;
+  reel* d_m2;
+  reel* d_m3;
+  reel* d_m4;
 
   void setComputeSystem(problemType type_);
   void resetStatesVectors();
@@ -197,12 +197,12 @@ class __GpuDriver{
   std::vector<reel> h_fwd_QinitCond; 
   reel*             d_fwd_QinitCond; 
   
-  reel* d_fwd_Q;  cusparseDnVecDescr_t d_fwd_Q_desc;
-  reel* d_fwd_mi; cusparseDnVecDescr_t d_fwd_mi_desc;
-  reel* d_fwd_m1; cusparseDnVecDescr_t d_fwd_m1_desc;
-  reel* d_fwd_m2; cusparseDnVecDescr_t d_fwd_m2_desc;
-  reel* d_fwd_m3; cusparseDnVecDescr_t d_fwd_m3_desc;
-  reel* d_fwd_m4; cusparseDnVecDescr_t d_fwd_m4_desc;
+  reel* d_fwd_Q;
+  reel* d_fwd_mi;
+  reel* d_fwd_m1;
+  reel* d_fwd_m2;
+  reel* d_fwd_m3;
+  reel* d_fwd_m4;
 
   void  allocateDeviceSystem();
   void  allocateDeviceSystemStatesVector();
@@ -229,12 +229,12 @@ class __GpuDriver{
   std::vector<reel> h_bwd_QinitCond; 
   reel*             d_bwd_QinitCond; 
   
-  reel* d_bwd_Q;  cusparseDnVecDescr_t d_bwd_Q_desc;
-  reel* d_bwd_mi; cusparseDnVecDescr_t d_bwd_mi_desc;
-  reel* d_bwd_m1; cusparseDnVecDescr_t d_bwd_m1_desc;
-  reel* d_bwd_m2; cusparseDnVecDescr_t d_bwd_m2_desc;
-  reel* d_bwd_m3; cusparseDnVecDescr_t d_bwd_m3_desc;
-  reel* d_bwd_m4; cusparseDnVecDescr_t d_bwd_m4_desc;
+  reel* d_bwd_Q;
+  reel* d_bwd_mi;
+  reel* d_bwd_m1;
+  reel* d_bwd_m2;
+  reel* d_bwd_m3;
+  reel* d_bwd_m4;
 
   void  allocateDeviceAdjointSystem();
   void  allocateDeviceAdjointStatesVector();
@@ -282,6 +282,7 @@ class __GpuDriver{
   int  numberOfSMs;
   uint nBlocks;
   uint nThreadsPerBlock;
+  uint maxThreads;
 
   cublasHandle_t   h_cublas;
   cusparseHandle_t h_cusparse;

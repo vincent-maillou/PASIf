@@ -128,9 +128,7 @@
    * @brief Construct a new CSRMatrix::allocateOnGPU object
    * 
    */
-    void CSRMatrix::allocateOnGPU(cusparseHandle_t     & handle, 
-                                  cusparseDnVecDescr_t & vecX, 
-                                  cusparseDnVecDescr_t & vecY){
+    void CSRMatrix::allocateOnGPU(cusparseHandle_t     & handle){
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_indices, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_indptr, (n[0]+1)*sizeof(uint)) );

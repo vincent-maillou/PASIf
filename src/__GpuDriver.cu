@@ -54,12 +54,12 @@
         h_QinitCond(nullptr),
         d_QinitCond(nullptr),
 
-        d_Q(nullptr),  d_Q_desc(NULL),
-        d_mi(nullptr), d_mi_desc(NULL),
-        d_m1(nullptr), d_m1_desc(NULL),
-        d_m2(nullptr), d_m2_desc(NULL),
-        d_m3(nullptr), d_m3_desc(NULL),
-        d_m4(nullptr), d_m4_desc(NULL),
+        d_Q(nullptr),
+        d_mi(nullptr),
+        d_m1(nullptr),
+        d_m2(nullptr),
+        d_m3(nullptr),
+        d_m4(nullptr),
 
 
         //            Forward system related data
@@ -73,12 +73,12 @@
 
         d_fwd_QinitCond(nullptr),
 
-        d_fwd_Q(nullptr),  d_fwd_Q_desc(NULL),
-        d_fwd_mi(nullptr), d_fwd_mi_desc(NULL),
-        d_fwd_m1(nullptr), d_fwd_m1_desc(NULL),
-        d_fwd_m2(nullptr), d_fwd_m2_desc(NULL),
-        d_fwd_m3(nullptr), d_fwd_m3_desc(NULL),
-        d_fwd_m4(nullptr), d_fwd_m4_desc(NULL),
+        d_fwd_Q(nullptr),
+        d_fwd_mi(nullptr),
+        d_fwd_m1(nullptr),
+        d_fwd_m2(nullptr),
+        d_fwd_m3(nullptr),
+        d_fwd_m4(nullptr),
 
 
         //            Adjoint system related data
@@ -92,12 +92,12 @@
 
         d_bwd_QinitCond(nullptr),
 
-        d_bwd_Q(nullptr),  d_bwd_Q_desc(NULL),
-        d_bwd_mi(nullptr), d_bwd_mi_desc(NULL),
-        d_bwd_m1(nullptr), d_bwd_m1_desc(NULL),
-        d_bwd_m2(nullptr), d_bwd_m2_desc(NULL),
-        d_bwd_m3(nullptr), d_bwd_m3_desc(NULL),
-        d_bwd_m4(nullptr), d_bwd_m4_desc(NULL),
+        d_bwd_Q(nullptr),
+        d_bwd_mi(nullptr),
+        d_bwd_m1(nullptr),
+        d_bwd_m2(nullptr),
+        d_bwd_m3(nullptr),
+        d_bwd_m4(nullptr),
 
 
         //            Interpolation related data
@@ -129,6 +129,7 @@
         numberOfSMs(0),
         nBlocks(0),
         nThreadsPerBlock(0),
+        maxThreads(512),
 
         h_cublas(nullptr),
         h_cusparse(nullptr)
@@ -680,22 +681,22 @@
 
 
     // Compute the derivatives
-    derivatives(d_m1_desc, d_Q_desc, nullptr, k, t, i, m);
+    derivatives(d_m1, d_Q, nullptr, k, t, i, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2_desc, d_mi_desc, nullptr, k, t, i+1, m);
+    derivatives(d_m2, d_mi, nullptr, k, t, i+1, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3_desc, d_mi_desc, nullptr, k, t, i+1, m);
+    derivatives(d_m3, d_mi, nullptr, k, t, i+1, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4_desc, d_mi_desc, nullptr, k, t, i+2, m);
+    derivatives(d_m4, d_mi, nullptr, k, t, i+2, m);
 
     // Compute next state vector Q
-    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+    integrate<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
   }
 
   void __GpuDriver::backwardRungeKutta(uint  tStart_, 
@@ -752,41 +753,33 @@
                             uint currentSetpoint){
 
     // Compute the derivatives
-    derivatives(d_m1_desc, d_Q_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i, m);
+    derivatives(d_m1, d_Q, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+    derivatives(d_m2, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+    derivatives(d_m3, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
 
-      updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4_desc, d_mi_desc, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-2, m);
+    derivatives(d_m4, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-2, m);
 
     // Compute next state vector Q
-    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+    integrate<<<nBlocks, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
 
   }
 
-  inline void __GpuDriver::derivatives(cusparseDnVecDescr_t m_desc, 
-                                       cusparseDnVecDescr_t q_desc,
-                                       reel*                pq_fwd_state, 
+  inline void __GpuDriver::derivatives(reel* pm, 
+                                       reel* pq,
+                                       reel* pq_fwd_state, 
                                        uint k, 
                                        uint t,
                                        uint i,
                                        uint m){
 
-    // Get the pointers from the descriptors
-    reel *pm; 
-    reel *pq;
-    //reel *pq_adjt;
-
-    CHECK_CUSPARSE( cusparseDnVecGetValues(m_desc, (void**)&pm) )
-    CHECK_CUSPARSE( cusparseDnVecGetValues(q_desc, (void**)&pq) )
-    //CHECK_CUSPARSE( cusparseDnVecGetValues(q_adjt_desc, (void**)&pq_adjt) )
     if(pq_fwd_state == nullptr){
       pq_fwd_state = pq;
     }
@@ -807,7 +800,9 @@
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
     
-    uint nThreads = min(max(Lambda->nzz,Gamma->nzz), 512);
+    uint nThreads = min(Lambda->nzz+Gamma->nzz+Psi->nzz, maxThreads);
+    //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
+    //Then each thread is made for one file and one (or more) non linear element
     SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
                                                         Gamma->d_slice,
                                                         Gamma->d_row, 
@@ -1058,12 +1053,12 @@
       h_QinitCond  = &h_fwd_QinitCond;
       d_QinitCond  = d_fwd_QinitCond;
 
-      d_Q  = d_fwd_Q;  d_Q_desc  = d_fwd_Q_desc;
-      d_mi = d_fwd_mi; d_mi_desc = d_fwd_mi_desc;
-      d_m1 = d_fwd_m1; d_m1_desc = d_fwd_m1_desc;
-      d_m2 = d_fwd_m2; d_m2_desc = d_fwd_m2_desc;
-      d_m3 = d_fwd_m3; d_m3_desc = d_fwd_m3_desc;
-      d_m4 = d_fwd_m4; d_m4_desc = d_fwd_m4_desc;
+      d_Q  = d_fwd_Q;
+      d_mi = d_fwd_mi;
+      d_m1 = d_fwd_m1;
+      d_m2 = d_fwd_m2;
+      d_m3 = d_fwd_m3;
+      d_m4 = d_fwd_m4;
 
       // Set the initial conditions to the states vectors
       // resetStatesVectors();
@@ -1081,12 +1076,12 @@
       h_QinitCond  = &h_bwd_QinitCond;
       d_QinitCond  = d_bwd_QinitCond;
 
-      d_Q  = d_bwd_Q;  d_Q_desc  = d_bwd_Q_desc;
-      d_mi = d_bwd_mi; d_mi_desc = d_bwd_mi_desc;
-      d_m1 = d_bwd_m1; d_m1_desc = d_bwd_m1_desc;
-      d_m2 = d_bwd_m2; d_m2_desc = d_bwd_m2_desc;
-      d_m3 = d_bwd_m3; d_m3_desc = d_bwd_m3_desc;
-      d_m4 = d_bwd_m4; d_m4_desc = d_bwd_m4_desc;
+      d_Q  = d_bwd_Q;
+      d_mi = d_bwd_mi;
+      d_m1 = d_bwd_m1;
+      d_m2 = d_bwd_m2;
+      d_m3 = d_bwd_m3;
+      d_m4 = d_bwd_m4;
 
       // Set the initial conditions to the states vectors
       resetStatesVectors();
@@ -1184,9 +1179,7 @@
 /*                    Forward system private methods                    */
   void __GpuDriver::allocateDeviceSystem(){
 
-    fwd_K->allocateOnGPU(h_cusparse, 
-                         d_fwd_mi_desc, 
-                         d_fwd_Q_desc);
+    fwd_K->allocateOnGPU(h_cusparse);
 
     fwd_Gamma->allocateOnGPU();
 
@@ -1206,19 +1199,13 @@
     
     // Copy the device QinitCond initial conditions vector to Q device vector
     CHECK_CUDA( cudaMemcpy(d_fwd_Q, d_fwd_QinitCond, n_dofs_fwd*sizeof(reel), cudaMemcpyDeviceToDevice) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_Q_desc, n_dofs_fwd, d_fwd_Q, CUDA_R_32F) )
 
     CHECK_CUDA( cudaMalloc((void**)&d_fwd_mi, n_dofs_fwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_mi_desc, n_dofs_fwd, d_fwd_mi, CUDA_R_32F) )
     
     CHECK_CUDA( cudaMalloc((void**)&d_fwd_m1, n_dofs_fwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_m1_desc, n_dofs_fwd, d_fwd_m1, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_fwd_m2, n_dofs_fwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_m2_desc, n_dofs_fwd, d_fwd_m2, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_fwd_m3, n_dofs_fwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_m3_desc, n_dofs_fwd, d_fwd_m3, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_fwd_m4, n_dofs_fwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_fwd_m4_desc, n_dofs_fwd, d_fwd_m4, CUDA_R_32F) )
   }
 
   void __GpuDriver::extendSystem(){
@@ -1370,9 +1357,7 @@
 /*                    Adjoint system private methods                    */
 
   void __GpuDriver::allocateDeviceAdjointSystem(){
-    bwd_K->allocateOnGPU(h_cusparse, 
-                         d_bwd_mi_desc, 
-                         d_bwd_Q_desc);
+    bwd_K->allocateOnGPU(h_cusparse);
 
     bwd_Gamma->allocateOnGPU();
 
@@ -1392,19 +1377,13 @@
     
     // Copy the device QinitCond initial conditions vector to Q device vector
     CHECK_CUDA( cudaMemcpy(d_bwd_Q, d_bwd_QinitCond, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToDevice) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_Q_desc, n_dofs_bwd, d_bwd_Q, CUDA_R_32F) )
 
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_mi, n_dofs_bwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_mi_desc, n_dofs_bwd, d_bwd_mi, CUDA_R_32F) )
-    
+  
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m1, n_dofs_bwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_m1_desc, n_dofs_bwd, d_bwd_m1, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m2, n_dofs_bwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_m2_desc, n_dofs_bwd, d_bwd_m2, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m3, n_dofs_bwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_m3_desc, n_dofs_bwd, d_bwd_m3, CUDA_R_32F) )
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m4, n_dofs_bwd*sizeof(reel)) )
-    CHECK_CUSPARSE( cusparseCreateDnVec(&d_bwd_m4_desc, n_dofs_bwd, d_bwd_m4, CUDA_R_32F) )
   }
 
   void __GpuDriver::extendAdjoint(){

@@ -82,9 +82,7 @@ enum problemType {forward, backward};
     ~CSRMatrix();
 
     uint   extendTheSystem(uint nTimes);
-    void   allocateOnGPU(cusparseHandle_t     & handle, 
-                         cusparseDnVecDescr_t & vecX, 
-                         cusparseDnVecDescr_t & vecY);
+    void   allocateOnGPU(cusparseHandle_t     & handle);
     size_t memFootprint();
 
     
