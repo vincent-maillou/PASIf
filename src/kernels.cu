@@ -28,81 +28,76 @@
             uint *d_hyperslice_L, 
             uint *d_slice_L, 
             uint *d_row_L, 
-            uint *d_col_L, 
-            uint  nzz_L,
+            uint *d_col_L,
+            uint nzz_L,
+            reel *d_val_P,
+            uint *d_hyperhyperslice_P,
+            uint *d_hyperslice_P, 
+            uint *d_slice_P, 
+            uint *d_row_P, 
+            uint *d_col_P,
+            uint  nzz_P,
             uint ntimes,
             uint n0,
             uint nlast,
-            reel* X1,
-            reel* X2,
-            reel* X3,
+            reel* X0,
+            reel* Xlast,
             reel* Y){
       
     uint k = threadIdx.x;
     uint l = blockIdx.x;
 
+    uint hyperhyperslice_idx = 0;
+    uint hyperslice_idx = 0;
+    uint slice_idx = 0;
+    reel val = 0;
+    uint row_idx = 0;
+    uint col_idx = 0;
+    int shift = 0;
+
+    //Tensor 3D element
     while (k <nzz_G){
-      uint slice_idx = d_slice_G[k];
-      reel val = d_val_G[k];
-      uint row_idx = d_row_G[k];
-      uint col_idx = d_col_G[k];
+      slice_idx = d_slice_G[k];
+      val = d_val_G[k];
+      row_idx = d_row_G[k];
+      col_idx = d_col_G[k];
       if(l<ntimes){
-        atomicAdd(&Y[slice_idx+l*n0], __fmul_rn(__fmul_rn(val, X1[row_idx+l*n0]), X2[col_idx+l*nlast]));
+        shift = l*n0;
+        atomicAdd(&Y[slice_idx+shift], __fmul_rn(__fmul_rn(val, X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
       k += 512;//in case there are more non zero elements than thread possibles
     }
   }
   k = threadIdx.x;
 
+  //Tensor 4D element
   while (k <nzz_L){
-    uint hyperslice_idx = d_hyperslice_L[k];
-    uint slice_idx = d_slice_L[k];
-    reel val = d_val_L[k];
-    uint row_idx = d_row_L[k];
-    uint col_idx = d_col_L[k];
+    hyperslice_idx = d_hyperslice_L[k];
+    slice_idx = d_slice_L[k];
+    val = d_val_L[k];
+    row_idx = d_row_L[k];
+    col_idx = d_col_L[k];
     if(l<ntimes){
-      atomicAdd(&Y[hyperslice_idx+l*n0], __fmul_rn(__fmul_rn(__fmul_rn(val, X1[slice_idx+l*n0]), X2[row_idx+l*n0]), X3[col_idx+l*nlast]));
+      atomicAdd(&Y[hyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
     }
     k+= 512;
   }
 
- }
+  k = threadIdx.x;
 
-
-
-/** SpT5dV()
- * @brief Perform the coo sparse tensor 5d - dense vector multiplication (order 4).
- * 
- */
- __global__
- void SpT5dV(reel *d_val,
-             uint *d_hyperhyperslice,
-             uint *d_hyperslice, 
-             uint *d_slice, 
-             uint *d_row, 
-             uint *d_col, 
-             uint  nzz,
-             uint ntimes,
-             uint n0,
-             uint n1,
-             uint n2,
-             uint n3,
-             uint n4,
-             reel* X1,
-             reel* X2,
-             reel* X3,  
-             reel* X4,  
-             reel* Y){
-
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint k = index; k < nzz; k += stride){
-      for(uint l=0; l<ntimes; l+=1){
-      atomicAdd(&Y[d_hyperhyperslice[k]+l*n0], d_val[k] * X1[d_hyperslice[k]+l*n1] * X2[d_slice[k]+l*n2] * X3[d_row[k]+l*n3] * X4[d_col[k]+l*n4]);
+  //Tensor 5D element
+  while (k <nzz_P){
+    hyperhyperslice_idx = d_hyperhyperslice_P[k];
+    hyperslice_idx = d_hyperslice_P[k];
+    slice_idx = d_slice_P[k];
+    val = d_val_P[k];
+    row_idx = d_row_P[k];
+    col_idx = d_col_P[k];
+    if(l<ntimes){
+      atomicAdd(&Y[hyperhyperslice_idx+shift], __fmul_rn(X0[hyperhyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast])));
     }
+    k+= 512;
   }
  }
-
 
 
 /** applyForces()

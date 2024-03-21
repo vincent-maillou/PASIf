@@ -261,6 +261,8 @@ class PASIf(__GpuDriver):
         self._setFwdLambda(self.system_Lambda.dimensions,
                            self.system_Lambda.val,
                            self.system_Lambda.indices)
+
+        self._setFwdPsi([1]*5, [], [])
         self._setFwdForcePattern(self.system_forcePattern)
         self._setFwdInitialConditions(self.system_initialConditions)
         self.systemSet = True

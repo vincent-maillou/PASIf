@@ -28,44 +28,22 @@
             uint *d_hyperslice_L, 
             uint *d_slice_L, 
             uint *d_row_L, 
-            uint *d_col_L, 
-            uint  nzz_L,
+            uint *d_col_L,
+            uint nzz_L,
+            reel *d_val_P,
+            uint *hyperhyperslice_P,
+            uint *d_hyperslice_P, 
+            uint *d_slice_P, 
+            uint *d_row_P, 
+            uint *d_col_P,
+            uint  nzz_P,
             uint ntimes,
             uint n0,
             uint nlast,
-            reel* X1,
-            reel* X2,
-            reel* X3,
+            reel* X0,
+            reel* Xlast,
             reel* Y);
 
-
-
-
-
-
-/** SpT5dV()
- * @brief Perform the coo sparse tensor 5d - dense vector multiplication (order 4).
- * 
- */
- __global__
- void SpT5dV(reel *d_val,
-             uint *d_hyperhyperslice,
-             uint *d_hyperslice, 
-             uint *d_slice, 
-             uint *d_row, 
-             uint *d_col, 
-             uint  nzz,
-             uint ntimes,
-             uint n0,
-             uint n1,
-             uint n2,
-             uint n3,
-             uint n4,
-             reel* X1,
-             reel* X2,
-             reel* X3,  
-             reel* X4,  
-             reel* Y);
 
 
 

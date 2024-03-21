@@ -202,8 +202,6 @@
                                             CUDA_R_32F,
                                             CUSPARSE_SPMM_CSR_ALG1,
                                             d_buffer));
-
-
     }
 
     size_t CSRMatrix::memFootprint(){

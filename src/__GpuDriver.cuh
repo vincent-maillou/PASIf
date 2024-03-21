@@ -39,6 +39,9 @@ class __GpuDriver{
   void _setFwdLambda(std::array<uint, 4> n_,
                      std::vector<reel>   values_,
                      std::vector<uint>   indices_);
+  void _setFwdPsi(std::array<uint, 5> n_,
+                     std::vector<reel>   values_,
+                     std::vector<uint>   indices_);
   void _setFwdForcePattern(std::vector<reel> & forcePattern_);
   void _setFwdInitialConditions(std::vector<reel> & initialConditions_);
   
@@ -187,6 +190,8 @@ class __GpuDriver{
   CSRMatrix*   fwd_K;
   COOTensor3D* fwd_Gamma;
   COOTensor4D* fwd_Lambda;
+  COOTensor5D* fwd_Psi;
+
   COOVector*   fwd_ForcePattern;
 
   std::vector<reel> h_fwd_QinitCond; 
@@ -206,6 +211,7 @@ class __GpuDriver{
   void  clearFwdK();
   void  clearFwdGamma();
   void  clearFwdLambda();
+  void  clearFwdPsi();
   void  clearFwdForcePattern();
   void  clearFwdInitialConditions();
   void  clearSystemStatesVector();

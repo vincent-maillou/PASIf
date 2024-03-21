@@ -68,6 +68,7 @@
         fwd_K(nullptr),
         fwd_Gamma(nullptr),
         fwd_Lambda(nullptr),
+        fwd_Psi(nullptr),
         fwd_ForcePattern(nullptr),
 
         d_fwd_QinitCond(nullptr),
@@ -159,6 +160,7 @@
     clearFwdK();
     clearFwdGamma();
     clearFwdLambda();
+    clearFwdPsi();
     clearFwdForcePattern();
     clearFwdInitialConditions();
     clearSystemStatesVector();
@@ -218,6 +220,17 @@
                                  values_,
                                  indices_);
   }
+
+  void __GpuDriver::_setFwdPsi(std::array<uint, 5> n_,
+                                  std::vector<reel>   values_,
+                                  std::vector<uint>   indices_){
+    clearFwdPsi();
+
+    fwd_Psi = new COOTensor5D(n_,
+                                 values_,
+                                 indices_);
+  }
+
 
   void __GpuDriver::_setFwdForcePattern(std::vector<reel> & forcePattern_){
     clearFwdForcePattern();
@@ -805,34 +818,19 @@
                                                         Lambda->d_row, 
                                                         Lambda->d_col,
                                                         Lambda->nzz,
+                                                        Psi->d_val,
+                                                        Psi->d_hyperhyperslice,
+                                                        Psi->d_hyperslice,
+                                                        Psi->d_slice,
+                                                        Psi->d_row,
+                                                        Psi->d_col,
+                                                        Psi->nzz,
                                                         Gamma->ntimes,
                                                         Gamma->n[0],
                                                         Gamma->n[2],
                                                         pq,
                                                         pq_fwd_state,
-                                                        pq_fwd_state,
-                                                        pm); 
-    // // k += Psi.d_mi⁴
-    if(Psi != nullptr){
-      SpT5dV<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(Psi->d_val,
-                                                           Psi->d_hyperhyperslice,
-                                                           Psi->d_hyperslice,
-                                                           Psi->d_slice, 
-                                                           Psi->d_row, 
-                                                           Psi->d_col,
-                                                           Psi->nzz,
-                                                           Psi->ntimes,
-                                                           Psi->n[0],
-                                                           Psi->n[1],
-                                                           Psi->n[2],
-                                                           Psi->n[3],
-                                                           Psi->n[4],
-                                                           pq,
-                                                           pq_fwd_state,
-                                                           pq_fwd_state, 
-                                                           pq_fwd_state, 
-                                                           pm);
-    }
+                                                        pm);
 
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
@@ -1054,7 +1052,7 @@
       K            = fwd_K;
       Gamma        = fwd_Gamma;
       Lambda       = fwd_Lambda;
-      Psi          = nullptr;
+      Psi          = fwd_Psi;
       ForcePattern = fwd_ForcePattern;
 
       h_QinitCond  = &h_fwd_QinitCond;
@@ -1194,6 +1192,8 @@
 
     fwd_Lambda->allocateOnGPU();
 
+    fwd_Psi->allocateOnGPU();
+
     fwd_ForcePattern->allocateOnGPU();
   }
 
@@ -1250,6 +1250,18 @@
       delete fwd_K;
       fwd_K = nullptr;
     }
+  }
+
+  void __GpuDriver::clearFwdPsi(){
+
+    if(Psi == fwd_Psi){
+      Psi = nullptr;
+    }
+    if(fwd_Psi != nullptr){
+      delete fwd_Psi;
+      fwd_Psi = nullptr;
+    }
+
   }
 
   void __GpuDriver::clearFwdGamma(){
