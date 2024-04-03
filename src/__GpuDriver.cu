@@ -467,14 +467,6 @@
     CHECK_CUDA( cudaMalloc((void**)&d_trajectories, h_trajectories.size()*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_trajectories, 0, h_trajectories.size()*sizeof(reel)) )
 
-    // DEBUG 
-    std::cout << "numsteps: " << numsteps << std::endl;
-    std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
-    std::cout << "numSetpoints: " << numSetpoints << std::endl;
-    std::cout << "chunkSize: " << chunkSize << std::endl;
-    std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
-    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl;
-    std::cout<<"lengthOfeachExcitation: "<<lengthOfeachExcitation<<std::endl<<std::endl;
 
     auto begin = std::chrono::high_resolution_clock::now();
     // Perform the simulations
@@ -670,11 +662,7 @@
   void __GpuDriver::fwdStep(uint t){
     // Compute the derivatives
     derivatives(d_m1, d_Q, nullptr);
-    if(t==0){
-      modterpolator(d_m1, t, false, false);
-    }else{
-      modterpolator(d_m1, t, false, false);
-    }
+    modterpolator(d_m1, t, false, false);
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
@@ -839,7 +827,7 @@
     // "currentSimulation" refers to the simulation number in the case of
     // wich multiple simulation are needed to compute the system against all
     // of the excitation file
-    uint systemStride      = n_dofs;
+    uint systemStride      = n_dofs/parallelismThroughExcitations;
     if(interpolationNumberOfPoints==0){
         if(step<lengthOfeachExcitation){
           applyForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
