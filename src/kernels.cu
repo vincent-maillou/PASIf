@@ -150,7 +150,8 @@
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
                         uint excoff,
-                        uint interpidx){
+                        uint interpidx,
+                        bool backward){
 
   // Prevent out of bound interpolation, 0 value (no force) will be used
   // in case of out of bound
@@ -158,11 +159,20 @@
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
-  for(uint k = index; k<nzz; k += stride){
-    selectedExcitation += d_indice[k]/systemStride;
-    uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
-    // Interpolate the excitations
-    Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize+interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpidx], excitationsSet[sweepStep+(excoff+1)])));
+  if(backward){
+    for(uint k = index; k<nzz; k += stride){
+      selectedExcitation += d_indice[k]/systemStride;
+      uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
+      // Interpolate the excitations
+      Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize-interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpolationWindowSize*2-interpidx], excitationsSet[sweepStep+(excoff-1)])));
+    }
+  }else{
+    for(uint k = index; k<nzz; k += stride){
+      selectedExcitation += d_indice[k]/systemStride;
+      uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
+      // Interpolate the excitations
+      Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize+interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpidx], excitationsSet[sweepStep+(excoff+1)])));
+    }
   }
  }
 

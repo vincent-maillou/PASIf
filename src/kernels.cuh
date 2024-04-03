@@ -80,7 +80,8 @@
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
                         uint excoff,
-                        uint interpidx);
+                        uint interpidx,
+                        bool backward);
 
 
 

@@ -524,14 +524,6 @@
     setComputeSystem(forward);
     forwardRungeKutta(0, numsteps, 0, chunkSize);
 
-    // DEBUG 
-    std::cout << "numsteps: " << numsteps << std::endl;
-    std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
-    std::cout << "numSetpoints: " << numSetpoints << std::endl;
-    std::cout << "chunkSize: " << chunkSize << std::endl;
-    std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
-    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl << std::endl;
-
     reel* h_fwd_setpoints = new reel[n_dofs_fwd];
     reel* h_bwd_state     = new reel[n_dofs_bwd];
     std::cout << std::setprecision(4);
@@ -540,7 +532,7 @@
     size_t endStep   = 0;
     size_t startBwdSetpoint = 0;
 
-    for(size_t setpoint(numSetpoints-1); setpoint>0; --setpoint){
+    for(size_t setpoint(numSetpoints-1); setpoint; --setpoint){
       startStep = setpoint*chunkSize;
 
       if(setpoint == numSetpoints-1){
@@ -561,7 +553,6 @@
                                 1, 
                                 d_fwd_Q, 
                                 1) )
-      
 
       setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint);
@@ -661,7 +652,7 @@
       // interpolation steps
       fwdStep(t);
 
-      if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps==1)){
+      if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps!=0)){
         //only save non interpolated steps  
         CHECK_CUBLAS( cublasScopy(h_cublas,
                                   n_dofs, 
@@ -716,25 +707,25 @@
     // Performe the rk4 steps
     for(uint t(tStart_-1); t>=tEnd_ ; --t){
 
-          if(t>(tStart_-10)){
-          CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-                                 d_trajectories + currentSetpoint*n_dofs_fwd,
-                                 n_dofs_fwd*sizeof(reel),
-                                 cudaMemcpyDeviceToHost) );
-          CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
-          std::cout << "in backward RK step: " << t <<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
+        //   if(t>(tStart_-10)){
+        //   CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+        //                          d_trajectories + currentSetpoint*n_dofs_fwd,
+        //                          n_dofs_fwd*sizeof(reel),
+        //                          cudaMemcpyDeviceToHost) );
+        //   CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
+        //   std::cout << "in backward RK step: " << t <<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
 
-          std::cout << " h_fwd_setpoints: ";
-          for(size_t j(0); j<n_dofs_fwd; ++j){
-            std::cout << h_fwd_setpoints[j] << " ";
-          }
+        //   std::cout << " h_fwd_setpoints: ";
+        //   for(size_t j(0); j<n_dofs_fwd; ++j){
+        //     std::cout << h_fwd_setpoints[j] << " ";
+        //   }
 
-          std::cout << "   h_bwd_state: ";
-          for(size_t j(0); j<n_dofs_bwd; ++j){
-            std::cout << h_bwd_state[j] << " ";
-          }
-          std::cout << std::endl;
-        }
+        //   std::cout << "   h_bwd_state: ";
+        //   for(size_t j(0); j<n_dofs_bwd; ++j){
+        //     std::cout << h_bwd_state[j] << " ";
+        //   }
+        //   std::cout << std::endl;
+        // }
 
         bwdStep(t, currentSetpoint);
         // Point to the previous state vector stored in the trajectory buffer
@@ -859,15 +850,13 @@
                                                 lengthOfeachExcitation, 
                                                 systemStride,
                                                 Y, 
-                                                step);    }
+                                                step);
         }
-    else{
+    }else{
         uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
         uint excoff((((step << 1) + (halfStep?1:0))>>2));
-        if(backward){
-          interpidx = interpolationWindowSize-1-interpidx;
-        }
-        if(excoff<lengthOfeachExcitation && excoff>0){
+        if((excoff<lengthOfeachExcitation && excoff>0 && !backward) ||
+            (excoff<lengthOfeachExcitation && excoff>1 && backward)){
           interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
                                                     (ForcePattern->d_val, 
                                                     ForcePattern->d_indice, 
@@ -879,7 +868,8 @@
                                                     d_interpolationMatrix,
                                                     interpolationWindowSize,
                                                     excoff,
-                                                    interpidx);
+                                                    interpidx,
+                                                    backward);
         }
     }
   }

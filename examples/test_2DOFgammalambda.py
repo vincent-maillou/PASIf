@@ -10,9 +10,10 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=True
-TRAJ=True
-GRAD= False
+USE_SOUND_FILE=False
+TRAJ=False
+GRAD= True
+CHAIN=True
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -72,51 +73,46 @@ system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].degreesOf
 system.interactionPotentials[f'OptoCoup_{opticalDOF}_{mechanicalDOF}'].strength.parameterized = True
 
 
-# system = spr.MechanicalSystem()
-# n_sites=2
-# k_scale_local_relative=100
-# k_scale = 10
-# gamma  = 1
-# duffing  = 10 #lambda
-# delay = .06
-# delay_per_site = delay/n_sites
-# mass = k_scale * delay_per_site**2
-# final_damping = k_scale * delay_per_site # equals sqrt(k_scale*m)
+if CHAIN:
+    system = spr.MechanicalSystem()
+    n_sites=6
+    k_scale_local_relative=100
+    k_scale = 10
+    gamma  = 1
+    duffing  = 10 #lambda
+    delay = .06
+    delay_per_site = delay/n_sites
+    mass = k_scale * delay_per_site**2
+    final_damping = k_scale * delay_per_site # equals sqrt(k_scale*m)
 
-# for i in range(n_sites): # generate chain
-#     site_name = f'dof_{i}'
-#     if i==0: site_name='oscillator'
-#     elif i==(n_sites-1): site_name='cantilever'
-#     system.degreesOfFreedom[site_name] = spr.ParametricVariable(mass)
-    
-#     # Make local stiffness for expressivity (and positive definiteness (not semi))
-#     system.interactionPotentials[f'{site_name}_K_l'] =  spr.IntegerPotential(0.5 * k_scale_local_relative*k_scale)
-#     system.interactionPotentials[f'{site_name}_K_l'].degreesOfFreedom[site_name] = 2
-#     system.interactionPotentials[f'{site_name}_K_l'].strength.parameterized = True
-#     if i != (n_sites-1) and i!=int(n_sites/2): # connect to next site
-#         name_dof_2 = f'dof_{i+1}' if i!=(n_sites-2) else 'cantilever'
-#         hf.makeLinearCoupling(system, site_name, name_dof_2, 
-#                         k_scale)
-#         system.interactionPotentials[f'LinCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
-#     elif i != (n_sites-1):
+    for i in range(n_sites): # generate chain
+        site_name = f'dof_{i}'
+        if i==0: site_name='oscillator'
+        elif i==(n_sites-1): site_name='cantilever'
+        system.degreesOfFreedom[site_name] = spr.ParametricVariable(mass)
+        
+        # Make local stiffness for expressivity (and positive definiteness (not semi))
+        system.interactionPotentials[f'{site_name}_K_l'] =  spr.IntegerPotential(0.5 * k_scale_local_relative*k_scale)
+        system.interactionPotentials[f'{site_name}_K_l'].degreesOfFreedom[site_name] = 2
+        system.interactionPotentials[f'{site_name}_K_l'].strength.parameterized = True
+        if i != (n_sites-1) and i!=int(n_sites/2): # connect to next site
+            name_dof_2 = f'dof_{i+1}' if i!=(n_sites-2) else 'cantilever'
+            hf.makeLinearCoupling(system, site_name, name_dof_2, 
+                            k_scale)
+            system.interactionPotentials[f'LinCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
+        elif i != (n_sites-1):
+            name_dof_2 = f'dof_{i+1}' if i!=(n_sites-2) else 'cantilever'
 
-#         name_dof_2 = f'dof_{i+1}' if i!=(n_sites-2) else 'cantilever'
-#         hf.makeLinearCoupling(system, site_name, name_dof_2, 
-#                         k_scale)
-#         system.interactionPotentials[f'LinCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
-
-#         # name_dof_2 = f'dof_{i+1}' if i!=(n_sites-2) else 'cantilever'
-
-#         # system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'] =  spr.IntegerPotential(-gamma)
-#         # system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].degreesOfFreedom[site_name] = 2
-#         # system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].degreesOfFreedom[name_dof_2] = 1
-#         # system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
-#         # system.interactionPotentials[f'{site_name}_L'] =  spr.IntegerPotential(duffing)
-#         # system.interactionPotentials[f'{site_name}_L'].degreesOfFreedom[site_name] = 4
-#         # system.interactionPotentials[f'{site_name}_L'].strength.parameterized = True
-#     else: # terminal damping
-#         system.interactionPotentials[f'{site_name}_B'] = spr.LocalDamping(site_name, final_damping)
-# #optomechanical coupling (gamma)
+            system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'] =  spr.IntegerPotential(-gamma)
+            system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].degreesOfFreedom[site_name] = 1
+            system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].degreesOfFreedom[name_dof_2] = 1
+            system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
+            # system.interactionPotentials[f'{site_name}_L'] =  spr.IntegerPotential(duffing)
+            # system.interactionPotentials[f'{site_name}_L'].degreesOfFreedom[site_name] = 4
+            # system.interactionPotentials[f'{site_name}_L'].strength.parameterized = True
+        else: # terminal damping
+            system.interactionPotentials[f'{site_name}_B'] = spr.LocalDamping(site_name, final_damping)
+    #optomechanical coupling (gamma)
 
 if not USE_SOUND_FILE:
     system.excitationSources['step'] = spr.DirectCInjectionSource(force)
