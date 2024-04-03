@@ -70,6 +70,8 @@
     }
 
   k = blockDim.x - threadIdx.x;
+  k = threadIdx.x;
+
   //For the 4D tensor we start from the back
   //This avoids the first few threads to take care of all non linear elements
 
@@ -85,6 +87,8 @@
   }
 
   k = threadIdx.x+nzz_G;
+  k = threadIdx.x;
+
   //For Psi we start in the middle, with an offset
 
   //Tensor 5D element
@@ -114,22 +118,17 @@
                   uint  nzz, 
                   reel* excitationsSet,
                   uint  lengthOfeachExcitation, 
-                  uint  currentSimulation,
                   uint  systemStride,
                   reel* Y, 
-                  uint  t,
-                  reel* modulationBuffer,
-                  uint  m){
+                  uint  t){
 
-  uint selectedExcitation = currentSimulation;
-
-  reel modulation = modulate(modulationBuffer, m);
+  uint selectedExcitation = 0;
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
   for(uint k = index; k<nzz; k += stride){
     selectedExcitation += d_indice[k]/systemStride;
-    Y[d_indice[k]] += modulation * d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
+    Y[d_indice[k]] += d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
   }
  }
 
@@ -146,69 +145,26 @@
                         uint  nzz, 
                         reel* excitationsSet,
                         uint  lengthOfeachExcitation, 
-                        uint  currentSimulation,
                         uint  systemStride,
                         reel* Y, 
-                        uint  t,
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
-                        int   i,
-                        reel* modulationBuffer,
-                        uint  m){
-
-  uint selectedExcitation = currentSimulation;
-  int  iws2m1 = interpolationWindowSize/2 - 1;
-
-  int startInterpolate = -iws2m1;
-  int endInterpolate   = iws2m1+1;
+                        uint excoff,
+                        uint interpidx){
 
   // Prevent out of bound interpolation, 0 value (no force) will be used
   // in case of out of bound
-  if((int)t+startInterpolate < 0){
-    startInterpolate = -t;
-  }
-  if((int)t+endInterpolate > lengthOfeachExcitation){
-    endInterpolate = lengthOfeachExcitation - t;
-  }
-
-  reel modulation = modulate(modulationBuffer, m);
-
+  uint selectedExcitation(0);
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
   uint stride = blockDim.x * gridDim.x;  
 
   for(uint k = index; k<nzz; k += stride){
     selectedExcitation += d_indice[k]/systemStride;
-
+    uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
     // Interpolate the excitations
-    reel tmp = 0.;
-    for(int j=startInterpolate; j<=endInterpolate; ++j){
-      reel a = interpolationMatrix[interpolationWindowSize*(i-1) + j + iws2m1];
-      reel b = excitationsSet[(selectedExcitation)*lengthOfeachExcitation + t + j];
-
-      tmp += modulation * a * b;
-    }
-
-    Y[d_indice[k]] += d_val[k] * tmp;
+    Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize+interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpidx], excitationsSet[sweepStep+(excoff+1)])));
   }
  }
-
-
-
-/** modulate()
- * @brief If the modulation buffer is not null, return the modulation 
- * value at the given index
- * 
- */
- __device__
- reel modulate(reel* modulationBuffer, 
-               uint  m){
-
-  if(modulationBuffer != NULL)
-    return modulationBuffer[m];
-
-  return 1.;
- }
-
 
 
 /** updateSlope()

@@ -95,35 +95,24 @@ class __GpuDriver{
                          uint saveSteps  = 1,
                          uint saveOffset = 0);
 
-  void fwdStep(uint k, 
-               uint t,
-               uint i,
-               uint m);
+  void fwdStep(uint t);
 
   void backwardRungeKutta(uint  tStart_, 
                           uint  tEnd_,
                           uint  k,
                           uint  startSetpoint);
 
-  void bwdStep(uint k, 
-               uint t,
-               uint i,
-               uint m,
+  void bwdStep(uint t,
                uint startSetpoint);                        
 
   void derivatives(reel* pm, 
                    reel* pq,
-                   reel* pq_fwd_state, 
-                   uint k, 
-                   uint t,
-                   uint i,
-                   uint m);
+                   reel* pq_fwd_state);
 
   void modterpolator(reel* Y,
-                     uint  k,
-                     uint  t,
-                     uint  i,
-                     uint  m);
+                     uint  step,
+                     bool  halfStep,
+                     bool backward);
 
 
   //            GPU work distribution

@@ -58,12 +58,9 @@
                   uint  nzz, 
                   reel* excitationsSet,
                   uint  lengthOfeachExcitation, 
-                  uint  currentSimulation,
                   uint  systemStride,
                   reel* Y, 
-                  uint  t,
-                  reel* modulationBuffer,
-                  uint  m);
+                  uint  t);
 
 
 
@@ -78,25 +75,12 @@
                         uint  nzz, 
                         reel* excitationsSet,
                         uint  lengthOfeachExcitation, 
-                        uint  currentSimulation,
                         uint  systemStride,
                         reel* Y, 
-                        uint  t,
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
-                        int   i,
-                        reel* modulationBuffer,
-                        uint  m);
-
-
-
-/** modulate()
- * @brief If the modulation buffer is not null, return the value at the given index
- * 
- */
- __device__
- reel modulate(reel* modulationBuffer, 
-               uint  m);
+                        uint excoff,
+                        uint interpidx);
 
 
 

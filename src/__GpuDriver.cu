@@ -381,7 +381,7 @@
     interpolationNumberOfPoints = interpolationMatrix_.size()/interpolationWindowSize_;
 
     setTimesteps();
-    totalNumsteps = numsteps*(1+interpolationNumberOfPoints);
+    totalNumsteps = numsteps;//*(1+interpolationNumberOfPoints);
 
     // Allocate the interpolation matrix on the GPU
     CHECK_CUDA( cudaMalloc((void**)&d_interpolationMatrix, interpolationMatrix.size()*sizeof(reel)) )
@@ -389,7 +389,7 @@
     CHECK_CUDA( cudaMemcpy(d_interpolationMatrix, interpolationMatrix.data(), interpolationMatrix.size()*sizeof(reel), cudaMemcpyHostToDevice) )
     
     std::cout << "[Info] __GpuDriver: Loaded interpolation matrix, " << interpolationNumberOfPoints << " points, windows length " << interpolationWindowSize << std::endl;
-  }
+    }
 
   void __GpuDriver::_setModulationBuffer(std::vector<reel> & modulationBuffer_){
     modulationBuffer = modulationBuffer_;
@@ -419,11 +419,13 @@
     // Perform the simulations
     for(size_t k(0); k < numberOfSimulationToPerform; ++k){
 
+      
       forwardRungeKutta(0, numsteps, k);
 
       // std::cout << "k = " << k << std::endl;
       // std::cout << "n_doofs = " << n_dofs << std::endl;
       // std::cout << "numsteps = " << numsteps << std::endl;
+      // std::cout << "interpolationNumberOfPoints = " << interpolationNumberOfPoints << std::endl;
       // std::cout << "d_Q = " << d_Q << std::endl;
       // std::cout << "d_fwd_Q = " << d_fwd_Q << std::endl;
       // std::cout << "sizeof(reel) = " << sizeof(reel) << std::endl;
@@ -458,14 +460,21 @@
 
     // Reserve the size of the trajectories vector on the CPU
     h_trajectories.clear();
-    size_t reservedTrajSize = (n_dofs*numberOfSimulationToPerform*(interpolationNumberOfPoints+1)*numsteps)/saveSteps_;
+    size_t reservedTrajSize = (n_dofs*numberOfSimulationToPerform*numsteps)/saveSteps_;
     h_trajectories.resize(reservedTrajSize);
 
     // Allocate the memory on the GPU
     CHECK_CUDA( cudaMalloc((void**)&d_trajectories, h_trajectories.size()*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_trajectories, 0, h_trajectories.size()*sizeof(reel)) )
 
-
+    // DEBUG 
+    std::cout << "numsteps: " << numsteps << std::endl;
+    std::cout << "totalNumsteps: " << totalNumsteps << std::endl;
+    std::cout << "numSetpoints: " << numSetpoints << std::endl;
+    std::cout << "chunkSize: " << chunkSize << std::endl;
+    std::cout << "lastChunkSize: " << lastChunkSize << std::endl;
+    std::cout << "reservedTrajSize: " << reservedTrajSize << std::endl;
+    std::cout<<"lengthOfeachExcitation: "<<lengthOfeachExcitation<<std::endl<<std::endl;
 
     auto begin = std::chrono::high_resolution_clock::now();
     // Perform the simulations
@@ -502,7 +511,7 @@
 
 
     // 1. Compute the setPoints (chunks first step)
-    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*(interpolationNumberOfPoints+1)*n_dofs_fwd;
+    size_t reservedTrajSize = (numSetpoints+chunkSize-2)*n_dofs_fwd;
 
     h_trajectories.clear();
     h_trajectories.resize(reservedTrajSize);
@@ -537,11 +546,11 @@
       if(setpoint == numSetpoints-1){
         // Avoid to overflow the allocated traj memory
         endStep          = numsteps;
-        startBwdSetpoint = setpoint + (lastChunkSize-1)*(interpolationNumberOfPoints+1)+interpolationNumberOfPoints;
+        startBwdSetpoint = setpoint + (lastChunkSize-1);
       }
       else{
         endStep          = startStep + chunkSize;
-        startBwdSetpoint = setpoint + (chunkSize-1)*(interpolationNumberOfPoints+1)+interpolationNumberOfPoints;
+        startBwdSetpoint = setpoint + (chunkSize-1);
       }
 
 
@@ -624,7 +633,7 @@
 
   void __GpuDriver::setTimesteps(){
     if(!interpolationMatrix.empty()){
-      h  = 1.0/(sampleRate*(interpolationNumberOfPoints+1));
+      h  = 1.0/(sampleRate);
     }
     else{
       h  = 1.0/sampleRate;
@@ -644,56 +653,52 @@
                                       uint saveSteps,
                                       uint saveOffset){
                           
-    uint   m(0); // Modulation index
     size_t trajSaveIndex(0);
 
     // Performe the rk4 steps
     for(uint t(tStart_); t<tEnd_ ; ++t){
       // Always performe one step without interpolation, and then performe the
       // interpolation steps
+      fwdStep(t);
 
-      for(uint i(0); i<=interpolationNumberOfPoints; ++i){
-        fwdStep(k, t, i, m);
-
-        if(d_trajectories != nullptr && (t%saveSteps==0) && (i==0 || saveSteps==1)){
-          //only save non interpolated steps  
-          CHECK_CUBLAS( cublasScopy(h_cublas,
-                                    n_dofs, 
-                                    d_Q, 
-                                    1, 
-                                    d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
-                                    1) )
-          ++trajSaveIndex;
+      if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps==1)){
+        //only save non interpolated steps  
+        CHECK_CUBLAS( cublasScopy(h_cublas,
+                                  n_dofs, 
+                                  d_Q, 
+                                  1, 
+                                  d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
+                                  1) )
+        ++trajSaveIndex;
         }
         
-        ++m;
-        if(m == modulationBufferSize){
-          m = 0;
-        }
-      }
+      // }
     }                       
   }
 
-  void __GpuDriver::fwdStep(uint k, 
-                            uint t,
-                            uint i,
-                            uint m){
-
-
+  void __GpuDriver::fwdStep(uint t){
     // Compute the derivatives
-    derivatives(d_m1, d_Q, nullptr, k, t, i, m);
+    derivatives(d_m1, d_Q, nullptr);
+    if(t==0){
+      modterpolator(d_m1, t, false, false);
+    }else{
+      modterpolator(d_m1, t, false, false);
+    }
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2, d_mi, nullptr, k, t, i+1, m);
+    derivatives(d_m2, d_mi, nullptr);
+    modterpolator(d_m2, t, true, false);
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3, d_mi, nullptr, k, t, i+1, m);
+    derivatives(d_m3, d_mi, nullptr);
+    modterpolator(d_m3, t, true, false);
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4, d_mi, nullptr, k, t, i+2, m);
+    derivatives(d_m4, d_mi, nullptr);
+    modterpolator(d_m4, t+1, false, false);
 
     // Compute next state vector Q
     integrate<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
@@ -704,7 +709,6 @@
                                        uint  k,
                                        uint  startSetpoint){
 
-    uint   m(0); // Modulation index
     uint   currentSetpoint(startSetpoint);
     reel* h_bwd_state     = new reel[n_dofs_bwd];
     reel* h_fwd_setpoints = new reel[n_dofs_fwd];
@@ -712,30 +716,29 @@
     // Performe the rk4 steps
     for(uint t(tStart_-1); t>=tEnd_ ; --t){
 
-      for(int i(interpolationNumberOfPoints); i>=0; --i){
-      
-          // CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-          //                        d_trajectories + currentSetpoint*n_dofs_fwd,
-          //                        n_dofs_fwd*sizeof(reel),
-          //                        cudaMemcpyDeviceToHost) );
-          // CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
-          // std::cout << "in backward RK step: " << t << " interpolation: "<<i<<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
+          if(t>(tStart_-10)){
+          CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
+                                 d_trajectories + currentSetpoint*n_dofs_fwd,
+                                 n_dofs_fwd*sizeof(reel),
+                                 cudaMemcpyDeviceToHost) );
+          CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
+          std::cout << "in backward RK step: " << t <<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
 
-          // std::cout << " h_fwd_setpoints: ";
-          // for(size_t j(0); j<n_dofs_fwd; ++j){
-          //   std::cout << h_fwd_setpoints[j] << " ";
-          // }
+          std::cout << " h_fwd_setpoints: ";
+          for(size_t j(0); j<n_dofs_fwd; ++j){
+            std::cout << h_fwd_setpoints[j] << " ";
+          }
 
-          // std::cout << "   h_bwd_state: ";
-          // for(size_t j(0); j<n_dofs_bwd; ++j){
-          //   std::cout << h_bwd_state[j] << " ";
-          // }
-          // std::cout << std::endl;
-      
-        bwdStep(k, t, i, m, currentSetpoint);
+          std::cout << "   h_bwd_state: ";
+          for(size_t j(0); j<n_dofs_bwd; ++j){
+            std::cout << h_bwd_state[j] << " ";
+          }
+          std::cout << std::endl;
+        }
+
+        bwdStep(t, currentSetpoint);
         // Point to the previous state vector stored in the trajectory buffer
         --currentSetpoint;
-      }
       if(t==0){break;}
     }  
 
@@ -746,26 +749,32 @@
     CHECK_CUDA( cudaMemcpy(d_QinitCond, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
   }
 
-  void __GpuDriver::bwdStep(uint k, 
-                            uint t,
-                            uint i,
-                            uint m,
+  void __GpuDriver::bwdStep(uint t,
                             uint currentSetpoint){
 
     // Compute the derivatives
-    derivatives(d_m1, d_Q, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i, m);
+    derivatives(d_m1, d_Q, d_trajectories+currentSetpoint*n_dofs_fwd);
+   if(t==0){
+      modterpolator(d_m1, t, false, true);
+    }else{
+      modterpolator(d_m1, t, false, true);
+    }
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    derivatives(d_m2, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+
+    derivatives(d_m2, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    modterpolator(d_m2, t, true, true);
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-1, m);
+    derivatives(d_m3, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    modterpolator(d_m3, t, true, true);
 
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd, k, t, i-2, m);
+    derivatives(d_m4, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    modterpolator(d_m4, t-1, false, true);
 
     // Compute next state vector Q
     integrate<<<nBlocks, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
@@ -774,11 +783,7 @@
 
   inline void __GpuDriver::derivatives(reel* pm, 
                                        reel* pq,
-                                       reel* pq_fwd_state, 
-                                       uint k, 
-                                       uint t,
-                                       uint i,
-                                       uint m){
+                                       reel* pq_fwd_state){
 
     if(pq_fwd_state == nullptr){
       pq_fwd_state = pq;
@@ -829,88 +834,53 @@
 
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
-    if(t < lengthOfeachExcitation && (pq == pq_fwd_state /* WOP: Just to ensure the fwd only for now*/ )){
-      // k += ForcePattern.d_ExcitationsSet
-      modterpolator(pm, k, t, i, m);
-    }
+    // if(t < lengthOfeachExcitation && (pq == pq_fwd_state /* WOP: Just to ensure the fwd only for now*/ )){
+    //   // k += ForcePattern.d_ExcitationsSet
+    //   modterpolator(pm, k, t, i, m);
+    // }
   } 
 
   inline void __GpuDriver::modterpolator(reel* Y,
-                                         uint  k,
-                                         uint  t,
-                                         uint  i,
-                                         uint  m){
+                                         uint  step,
+                                         bool  halfStep,
+                                         bool backward){
 
     // "currentSimulation" refers to the simulation number in the case of
     // wich multiple simulation are needed to compute the system against all
     // of the excitation file
-    uint currentSimulation = k/parallelismThroughExcitations;
-    uint systemStride      = n_dofs/parallelismThroughExcitations;
-    uint adjustedTime          = t;
-    uint adjustedInterpolation = i;
-    uint adjustedModulation    = m;
-
-    uint useCase = 0;
-
-    if(interpolationNumberOfPoints == 0){
-      adjustedTime         += i;
-      adjustedModulation   += i;
-      adjustedInterpolation = 0;
-
-      useCase = 0;
-    }
+    uint systemStride      = n_dofs;
+    if(interpolationNumberOfPoints==0){
+        if(step<lengthOfeachExcitation){
+          applyForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+                                                (ForcePattern->d_val, 
+                                                ForcePattern->d_indice, 
+                                                ForcePattern->nzz, 
+                                                d_ExcitationsSet,
+                                                lengthOfeachExcitation, 
+                                                systemStride,
+                                                Y, 
+                                                step);    }
+        }
     else{
-      if(i > interpolationNumberOfPoints){
-        adjustedTime          += 1;
-        adjustedModulation    += 1;
-        adjustedInterpolation -= (interpolationNumberOfPoints+1);
-      }
-      
-      if(adjustedInterpolation == 0){
-        useCase = 0;
-      }
-      else{
-        useCase = 1;
-        adjustedModulation    += adjustedInterpolation;
-      }
-    }
-
-    if(adjustedModulation >= modulationBufferSize){
-      adjustedModulation -= modulationBufferSize;
-    }
-
-    switch(useCase){
-      case 0: // Just apply the force
-        applyForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
-                                              (ForcePattern->d_val, 
-                                              ForcePattern->d_indice, 
-                                              ForcePattern->nzz, 
-                                              d_ExcitationsSet,
-                                              lengthOfeachExcitation, 
-                                              currentSimulation,
-                                              systemStride,
-                                              Y, 
-                                              adjustedTime,
-                                              d_modulationBuffer,
-                                              adjustedModulation);
-        break;
-      case 1: // Interpolate the force
-        interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+        uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
+        uint excoff((((step << 1) + (halfStep?1:0))>>2));
+        if(backward){
+          interpidx = interpolationWindowSize-1-interpidx;
+        }
+        if(excoff<lengthOfeachExcitation && excoff>0){
+          interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
                                                     (ForcePattern->d_val, 
                                                     ForcePattern->d_indice, 
                                                     ForcePattern->nzz, 
                                                     d_ExcitationsSet,
                                                     lengthOfeachExcitation, 
-                                                    currentSimulation,
                                                     systemStride,
                                                     Y, 
-                                                    adjustedTime,
                                                     d_interpolationMatrix,
                                                     interpolationWindowSize,
-                                                    adjustedInterpolation,
-                                                    d_modulationBuffer,
-                                                    adjustedModulation);
-        break;
+                                                    excoff,
+                                                    interpidx);
+        }
     }
   }
 
@@ -1173,7 +1143,6 @@
       std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
     }
   }
-
 
 
 /*                    Forward system private methods                    */
