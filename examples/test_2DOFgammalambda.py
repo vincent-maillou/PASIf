@@ -10,10 +10,10 @@ import numpy as np
 import time
 
 
-USE_SOUND_FILE=False
-TRAJ=False
-GRAD= True
-CHAIN=True
+USE_SOUND_FILE=True
+TRAJ=True
+GRAD= False
+CHAIN=False
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -266,3 +266,6 @@ if TRAJ:
     axs[2].set_xlabel('time (s)')
     axs[2].set_ylabel('amplitude')
     plt.show()   
+
+
+    del cudaEnvironment

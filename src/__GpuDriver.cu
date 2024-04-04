@@ -131,6 +131,8 @@
         nThreadsPerBlock(0),
         maxThreads(512),
 
+        fwd_graphs_created(false),
+
         h_cublas(nullptr),
         h_cusparse(nullptr)
         {
@@ -142,7 +144,7 @@
       CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
       CHECK_CUDA( cudaMemcpy(d_alpha, &alpha,  sizeof(reel), cudaMemcpyHostToDevice) )
       CHECK_CUDA( cudaMemcpy(d_beta0, &beta0,  sizeof(reel), cudaMemcpyHostToDevice) )
-
+      
       _loadExcitationsSet(excitationSet_,
                           sampleRate_);
 
@@ -155,7 +157,6 @@
     clearTrajectories();
     clearInterpolationMatrix();
     clearModulationBuffer();
-
 
     //            Forward system destructor
     clearFwdK();
@@ -175,7 +176,6 @@
     clearBwdForcePattern();
     clearBwdInitialConditions();
     clearAdjointStatesVector();
-    
 
     if(streams != nullptr){
       for(uint i = 0; i < nStreams; i++){
@@ -661,22 +661,52 @@
 
   void __GpuDriver::fwdStep(uint t){
     // Compute the derivatives
-    derivatives(d_m1, d_Q, nullptr);
+    if(!fwd_graphs_created){
+      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
+      derivatives(d_m1, d_Q, nullptr);
+      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_1));
+      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_1, fwd_graph_1, NULL, NULL, 0));
+      CHECK_CUDA(cudaGraphDestroy(fwd_graph_1));
+    }
+    CHECK_CUDA(cudaGraphLaunch(fwd_instance_1, streams[0]));
+    
     modterpolator(d_m1, t, false, false);
 
+    if(!fwd_graphs_created){
+      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+      derivatives(d_m2, d_mi, nullptr);
+      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_2));
+      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_2, fwd_graph_2, NULL, NULL, 0));
+      CHECK_CUDA(cudaGraphDestroy(fwd_graph_2));
+    }
+    CHECK_CUDA(cudaGraphLaunch(fwd_instance_2, streams[0]));
 
-    derivatives(d_m2, d_mi, nullptr);
     modterpolator(d_m2, t, true, false);
 
+    if(!fwd_graphs_created){
+      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+      derivatives(d_m3, d_mi, nullptr);
+      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_3));
+      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_3, fwd_graph_3, NULL, NULL, 0));
+      CHECK_CUDA(cudaGraphDestroy(fwd_graph_3));
+    }
+    CHECK_CUDA(cudaGraphLaunch(fwd_instance_3, streams[0]));
 
-    derivatives(d_m3, d_mi, nullptr);
     modterpolator(d_m3, t, true, false);
 
+    if(!fwd_graphs_created){
+      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
       updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+      derivatives(d_m4, d_mi, nullptr);
+      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_4));
+      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_4, fwd_graph_4, NULL, NULL, 0));
+      CHECK_CUDA(cudaGraphDestroy(fwd_graph_4));
+      fwd_graphs_created=true;
+    }
+    CHECK_CUDA(cudaGraphLaunch(fwd_instance_4, streams[0]));
 
-    derivatives(d_m4, d_mi, nullptr);
     modterpolator(d_m4, t+1, false, false);
 
     // Compute next state vector Q
@@ -1047,6 +1077,8 @@
     CHECK_CUDA( cudaMemset(d_m2, 0, n_dofs*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_m3, 0, n_dofs*sizeof(reel)) )
     CHECK_CUDA( cudaMemset(d_m4, 0, n_dofs*sizeof(reel)) )
+    fwd_graphs_created = false;
+
   }
 
   void __GpuDriver::displaySimuInfos(problemType type_){
@@ -1297,6 +1329,11 @@
       CHECK_CUDA( cudaFree(d_fwd_m4) )
       d_fwd_m4 = nullptr;
     }
+
+    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_1));
+    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_2));
+    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_3));
+    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_4));
   }
 
 

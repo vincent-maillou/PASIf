@@ -275,6 +275,16 @@ class __GpuDriver{
 
   cublasHandle_t   h_cublas;
   cusparseHandle_t h_cusparse;
+
+  cudaGraph_t fwd_graph_1;
+  cudaGraphExec_t fwd_instance_1;
+  cudaGraph_t fwd_graph_2;
+  cudaGraphExec_t fwd_instance_2;
+  cudaGraph_t fwd_graph_3;
+  cudaGraphExec_t fwd_instance_3;
+  cudaGraph_t fwd_graph_4;
+  cudaGraphExec_t fwd_instance_4;
+  bool fwd_graphs_created;
 };
 
 
