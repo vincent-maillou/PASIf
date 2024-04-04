@@ -669,7 +669,8 @@
       CHECK_CUDA(cudaGraphDestroy(fwd_graph_1));
     }
     CHECK_CUDA(cudaGraphLaunch(fwd_instance_1, streams[0]));
-    
+    cudaStreamSynchronize(streams[0]);
+
     modterpolator(d_m1, t, false, false);
 
     if(!fwd_graphs_created){
@@ -681,6 +682,7 @@
       CHECK_CUDA(cudaGraphDestroy(fwd_graph_2));
     }
     CHECK_CUDA(cudaGraphLaunch(fwd_instance_2, streams[0]));
+    cudaStreamSynchronize(streams[0]);
 
     modterpolator(d_m2, t, true, false);
 
@@ -693,6 +695,7 @@
       CHECK_CUDA(cudaGraphDestroy(fwd_graph_3));
     }
     CHECK_CUDA(cudaGraphLaunch(fwd_instance_3, streams[0]));
+    cudaStreamSynchronize(streams[0]);
 
     modterpolator(d_m3, t, true, false);
 
@@ -706,6 +709,7 @@
       fwd_graphs_created=true;
     }
     CHECK_CUDA(cudaGraphLaunch(fwd_instance_4, streams[0]));
+    cudaStreamSynchronize(streams[0]);
 
     modterpolator(d_m4, t+1, false, false);
 
@@ -860,7 +864,7 @@
     uint systemStride      = n_dofs/parallelismThroughExcitations;
     if(interpolationNumberOfPoints==0){
         if(step<lengthOfeachExcitation){
-          applyForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+          applyForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
                                                 (ForcePattern->d_val, 
                                                 ForcePattern->d_indice, 
                                                 ForcePattern->nzz, 
@@ -875,7 +879,7 @@
         uint excoff((((step << 1) + (halfStep?1:0))>>2));
         if((excoff<lengthOfeachExcitation && excoff>0 && !backward) ||
             (excoff<lengthOfeachExcitation && excoff>1 && backward)){
-          interpolateForces<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>
+          interpolateForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
                                                     (ForcePattern->d_val, 
                                                     ForcePattern->d_indice, 
                                                     ForcePattern->nzz, 

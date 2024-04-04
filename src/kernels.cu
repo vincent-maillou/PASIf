@@ -69,9 +69,7 @@
       k += blockDim.x;//in case there are more non zero elements than thread possibles
     }
 
-  k = blockDim.x - threadIdx.x;
-  k = threadIdx.x;
-
+  k = blockDim.x - threadIdx.x-1;
   //For the 4D tensor we start from the back
   //This avoids the first few threads to take care of all non linear elements
 
@@ -83,12 +81,10 @@
     row_idx = d_row_L[k];
     col_idx = d_col_L[k];
     atomicAdd(&Y[hyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
-    k+= blockDim.x;
+    k += blockDim.x;
   }
 
   k = threadIdx.x+nzz_G;
-  k = threadIdx.x;
-
   //For Psi we start in the middle, with an offset
 
   //Tensor 5D element
@@ -123,13 +119,9 @@
                   uint  t){
 
   uint selectedExcitation = 0;
-
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-  for(uint k = index; k<nzz; k += stride){
-    selectedExcitation += d_indice[k]/systemStride;
-    Y[d_indice[k]] += d_val[k] * excitationsSet[selectedExcitation*lengthOfeachExcitation + t];
-  }
+  uint k = blockIdx.x;
+  selectedExcitation += d_indice[k]/systemStride;
+  atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], excitationsSet[selectedExcitation*lengthOfeachExcitation + t]));
  }
 
 
@@ -156,23 +148,19 @@
   // Prevent out of bound interpolation, 0 value (no force) will be used
   // in case of out of bound
   uint selectedExcitation(0);
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
 
+
+  uint k = blockIdx.x;
   if(backward){
-    for(uint k = index; k<nzz; k += stride){
-      selectedExcitation += d_indice[k]/systemStride;
-      uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
-      // Interpolate the excitations
-      Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize-interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpolationWindowSize*2-interpidx], excitationsSet[sweepStep+(excoff-1)])));
-    }
+    selectedExcitation += d_indice[k]/systemStride;
+    uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
+    // Interpolate the excitations
+    atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize-interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpolationWindowSize*2-interpidx], excitationsSet[sweepStep+(excoff-1)]))));
   }else{
-    for(uint k = index; k<nzz; k += stride){
       selectedExcitation += d_indice[k]/systemStride;
       uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
       // Interpolate the excitations
-      Y[d_indice[k]] += __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize+interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpidx], excitationsSet[sweepStep+(excoff+1)])));
-    }
+      atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize+interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpidx], excitationsSet[sweepStep+(excoff+1)]))));
   }
  }
 
