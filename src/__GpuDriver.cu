@@ -36,6 +36,7 @@
 
         alpha(1.0), d_alpha(nullptr),
         beta0(0.0), d_beta0(nullptr),
+        fwd_step(0), d_step(nullptr),
 
         dCompute(dCompute_),
         dSystem(dSystem_),
@@ -142,9 +143,11 @@
       // Put on the device alpha and beta values for the cuSPARSE API
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) )
       CHECK_CUDA( cudaMalloc((void**)&d_beta0, sizeof(reel)) )
+      CHECK_CUDA( cudaMalloc((void**)&d_step, sizeof(uint)) )
+
       CHECK_CUDA( cudaMemcpy(d_alpha, &alpha,  sizeof(reel), cudaMemcpyHostToDevice) )
       CHECK_CUDA( cudaMemcpy(d_beta0, &beta0,  sizeof(reel), cudaMemcpyHostToDevice) )
-      
+      CHECK_CUDA( cudaMemcpy(d_step, &fwd_step,  sizeof(uint), cudaMemcpyHostToDevice) )
       _loadExcitationsSet(excitationSet_,
                           sampleRate_);
 
@@ -638,11 +641,25 @@
                           
     size_t trajSaveIndex(0);
 
+    fwd_step = tStart_;
+    CHECK_CUDA( cudaMemcpy(d_step, &fwd_step,  sizeof(uint), cudaMemcpyHostToDevice) );
+
     // Performe the rk4 steps
     for(uint t(tStart_); t<tEnd_ ; ++t){
       // Always performe one step without interpolation, and then performe the
       // interpolation steps
-      fwdStep(t);
+      if(!fwd_graphs_created){
+        CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
+        fwdStep();
+        stepfwd<<<1, 1, 0, streams[0]>>>(d_step);
+        CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph));
+        CHECK_CUDA(cudaGraphInstantiate(&fwd_instance, fwd_graph, NULL, NULL, 0));
+        CHECK_CUDA(cudaGraphDestroy(fwd_graph));
+        fwd_graphs_created=true;
+      }
+      CHECK_CUDA(cudaGraphLaunch(fwd_instance, streams[0]));
+      // cudaStreamSynchronize(streams[0]);
+
 
       if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps!=0)){
         //only save non interpolated steps  
@@ -659,59 +676,23 @@
     }                       
   }
 
-  void __GpuDriver::fwdStep(uint t){
+  void __GpuDriver::fwdStep(){
     // Compute the derivatives
-    if(!fwd_graphs_created){
-      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
-      derivatives(d_m1, d_Q, nullptr);
-      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_1));
-      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_1, fwd_graph_1, NULL, NULL, 0));
-      CHECK_CUDA(cudaGraphDestroy(fwd_graph_1));
-    }
-    CHECK_CUDA(cudaGraphLaunch(fwd_instance_1, streams[0]));
-    cudaStreamSynchronize(streams[0]);
 
-    modterpolator(d_m1, t, false, false);
+    derivatives(d_m1, d_Q, nullptr);
+    modterpolator(d_m1, 0, false, false);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
-    if(!fwd_graphs_created){
-      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
-      derivatives(d_m2, d_mi, nullptr);
-      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_2));
-      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_2, fwd_graph_2, NULL, NULL, 0));
-      CHECK_CUDA(cudaGraphDestroy(fwd_graph_2));
-    }
-    CHECK_CUDA(cudaGraphLaunch(fwd_instance_2, streams[0]));
-    cudaStreamSynchronize(streams[0]);
+    derivatives(d_m2, d_mi, nullptr);
+    modterpolator(d_m2, 0, true, false);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+    
+    derivatives(d_m3, d_mi, nullptr);
+    modterpolator(d_m3, 0, true, false);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    modterpolator(d_m2, t, true, false);
-
-    if(!fwd_graphs_created){
-      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
-      derivatives(d_m3, d_mi, nullptr);
-      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_3));
-      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_3, fwd_graph_3, NULL, NULL, 0));
-      CHECK_CUDA(cudaGraphDestroy(fwd_graph_3));
-    }
-    CHECK_CUDA(cudaGraphLaunch(fwd_instance_3, streams[0]));
-    cudaStreamSynchronize(streams[0]);
-
-    modterpolator(d_m3, t, true, false);
-
-    if(!fwd_graphs_created){
-      CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal));
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
-      derivatives(d_m4, d_mi, nullptr);
-      CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph_4));
-      CHECK_CUDA(cudaGraphInstantiate(&fwd_instance_4, fwd_graph_4, NULL, NULL, 0));
-      CHECK_CUDA(cudaGraphDestroy(fwd_graph_4));
-      fwd_graphs_created=true;
-    }
-    CHECK_CUDA(cudaGraphLaunch(fwd_instance_4, streams[0]));
-    cudaStreamSynchronize(streams[0]);
-
-    modterpolator(d_m4, t+1, false, false);
+    derivatives(d_m4, d_mi, nullptr);
+    modterpolator(d_m4, 1, false, false);
 
     // Compute next state vector Q
     integrate<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
@@ -854,7 +835,7 @@
   } 
 
   inline void __GpuDriver::modterpolator(reel* Y,
-                                         uint  step,
+                                         uint  offset,
                                          bool  halfStep,
                                          bool backward){
 
@@ -863,7 +844,6 @@
     // of the excitation file
     uint systemStride      = n_dofs/parallelismThroughExcitations;
     if(interpolationNumberOfPoints==0){
-        if(step<lengthOfeachExcitation){
           applyForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
                                                 (ForcePattern->d_val, 
                                                 ForcePattern->d_indice, 
@@ -872,13 +852,9 @@
                                                 lengthOfeachExcitation, 
                                                 systemStride,
                                                 Y, 
-                                                step);
-        }
+                                                d_step,
+                                                offset);
     }else{
-        uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
-        uint excoff((((step << 1) + (halfStep?1:0))>>2));
-        if((excoff<lengthOfeachExcitation && excoff>0 && !backward) ||
-            (excoff<lengthOfeachExcitation && excoff>1 && backward)){
           interpolateForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
                                                     (ForcePattern->d_val, 
                                                     ForcePattern->d_indice, 
@@ -889,10 +865,10 @@
                                                     Y, 
                                                     d_interpolationMatrix,
                                                     interpolationWindowSize,
-                                                    excoff,
-                                                    interpidx,
+                                                    d_step,
+                                                    offset,
+                                                    halfStep,
                                                     backward);
-        }
     }
   }
 
@@ -1334,10 +1310,11 @@
       d_fwd_m4 = nullptr;
     }
 
-    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_1));
-    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_2));
-    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_3));
-    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance_4));
+    CHECK_CUDA(cudaGraphExecDestroy(fwd_instance));
+
+    if(d_step!=nullptr){
+      CHECK_CUDA( cudaFree(d_step) )
+    }
   }
 
 

@@ -95,7 +95,7 @@ class __GpuDriver{
                          uint saveSteps  = 1,
                          uint saveOffset = 0);
 
-  void fwdStep(uint t);
+  void fwdStep();
 
   void backwardRungeKutta(uint  tStart_, 
                           uint  tEnd_,
@@ -110,7 +110,7 @@ class __GpuDriver{
                    reel* pq_fwd_state);
 
   void modterpolator(reel* Y,
-                     uint  step,
+                     uint  offset,
                      bool  halfStep,
                      bool backward);
 
@@ -276,14 +276,9 @@ class __GpuDriver{
   cublasHandle_t   h_cublas;
   cusparseHandle_t h_cusparse;
 
-  cudaGraph_t fwd_graph_1;
-  cudaGraphExec_t fwd_instance_1;
-  cudaGraph_t fwd_graph_2;
-  cudaGraphExec_t fwd_instance_2;
-  cudaGraph_t fwd_graph_3;
-  cudaGraphExec_t fwd_instance_3;
-  cudaGraph_t fwd_graph_4;
-  cudaGraphExec_t fwd_instance_4;
+  uint fwd_step; uint* d_step;
+  cudaGraph_t fwd_graph;
+  cudaGraphExec_t fwd_instance;
   bool fwd_graphs_created;
 };
 

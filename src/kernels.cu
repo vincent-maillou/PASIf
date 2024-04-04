@@ -116,12 +116,16 @@
                   uint  lengthOfeachExcitation, 
                   uint  systemStride,
                   reel* Y, 
-                  uint  t){
+                  uint* d_step,
+                  uint offset){
 
   uint selectedExcitation = 0;
   uint k = blockIdx.x;
-  selectedExcitation += d_indice[k]/systemStride;
-  atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], excitationsSet[selectedExcitation*lengthOfeachExcitation + t]));
+  uint step = *d_step+offset;
+  if(step<lengthOfeachExcitation){
+    selectedExcitation += d_indice[k]/systemStride;
+    atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], excitationsSet[selectedExcitation*lengthOfeachExcitation + step]));
+  }
  }
 
 
@@ -141,22 +145,27 @@
                         reel* Y, 
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
-                        uint excoff,
-                        uint interpidx,
+                        uint* d_step,
+                        uint offset,
+                        bool halfStep,
                         bool backward){
 
   // Prevent out of bound interpolation, 0 value (no force) will be used
   // in case of out of bound
   uint selectedExcitation(0);
 
+  uint step = *d_step+offset;
+  uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
+  uint excoff((((step << 1) + (halfStep?1:0))>>2));
+
 
   uint k = blockIdx.x;
-  if(backward){
+  if((excoff<lengthOfeachExcitation && excoff>1 && backward)){
     selectedExcitation += d_indice[k]/systemStride;
     uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
     // Interpolate the excitations
     atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize-interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpolationWindowSize*2-interpidx], excitationsSet[sweepStep+(excoff-1)]))));
-  }else{
+  }else if (excoff<lengthOfeachExcitation && excoff>0 && !backward){
       selectedExcitation += d_indice[k]/systemStride;
       uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
       // Interpolate the excitations
@@ -207,5 +216,7 @@
   }
  }
 
-
-
+ __global__
+ void stepfwd(uint* d_step){
+  *d_step += 1;
+ }

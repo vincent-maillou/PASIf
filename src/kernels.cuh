@@ -60,7 +60,8 @@
                   uint  lengthOfeachExcitation, 
                   uint  systemStride,
                   reel* Y, 
-                  uint  t);
+                  uint* d_step,
+                  uint offset);
 
 
 
@@ -79,8 +80,9 @@
                         reel* Y, 
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
-                        uint excoff,
-                        uint interpidx,
+                        uint* d_step,
+                        uint offset,
+                        bool halfStep,
                         bool backward);
 
 
@@ -112,3 +114,5 @@
                 uint  n);
 
 
+ __global__
+ void stepfwd(uint* d_step);
