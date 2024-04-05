@@ -38,10 +38,10 @@
             uint *d_col_P,
             uint  nzz_P,
             uint ntimes,
-            uint n0,
-            uint nlast,
-            reel* X0,
-            reel* Xlast,
+            uint n_source,
+            uint n_setpoint,
+            reel* X_source,
+            reel* X_setpoint,
             reel* Y);
 
 
@@ -61,7 +61,7 @@
                   uint  systemStride,
                   reel* Y, 
                   uint* d_step,
-                  uint offset);
+                  int offset);
 
 
 
@@ -81,7 +81,7 @@
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
                         uint* d_step,
-                        uint offset,
+                        int offset,
                         bool halfStep,
                         bool backward);
 

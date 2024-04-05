@@ -38,13 +38,13 @@
             uint *d_col_P,
             uint  nzz_P,
             uint ntimes,
-            uint n0,
-            uint nlast,
-            reel* X0,
-            reel* Xlast,
+            uint n_source,
+            uint n_setpoint,
+            reel* X_source,
+            reel* X_setpoint,
             reel* Y){
       
-    uint k = threadIdx.x;
+    int k = threadIdx.x;
     //K is the index of the non-linear element
     uint l = blockIdx.x;
     //l is the index of the execitation
@@ -56,16 +56,17 @@
     reel val = 0;
     uint row_idx = 0;
     uint col_idx = 0;
-    int shift = l*n0;
+    int shift_src = l*n_source;
+    int shift_spt = l*n_setpoint;
 
     //Tensor 3D element
     while (k <nzz_G){//While pointing to a tensor elemnt
-      slice_idx = d_slice_G[k];
+      slice_idx = d_slice_G[k]+shift_spt;
+      row_idx = d_row_G[k]+shift_src;
+      col_idx = d_col_G[k]+shift_spt;
       val = d_val_G[k];
-      row_idx = d_row_G[k];
-      col_idx = d_col_G[k];
       //getting C00 indexes
-      atomicAdd(&Y[slice_idx+shift], __fmul_rn(__fmul_rn(val, X0[row_idx+shift]), Xlast[col_idx+l*nlast]));//Tensor contraction
+      atomicAdd(&Y[slice_idx], __fmul_rn(__fmul_rn(val, X_source[row_idx]), X_setpoint[col_idx]));//Tensor contraction
       k += blockDim.x;//in case there are more non zero elements than thread possibles
     }
 
@@ -75,28 +76,28 @@
 
   //Tensor 4D element
   while (k <nzz_L){
-    hyperslice_idx = d_hyperslice_L[k];
-    slice_idx = d_slice_L[k];
+    hyperslice_idx = d_hyperslice_L[k]+shift_spt;
+    slice_idx = d_slice_L[k]+shift_src;
+    row_idx = d_row_L[k]+shift_spt;
+    col_idx = d_col_L[k]+shift_spt;
     val = d_val_L[k];
-    row_idx = d_row_L[k];
-    col_idx = d_col_L[k];
-    atomicAdd(&Y[hyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast]));
+    atomicAdd(&Y[hyperslice_idx], __fmul_rn(__fmul_rn(__fmul_rn(val, X_source[slice_idx]), X_setpoint[row_idx]), X_setpoint[col_idx]));
     k += blockDim.x;
   }
 
-  k = threadIdx.x+nzz_G;
-  //For Psi we start in the middle, with an offset
+  k = threadIdx.x-nzz_G;
+  //For Psi we start in the middle,w ith an offset
 
   //Tensor 5D element
-  while (k <nzz_P){
-    hyperhyperslice_idx = d_hyperhyperslice_P[k];
-    hyperslice_idx = d_hyperslice_P[k];
-    slice_idx = d_slice_P[k];
+  while (k <nzz_P && k>=0){
+    hyperhyperslice_idx = d_hyperhyperslice_P[k]+shift_spt;
+    hyperslice_idx = d_hyperslice_P[k]+shift_src;
+    slice_idx = d_slice_P[k]+shift_spt;
+    row_idx = d_row_P[k]+shift_spt;
+    col_idx = d_col_P[k]+shift_spt;
     val = d_val_P[k];
-    row_idx = d_row_P[k];
-    col_idx = d_col_P[k];
     if(l<ntimes){
-      atomicAdd(&Y[hyperhyperslice_idx+shift], __fmul_rn(X0[hyperhyperslice_idx+shift], __fmul_rn(__fmul_rn(__fmul_rn(val, X0[slice_idx+shift]), X0[row_idx+shift]), Xlast[col_idx+l*nlast])));
+      atomicAdd(&Y[hyperhyperslice_idx], __fmul_rn(X_source[hyperslice_idx], __fmul_rn(__fmul_rn(__fmul_rn(val, X_setpoint[slice_idx]), X_setpoint[row_idx]), X_setpoint[col_idx])));
     }
     k+= blockDim.x;
   }
@@ -117,7 +118,7 @@
                   uint  systemStride,
                   reel* Y, 
                   uint* d_step,
-                  uint offset){
+                  int offset){
 
   uint selectedExcitation = 0;
   uint k = blockIdx.x;
@@ -146,7 +147,7 @@
                         reel* interpolationMatrix,
                         uint  interpolationWindowSize,
                         uint* d_step,
-                        uint offset,
+                        int offset,
                         bool halfStep,
                         bool backward){
 

@@ -748,28 +748,20 @@
 
     // Compute the derivatives
     derivatives(d_m1, d_Q, d_trajectories+currentSetpoint*n_dofs_fwd);
-   if(t==0){
-      modterpolator(d_m1, t, false, true);
-    }else{
-      modterpolator(d_m1, t, false, true);
-    }
-
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+    modterpolator(d_m1, 0, false, true);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
 
     derivatives(d_m2, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
-    modterpolator(d_m2, t, true, true);
-
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+    modterpolator(d_m2, 0, true, true);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
     derivatives(d_m3, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
-    modterpolator(d_m3, t, true, true);
-
-      updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+    modterpolator(d_m3, 0, true, true);
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
     derivatives(d_m4, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
-    modterpolator(d_m4, t-1, false, true);
-
+    modterpolator(d_m4, -1, false, true);
     // Compute next state vector Q
     integrate<<<nBlocks, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
 
@@ -835,7 +827,7 @@
   } 
 
   inline void __GpuDriver::modterpolator(reel* Y,
-                                         uint  offset,
+                                         int  offset,
                                          bool  halfStep,
                                          bool backward){
 

@@ -322,26 +322,22 @@ class PASIf(__GpuDriver):
 
         jac_csr_K = (self.jacobian_B+self.jacobian_K).tocsr()
         jac_csr_K.sort_indices()
-        print(jac_csr_K.todense())
         self._setBwdK(self.jacobian_K.shape,
                       jac_csr_K.data, 
                       jac_csr_K.indices, 
                       jac_csr_K.indptr)
-        print(self.jacobian_Gamma.val)
-        print(self.jacobian_Gamma.indices)
+
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 
                           self.jacobian_Gamma.indices)
-        print(self.jacobian_Lambda.val)
-        print(self.jacobian_Lambda.indices)
+
         self._setBwdLambda(self.jacobian_Lambda.dimensions,
                            self.jacobian_Lambda.val,
                            self.jacobian_Lambda.indices)
         
         self._setBwdForcePattern(self.jacobian_forcePattern)
         self._setBwdInitialConditions(self.jacobian_initialConditions)
-        print(self.jacobian_Psi.val)
-        print(self.jacobian_Psi.indices)
+
         self._setBwdPsi(self.jacobian_Psi.dimensions,
                     self.jacobian_Psi.val,
                     self.jacobian_Psi.indices)

@@ -110,7 +110,7 @@ class __GpuDriver{
                    reel* pq_fwd_state);
 
   void modterpolator(reel* Y,
-                     uint  offset,
+                     int  offset,
                      bool  halfStep,
                      bool backward);
 
