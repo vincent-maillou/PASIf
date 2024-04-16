@@ -618,13 +618,7 @@
   }
 
   void __GpuDriver::setTimesteps(){
-    if(!interpolationMatrix.empty()){
-      h  = 1.0/(sampleRate);
-    }
-    else{
-      h  = 1.0/sampleRate;
-    }
-
+    h  = 1.0/sampleRate;
     h2 = h/2.0;
     h6 = h/6.0;
   }
@@ -646,12 +640,12 @@
 
     // Performe the rk4 steps
     for(uint t(tStart_); t<tEnd_ ; ++t){
-      // Always performe one step without interpolation, and then performe the
-      // interpolation steps
+
+      // //create cuda graph for the fwd step
       if(!fwd_graphs_created){
         CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
         fwdStep();
-        stepfwd<<<1, 1, 0, streams[0]>>>(d_step);
+        stepfwd<<<1, 1, 0, streams[0]>>>(d_step);//small kernel to update the step
         CHECK_CUDA(cudaStreamEndCapture(streams[0], &fwd_graph));
         CHECK_CUDA(cudaGraphInstantiate(&fwd_instance, fwd_graph, NULL, NULL, 0));
         CHECK_CUDA(cudaGraphDestroy(fwd_graph));
@@ -678,10 +672,10 @@
 
   void __GpuDriver::fwdStep(){
     // Compute the derivatives
-
     derivatives(d_m1, d_Q, nullptr);
-    modterpolator(d_m1, 0, false, false);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+    
+    modterpolator(d_m1, 0, false, false);//add the excitation force
+    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);//update state vector
 
     derivatives(d_m2, d_mi, nullptr);
     modterpolator(d_m2, 0, true, false);
@@ -710,25 +704,6 @@
     // Performe the rk4 steps
     for(uint t(tStart_-1); t>=tEnd_ ; --t){
 
-        //   if(t>(tStart_-10)){
-        //   CHECK_CUDA( cudaMemcpy(h_fwd_setpoints, 
-        //                          d_trajectories + currentSetpoint*n_dofs_fwd,
-        //                          n_dofs_fwd*sizeof(reel),
-        //                          cudaMemcpyDeviceToHost) );
-        //   CHECK_CUDA( cudaMemcpy(h_bwd_state, d_Q, n_dofs_bwd*sizeof(reel), cudaMemcpyDeviceToHost) );
-        //   std::cout << "in backward RK step: " << t <<" cSetP: " << currentSetpoint << " at "<< (size_t)d_trajectories+currentSetpoint*n_dofs_fwd<<" / ";
-
-        //   std::cout << " h_fwd_setpoints: ";
-        //   for(size_t j(0); j<n_dofs_fwd; ++j){
-        //     std::cout << h_fwd_setpoints[j] << " ";
-        //   }
-
-        //   std::cout << "   h_bwd_state: ";
-        //   for(size_t j(0); j<n_dofs_bwd; ++j){
-        //     std::cout << h_bwd_state[j] << " ";
-        //   }
-        //   std::cout << std::endl;
-        // }
 
         bwdStep(t, currentSetpoint);
         // Point to the previous state vector stored in the trajectory buffer
@@ -790,40 +765,35 @@
                                 CUDA_R_32F, 
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
-    
+
     uint nThreads = min(Lambda->nzz+Gamma->nzz+Psi->nzz, maxThreads);
     //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
     //Then each thread is made for one file and one (or more) non linear element
+    
     SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
-                                                        Gamma->d_slice,
-                                                        Gamma->d_row, 
-                                                        Gamma->d_col,
-                                                        Gamma->nzz,          Lambda->d_val,
-                                                        Lambda->d_hyperslice,
-                                                        Lambda->d_slice, 
-                                                        Lambda->d_row, 
-                                                        Lambda->d_col,
-                                                        Lambda->nzz,
-                                                        Psi->d_val,
-                                                        Psi->d_hyperhyperslice,
-                                                        Psi->d_hyperslice,
-                                                        Psi->d_slice,
-                                                        Psi->d_row,
-                                                        Psi->d_col,
-                                                        Psi->nzz,
-                                                        Gamma->ntimes,
-                                                        Gamma->n[0],
-                                                        Gamma->n[2],
-                                                        pq,
-                                                        pq_fwd_state,
-                                                        pm);
-
-    // Conditional release of the excitation in the case of a simulation longer 
-    // than the excitation length
-    // if(t < lengthOfeachExcitation && (pq == pq_fwd_state /* WOP: Just to ensure the fwd only for now*/ )){
-    //   // k += ForcePattern.d_ExcitationsSet
-    //   modterpolator(pm, k, t, i, m);
-    // }
+                                  Gamma->d_slice,
+                                  Gamma->d_row, 
+                                  Gamma->d_col,
+                                  Gamma->nzz,
+                                  Lambda->d_val,
+                                  Lambda->d_hyperslice,
+                                  Lambda->d_slice, 
+                                  Lambda->d_row, 
+                                  Lambda->d_col,
+                                  Lambda->nzz,
+                                  // Psi->d_val,
+                                  // Psi->d_hyperhyperslice,
+                                  // Psi->d_hyperslice,
+                                  // Psi->d_slice,
+                                  // Psi->d_row,
+                                  // Psi->d_col,
+                                  // Psi->nzz,
+                                  // Gamma->ntimes,
+                                  // Gamma->n[0],
+                                  // Gamma->n[2],
+                                  pq,
+                                  pq_fwd_state,
+                                  pm);
   } 
 
   inline void __GpuDriver::modterpolator(reel* Y,
@@ -1120,7 +1090,7 @@
     if(dSolver){
       std::cout << "Solver info:" << std::endl;
       std::cout << "  Number of steps to perform: " << numsteps << std::endl;
-      reel duration = numsteps*(interpolationNumberOfPoints+1)*h;
+      reel duration = numsteps*h;
       std::cout << "  Duration length: " << duration << "s" << std::endl;
       std::cout << "  Time step: h=" << h << "s / h2=" << h2 << "s / h6=" << h6 << "s" << std::endl;
     }

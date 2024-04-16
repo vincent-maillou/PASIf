@@ -249,15 +249,18 @@ class PASIf(__GpuDriver):
 
         csr_K = (self.system_B + self.system_K).tocsr()
         csr_K.sort_indices()
-
         self._setFwdK(self.system_K.shape,
                       csr_K.data, 
                       csr_K.indices, 
                       csr_K.indptr)
 
+        # for i, val in enumerate(self.system_Gamma.val):
+        #     print(f'Val {val}, indices: {self.system_Gamma.indices[i*3:(i+1)*3]}')
+
         self._setFwdGamma(self.system_Gamma.dimensions, 
                           self.system_Gamma.val, 
                           self.system_Gamma.indices)
+
         self._setFwdLambda(self.system_Lambda.dimensions,
                            self.system_Lambda.val,
                            self.system_Lambda.indices)
@@ -392,7 +395,7 @@ class PASIf(__GpuDriver):
     
         for t in range(numOfSavedSteps):
             # first row always contain time
-            unwrappedTrajectory[0][t] = t*self.saveSteps/(self.sampleRate*(self.interpolSize+1))
+            unwrappedTrajectory[0][t] = t*self.saveSteps/self.sampleRate
             for i in range(self.globalSystemSize*self.n_excitations):
                 unwrappedTrajectory[i+1][t] = trajectory[t*self.globalSystemSize*self.n_excitations + i]
     
@@ -403,6 +406,11 @@ class PASIf(__GpuDriver):
             raise ValueError("The jacobian must be set before computing the gradient.")
 
         return self._getGradient(0)
+
+    def getMatrices(self):
+        if not self.systemSet: raise ValueError("System is not set yet")
+        K_assembled = (self.system_B + self.system_K)
+        return K_assembled, self.system_Gamma, self.system_Lambda, self.system_forcePattern, self.system_initialConditions
 
     ############################################################# 
     #                      Private methods

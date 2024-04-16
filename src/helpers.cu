@@ -165,7 +165,7 @@
                                         CUSPARSE_ORDER_COL) )
 
       CHECK_CUSPARSE( cusparseCreateDnMat(&resMat_desc, 
-                                        n[0], 
+                                        n[0],
                                         ntimes, 
                                         n[0], 
                                         d_vec, 
