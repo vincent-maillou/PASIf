@@ -29,7 +29,7 @@
                          std::vector<uint>  indptr_):
       n(n_),
       alpha(1),
-      beta(1){
+      beta(0){
 
       // Set device pointer to nullprt
       d_val = nullptr;
@@ -260,12 +260,24 @@
     COOTensor3D::COOTensor3D(std::array<uint, 3> n_,
                              std::vector<reel>   values_,
                              std::vector<uint>   indices_) : 
-      n(n_){
-      // Set device pointer to nullprt
+      n(n_),      
+      alpha(1),
+      beta(1){
+      // Set device pointer to nullptr
       d_val   = nullptr;
       d_row   = nullptr;
       d_col   = nullptr;
       d_slice = nullptr;
+      d_U = nullptr;
+      d_U1 = nullptr;
+      d_U2 = nullptr;
+      d_Q_res = nullptr;
+      d_buffer = nullptr;
+      bufferSize = 0;
+      d_M_cols = nullptr;
+
+      d_alpha = nullptr;
+      d_beta = nullptr;
 
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
@@ -273,6 +285,7 @@
         slice.push_back(indices_[3*i]);
         row.push_back(indices_[3*i+1]);
         col.push_back(indices_[3*i+2]);
+        M_cols.push_back(i);
       }
     }
 
@@ -293,6 +306,31 @@
       if(d_slice != nullptr){
         CHECK_CUDA( cudaFree(d_slice) );
       }
+      if(d_U != nullptr){
+        CHECK_CUDA( cudaFree(d_U) );
+      }
+      if(d_U1 != nullptr){
+        CHECK_CUDA( cudaFree(d_U1) );
+      }
+      if(d_U2 != nullptr){
+        CHECK_CUDA( cudaFree(d_U2) );
+      }
+      if(d_Q_res != nullptr){
+        CHECK_CUDA( cudaFree(d_Q_res) );
+      }
+      if(d_alpha != nullptr){
+        CHECK_CUDA( cudaFree(d_alpha) );
+      }
+      if(d_buffer != nullptr){
+        CHECK_CUDA( cudaFree(d_buffer) );
+      }
+      if(d_beta != nullptr){
+        CHECK_CUDA( cudaFree(d_beta) );
+      }
+      if(d_M_cols != nullptr){
+        CHECK_CUDA( cudaFree(d_M_cols) );
+      }
+
     }
 
   /**
@@ -302,6 +340,18 @@
    */
     uint COOTensor3D::extendTheSystem(uint nTimes){
       ntimes = nTimes;
+
+      for(uint l=0; l<ntimes; l+=1){
+          for(uint i=0; i<nzz; i+=1){
+            U.push_back(0);
+            U1.push_back(0);
+            U2.push_back(0);
+          }
+          for(uint i=0; i<n[0]; i+=1){
+            Q_res.push_back(0);
+          }
+      }
+
       return ntimes*n[0];
     }
 
@@ -309,18 +359,80 @@
    * @brief Construct a new COOTensor3D::allocateOnGPU object
    * 
    */
-    void COOTensor3D::allocateOnGPU(){
+    void COOTensor3D::allocateOnGPU(cusparseHandle_t     & handle){
       // Allocate memory on the device
       CHECK_CUDA( cudaMalloc((void**)&d_row,   nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_col,   nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_slice, nzz*sizeof(uint)) );
       CHECK_CUDA( cudaMalloc((void**)&d_val,   nzz*sizeof(reel)) );
 
+      CHECK_CUDA( cudaMalloc((void**)&d_U,   nzz*ntimes*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_U1,   nzz*ntimes*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_U2,   nzz*ntimes*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_Q_res,   n[0]*ntimes*sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_M_cols,   nzz*sizeof(uint)) );
+      
+
       // Copy the data to the device
       CHECK_CUDA( cudaMemcpy(d_val,   val.data(),   nzz*sizeof(reel), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_slice, slice.data(), nzz*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_row,   row.data(),   nzz*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_col,   col.data(),   nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+
+      CHECK_CUDA( cudaMemcpy(d_U,   U.data(),   nzz*ntimes*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_U1,   U1.data(),   nzz*ntimes*sizeof(reel), cudaMemcpyHostToDevice) );
+      CHECK_CUDA( cudaMemcpy(d_U2,   U2.data(),   nzz*ntimes*sizeof(reel), cudaMemcpyHostToDevice) ); 
+      CHECK_CUDA( cudaMemcpy(d_Q_res,   Q_res.data(),   n[0]*ntimes*sizeof(reel), cudaMemcpyHostToDevice) );  
+
+      CHECK_CUDA( cudaMemcpy(d_M_cols,   M_cols.data(),   nzz*sizeof(uint), cudaMemcpyHostToDevice) ); 
+
+      // Create the sparse matrix descriptor and allocate the needed buffer
+      CHECK_CUSPARSE( cusparseCreateConstCoo(&M_desc, 
+                                        n[0], 
+                                        nzz, 
+                                        nzz, 
+                                        d_slice, 
+                                        d_M_cols, 
+                                        d_val, 
+                                        CUSPARSE_INDEX_32I,
+                                        CUSPARSE_INDEX_BASE_ZERO, 
+                                        CUDA_R_32F) )
+
+      CHECK_CUSPARSE( cusparseCreateDnMat(&U_desc, 
+                                        nzz, 
+                                        ntimes, 
+                                        nzz, 
+                                        d_U, 
+                                        CUDA_R_32F, 
+                                        CUSPARSE_ORDER_COL) )
+
+      CHECK_CUSPARSE( cusparseCreateDnMat(&resQ_desc, 
+                                        n[0], 
+                                        ntimes, 
+                                        n[0], 
+                                        d_Q_res, 
+                                        CUDA_R_32F,
+                                        CUSPARSE_ORDER_COL) );
+
+      CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) );
+      CHECK_CUDA( cudaMalloc((void**)&d_beta,  sizeof(reel)) );
+      CHECK_CUDA( cudaMemcpy(d_alpha,   &alpha,   sizeof(reel), cudaMemcpyHostToDevice) ); 
+      CHECK_CUDA( cudaMemcpy(d_beta,   &beta,   sizeof(reel), cudaMemcpyHostToDevice) ); 
+
+      CHECK_CUSPARSE( cusparseSpMM_bufferSize(handle, 
+                                              CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                              CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                              &d_alpha, 
+                                              M_desc, 
+                                              U_desc, 
+                                              &d_beta, 
+                                              resQ_desc, 
+                                              CUDA_R_32F, 
+                                              CUSPARSE_SPMM_COO_ALG1, 
+                                              &bufferSize) )
+
+      CHECK_CUDA( cudaMalloc((void**)&d_buffer, bufferSize) );
+
     }
 
     size_t COOTensor3D::memFootprint(){

@@ -221,3 +221,36 @@
  void stepfwd(uint* d_step){
   *d_step += 1;
  }
+
+   __global__
+ void copykernel(uint* indices1,
+                reel* U1,
+                uint* indices2,
+                reel* U2,
+                reel* X,
+                uint nzz,
+                uint ntimes){
+
+  if(blockIdx.x==0 && threadIdx.x==0){
+    for(uint k(0); k<nzz; k++){
+      for(uint l(0); l<ntimes; l++){
+        memcpy(&U1[k+l*ntimes], &X[indices1[k]+l*ntimes], sizeof(reel));
+        memcpy(&U2[k+l*ntimes], &X[indices2[k]+l*ntimes], sizeof(reel));
+      }
+    }
+  }
+}
+
+
+   __global__
+ void hadamardproduct(reel* U,
+                reel* U1,
+                reel* U2,
+                uint size){
+
+  if(blockIdx.x==0 && threadIdx.x==0){
+    for(uint k(0); k<size; k++){
+      U[k] = U1[k]*U2[k];
+    }
+  }
+}

@@ -791,32 +791,60 @@
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
     
-    uint nThreads = min(Lambda->nzz+Gamma->nzz+Psi->nzz, maxThreads);
-    //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
-    //Then each thread is made for one file and one (or more) non linear element
-    SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
-                                                        Gamma->d_slice,
-                                                        Gamma->d_row, 
-                                                        Gamma->d_col,
-                                                        Gamma->nzz,          Lambda->d_val,
-                                                        Lambda->d_hyperslice,
-                                                        Lambda->d_slice, 
-                                                        Lambda->d_row, 
-                                                        Lambda->d_col,
-                                                        Lambda->nzz,
-                                                        Psi->d_val,
-                                                        Psi->d_hyperhyperslice,
-                                                        Psi->d_hyperslice,
-                                                        Psi->d_slice,
-                                                        Psi->d_row,
-                                                        Psi->d_col,
-                                                        Psi->nzz,
-                                                        Gamma->ntimes,
-                                                        Gamma->n[0],
-                                                        Gamma->n[2],
-                                                        pq,
-                                                        pq_fwd_state,
-                                                        pm);
+    // uint nThreads = min(Lambda->nzz+Gamma->nzz+Psi->nzz, maxThreads);
+    // //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
+    // //Then each thread is made for one file and one (or more) non linear element
+    // SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
+    //                                                     Gamma->d_slice,
+    //                                                     Gamma->d_row, 
+    //                                                     Gamma->d_col,
+    //                                                     Gamma->nzz,          Lambda->d_val,
+    //                                                     Lambda->d_hyperslice,
+    //                                                     Lambda->d_slice, 
+    //                                                     Lambda->d_row, 
+    //                                                     Lambda->d_col,
+    //                                                     Lambda->nzz,
+    //                                                     Psi->d_val,
+    //                                                     Psi->d_hyperhyperslice,
+    //                                                     Psi->d_hyperslice,
+    //                                                     Psi->d_slice,
+    //                                                     Psi->d_row,
+    //                                                     Psi->d_col,
+    //                                                     Psi->nzz,
+    //                                                     Gamma->ntimes,
+    //                                                     Gamma->n[0],
+    //                                                     Gamma->n[2],
+    //                                                     pq,
+    //                                                     pq_fwd_state,
+    //                                                     pm);
+
+    copykernel<<<1, 1, 0, streams[0]>>>(Gamma->d_row,
+              Gamma->d_U1,
+              Gamma->d_col,
+              Gamma->d_U2,
+              pq,
+              Gamma->nzz,
+              Gamma->ntimes);
+    
+    hadamardproduct<<<1, 1, 0, streams[0]>>>(Gamma->d_U,
+                    Gamma->d_U1,
+                    Gamma->d_U2,
+                    Gamma->ntimes*Gamma->nzz);
+
+    CHECK_CUSPARSE(cusparseDnMatSetValues(Gamma->resQ_desc, pm))
+    CHECK_CUSPARSE(cusparseDnMatSetValues(Gamma->U_desc, Gamma->d_U))  
+
+    CHECK_CUSPARSE(cusparseSpMM(h_cusparse, 
+                                CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                Gamma->d_alpha, 
+                                Gamma->M_desc,
+                                Gamma->U_desc,
+                                Gamma->d_beta,
+                                Gamma->resQ_desc,
+                                CUDA_R_32F, 
+                                CUSPARSE_SPMM_COO_ALG1, 
+                                Gamma->d_buffer));
 
     // Conditional release of the excitation in the case of a simulation longer 
     // than the excitation length
@@ -1132,7 +1160,7 @@
 
     fwd_K->allocateOnGPU(h_cusparse);
 
-    fwd_Gamma->allocateOnGPU();
+    fwd_Gamma->allocateOnGPU(h_cusparse);
 
     fwd_Lambda->allocateOnGPU();
 
@@ -1309,14 +1337,12 @@
     }
   }
 
-
-
 /*                    Adjoint system private methods                    */
 
   void __GpuDriver::allocateDeviceAdjointSystem(){
     bwd_K->allocateOnGPU(h_cusparse);
 
-    bwd_Gamma->allocateOnGPU();
+    bwd_Gamma->allocateOnGPU(h_cusparse);
 
     bwd_Lambda->allocateOnGPU();
 
