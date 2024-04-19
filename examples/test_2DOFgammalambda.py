@@ -11,7 +11,7 @@ import time
 
 
 USE_SOUND_FILE=True
-TRAJ=True
+TRAJ=False
 GRAD= False
 CHAIN=True
 

@@ -131,7 +131,7 @@ enum problemType {forward, backward};
     ~COOTensor3D();
 
     uint   extendTheSystem(uint nTimes);
-    void   allocateOnGPU(cusparseHandle_t     & handle);
+    void   allocateOnGPU();
     size_t memFootprint();
 
     std::ostream& print(std::ostream& out) const;
@@ -145,32 +145,13 @@ enum problemType {forward, backward};
     std::vector<uint>   slice;
     std::vector<uint>   row;
     std::vector<uint>   col;
-    std::vector<reel> U1;
-    std::vector<reel> U2;
-    std::vector<reel> U;
-    std::vector<reel> M;
-    std::vector<uint> M_cols;
-    std::vector<reel> Q_res;
+
 
    // Device-side data
     reel *d_val;
     uint *d_slice;
     uint *d_row;
     uint *d_col;
-    reel *d_U1;
-    reel *d_U2;
-    reel *d_U;
-    reel *d_Q_res;
-    uint *d_M_cols;
-
-    cusparseDnMatDescr_t U_desc;
-    cusparseDnMatDescr_t resQ_desc;
-    cusparseConstSpMatDescr_t M_desc;
-    void*  d_buffer;
-    size_t bufferSize;
-
-    reel  alpha; reel *d_alpha;
-    reel  beta;  reel *d_beta;
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor3D const& tensor_);

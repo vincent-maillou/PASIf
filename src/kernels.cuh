@@ -116,20 +116,3 @@
 
  __global__
  void stepfwd(uint* d_step);
-
-
-   __global__
- void copykernel(uint* indices1,
-                reel* U1,
-                uint* indices2,
-                reel* U2,
-                reel* X,
-                uint nzz,
-                uint ntimes);
-
-
-   __global__
- void hadamardproduct(reel* U,
-                reel* U1,
-                reel* U2,
-                uint size);
