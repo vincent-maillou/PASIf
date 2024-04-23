@@ -12,8 +12,8 @@ import time
 
 USE_SOUND_FILE=True
 TRAJ=False
-GRAD= False
-CHAIN=True
+GRAD= True
+CHAIN=False
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -40,7 +40,7 @@ filelength = 5000
 numSteps=filelength
 sr = 16000
 x  = np.linspace(0, filelength/sr, filelength)
-
+n_sites = 2
 dofName = 'oscillator'
 system.degreesOfFreedom[f'{dofName}'] = spr.ParametricVariable(m)
 system.interactionPotentials[f'{dofName}_K'] =  spr.IntegerPotential(k)
@@ -108,10 +108,10 @@ if CHAIN:
             system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].degreesOfFreedom[name_dof_2] = 1
 
 
-            # system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
-            # system.interactionPotentials[f'{site_name}_L'] =  spr.IntegerPotential(duffing)
-            # system.interactionPotentials[f'{site_name}_L'].degreesOfFreedom[site_name] = 4
-            # system.interactionPotentials[f'{site_name}_L'].strength.parameterized = True
+            system.interactionPotentials[f'OptoCoup_{site_name}_{name_dof_2}'].strength.parameterized = True
+            system.interactionPotentials[f'{site_name}_L'] =  spr.IntegerPotential(duffing)
+            system.interactionPotentials[f'{site_name}_L'].degreesOfFreedom[site_name] = 4
+            system.interactionPotentials[f'{site_name}_L'].strength.parameterized = True
         else: # terminal damping
             system.interactionPotentials[f'{site_name}_B'] = spr.LocalDamping(site_name, final_damping)
             system.interactionPotentials[f'{site_name}_B'].strength.parameterized = True
@@ -126,7 +126,7 @@ else:
     trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2500']#, '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2812', '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2020']
 
     # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1010']
-    trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
+    # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
 
     sr = 16000*16
     excitationFileLength = 78001
@@ -139,7 +139,9 @@ else:
     system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 1e3)
 
 system.probes[f'probe__squared'] = spr.SimpleA2Probe(f'cantilever')
-system.probes[f'probe__multi'] = spr.SimpleA2MultiProbe(f'cantilever', f'oscillator')
+system.interactionPotentials['probe__squared_grad'] = system.probes['probe__squared'].makeAdjointSource()
+
+# system.probes[f'probe__multi'] = spr.SimpleA2MultiProbe(f'cantilever', f'oscillator')
 
 # for i in range(1, 5):
 #     system.probes[f'probe__multi_{i}'] = spr.SimpleA2MultiProbe(f'dof_{i}', f'dof_{i+1}')

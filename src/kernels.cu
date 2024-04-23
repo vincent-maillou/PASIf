@@ -48,20 +48,20 @@
   uint sp_offset = blockIdx.x*n_setpoint;
   uint src_offset = blockIdx.x*n_source;
 
-  uint k=threadIdx.x;
+  int k=threadIdx.x;
   while(k<nzz_G){      
     atomicAdd(&Y[d_slice_G[k]+src_offset],  d_val_G[k]*X_source[d_row_G[k]+src_offset]*X_setpoint[d_col_G[k]+sp_offset]);
     k += stride;
   }
 
-  k=blockDim.x-threadIdx.x;
-  while(k<nzz_L){
+  k = blockDim.x-threadIdx.x-1;
+  while(k<nzz_L && k>=0){
     atomicAdd(&Y[d_hyperslice_L[k]+src_offset], d_val_L[k]*X_source[d_slice_L[k]+src_offset]*X_setpoint[d_row_L[k]+sp_offset]*X_setpoint[d_col_L[k]+sp_offset]);
     k += stride;
   }
 
   k=threadIdx.x-nzz_G;
-  while(k<nzz_P && k>0){
+  while(k<nzz_P && k>=0){
     atomicAdd(&Y[d_hyperhyperslice_P[k]+src_offset], d_val_P[k]*X_source[d_hyperslice_P[k]+src_offset]*X_setpoint[d_slice_P[k]+sp_offset]*X_setpoint[d_row_P[k]+sp_offset]*X_setpoint[d_col_P[k]+sp_offset]);
     k += stride;
   }

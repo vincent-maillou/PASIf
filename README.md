@@ -26,6 +26,11 @@ To compile the code using the Makefile you'll need to fulfill the following requ
         mkdir build
         make
 
+
+### Single vs Double precision
+
+To switch the precision, change float to double in /src/helpers.cuh
+
 ### Other comments on the Makefile
 
 Depending on the hardware targeted during the compilation make sure that the _-arch_ flag match the architecture of your hardware. This to get the best performances.  

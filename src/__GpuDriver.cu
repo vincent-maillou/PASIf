@@ -137,7 +137,7 @@
         h_cublas(nullptr),
         h_cusparse(nullptr)
         {
-    
+
       setCUDA(nStreams);
 
       // Put on the device alpha and beta values for the cuSPARSE API
@@ -541,13 +541,22 @@
       }
 
 
-      // 2. Compute the current chunk
-      CHECK_CUBLAS( cublasScopy(h_cublas,
-                                n_dofs_fwd, 
-                                d_trajectories + (setpoint)*n_dofs_fwd, 
-                                1, 
-                                d_fwd_Q, 
-                                1) )
+    // 2. Compute the current chunk 
+      if (std::is_same<float,reel>::value){
+        CHECK_CUBLAS( cublasScopy(h_cublas,
+                                  n_dofs_fwd, 
+                                  (float *) d_trajectories + (setpoint)*n_dofs_fwd, 
+                                  1, 
+                                  (float *) d_fwd_Q, 
+                                  1) );
+      }else{
+        CHECK_CUBLAS( cublasDcopy(h_cublas,
+                                  n_dofs_fwd, 
+                                  (double *) d_trajectories + (setpoint)*n_dofs_fwd, 
+                                  1, 
+                                  (double *) d_fwd_Q, 
+                                  1) );
+      }
 
       setComputeSystem(forward);
       forwardRungeKutta(startStep, endStep, 0, 1, setpoint);
@@ -657,12 +666,22 @@
 
       if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps!=0)){
         //only save non interpolated steps  
-        CHECK_CUBLAS( cublasScopy(h_cublas,
-                                  n_dofs, 
-                                  d_Q, 
-                                  1, 
-                                  d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
-                                  1) )
+
+          if (std::is_same<float,reel>::value){
+            CHECK_CUBLAS( cublasScopy(h_cublas,
+                                      n_dofs, 
+                                      (float *) d_Q, 
+                                      1, 
+                                      (float *) d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
+                                      1) )
+          }else{
+            CHECK_CUBLAS( cublasDcopy(h_cublas,
+                                      n_dofs, 
+                                      (double *) d_Q, 
+                                      1, 
+                                      (double *) d_trajectories + (trajSaveIndex+saveOffset)*n_dofs, 
+                                      1) ) 
+          }
         ++trajSaveIndex;
         }
         
@@ -762,7 +781,7 @@
                                 K->denseMat_desc,
                                 d_beta0,
                                 K->resMat_desc,
-                                CUDA_R_32F, 
+                                K->cuda_dtype, 
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
 

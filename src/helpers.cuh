@@ -24,8 +24,9 @@
 #include <chrono>
 #include <assert.h>
 #include <iomanip>
+#include <functional>
 
-#define reel float
+#define reel double
 #define reel_eps  std::numeric_limits<reel>::epsilon()
 
 #define matrix std::vector<std::vector<reel>>
@@ -67,8 +68,6 @@ enum problemType {forward, backward};
       }                                                                          \
   }                                                                             
 
-
-
 /****************************************************
  *              COO Matrix
  ****************************************************/
@@ -105,6 +104,7 @@ enum problemType {forward, backward};
     reel *d_vec;
     reel *d_res;
 
+    cudaDataType cuda_dtype;
     cusparseDnMatDescr_t denseMat_desc;
     cusparseDnMatDescr_t resMat_desc;
     cusparseConstSpMatDescr_t sparseMat_desc;

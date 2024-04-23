@@ -12,8 +12,6 @@
 
 #include "helpers.cuh"
 
-
-
 /****************************************************
  *              CSR Matrix
  ****************************************************/
@@ -30,6 +28,12 @@
       n(n_),
       alpha(1),
       beta(0){
+
+      if (std::is_same<float,reel>::value){
+        cuda_dtype = CUDA_R_32F;
+      }else{
+        cuda_dtype = CUDA_R_64F;
+      }
 
       // Set device pointer to nullprt
       d_val = nullptr;
@@ -143,6 +147,8 @@
       CHECK_CUDA( cudaMemcpy(d_vec, vec.data(), ntimes*n[0]*sizeof(reel), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_res, vec.data(), ntimes*n[0]*sizeof(reel), cudaMemcpyHostToDevice) );      
 
+
+
       // Create the sparse matrix descriptor and allocate the needed buffer
       CHECK_CUSPARSE( cusparseCreateConstCsr(&sparseMat_desc, 
                                         n[0], 
@@ -154,14 +160,14 @@
                                         CUSPARSE_INDEX_32I,
                                         CUSPARSE_INDEX_32I, 
                                         CUSPARSE_INDEX_BASE_ZERO, 
-                                        CUDA_R_32F) )
+                                        cuda_dtype) )
 
       CHECK_CUSPARSE( cusparseCreateDnMat(&denseMat_desc, 
                                         n[0], 
                                         ntimes, 
                                         n[0], 
                                         d_vec, 
-                                        CUDA_R_32F, 
+                                        cuda_dtype, 
                                         CUSPARSE_ORDER_COL) )
 
       CHECK_CUSPARSE( cusparseCreateDnMat(&resMat_desc, 
@@ -169,7 +175,7 @@
                                         ntimes, 
                                         n[0], 
                                         d_vec, 
-                                        CUDA_R_32F,
+                                        cuda_dtype,
                                         CUSPARSE_ORDER_COL) );
       
       CHECK_CUDA( cudaMalloc((void**)&d_alpha, sizeof(reel)) );
@@ -183,7 +189,7 @@
                                               denseMat_desc, 
                                               &d_beta, 
                                               resMat_desc, 
-                                              CUDA_R_32F, 
+                                              cuda_dtype, 
                                               CUSPARSE_SPMM_CSR_ALG1, 
                                               &bufferSize) )
 
@@ -197,7 +203,7 @@
                                             denseMat_desc,
                                             &d_beta,
                                             resMat_desc,
-                                            CUDA_R_32F,
+                                            cuda_dtype,
                                             CUSPARSE_SPMM_CSR_ALG1,
                                             d_buffer));
     }
