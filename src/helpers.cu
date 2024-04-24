@@ -664,6 +664,12 @@
       d_val = nullptr;
       d_indice = nullptr;
 
+      if (std::is_same<float,reel>::value){
+        cuda_dtype = CUDA_R_32F;
+      }else{
+        cuda_dtype = CUDA_R_64F;
+      }
+
       n = denseVector_.size();
       for(size_t i(0); i<denseVector_.size(); ++i){
         if(std::abs(denseVector_[i]) > reel_eps){
@@ -717,7 +723,7 @@
 
     // Create the sparse vector descriptor
     CHECK_CUSPARSE( cusparseCreateSpVec(&sparseVec_desc, n, nzz, &d_indice, &d_val,
-                                        CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F) )
+                                        CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, cuda_dtype) )
   }
 
   size_t COOVector::memFootprint(){

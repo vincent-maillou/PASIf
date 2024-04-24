@@ -271,6 +271,7 @@ enum problemType {forward, backward};
     reel *d_val;
     uint *d_indice;
 
+    cudaDataType cuda_dtype;
     cusparseSpVecDescr_t sparseVec_desc;
   };
 

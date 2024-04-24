@@ -255,11 +255,14 @@ class PASIf(__GpuDriver):
                       csr_K.indptr)
 
         # for i, val in enumerate(self.system_Gamma.val):
-        #     print(f'Val {val}, indices: {self.system_Gamma.indices[i*3:(i+1)*3]}')
+            # print(f'Val {val}, indices: {self.system_Gamma.indices[i*3:(i+1)*3]}')
 
         self._setFwdGamma(self.system_Gamma.dimensions, 
                           self.system_Gamma.val, 
                           self.system_Gamma.indices)
+
+        # for i, val in enumerate(self.system_Lambda.val):
+        #     print(f'Val {val}, indices: {self.system_Lambda.indices[i*4:(i+1)*4]}')
 
         self._setFwdLambda(self.system_Lambda.dimensions,
                            self.system_Lambda.val,
@@ -605,64 +608,3 @@ class PASIf(__GpuDriver):
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
         #self.jacobian_forcePattern *= -1*self.jacobian_M.data
     
-    ###             DEPRECATED              ###        
-        
-    def __assembleSystemAndJacobian(self):
-        
-        """
-        Concatenate the system and jacobian matrices to form the final system
-        to be used during the getGradient() method. We do so because during 
-        the gradient calculation we need both the system to solve the forward 
-        problem and the jacobian to solve the adjoint problem.
-        """
-        
-        self.jacobian_B.resize((self.system_B.shape[0]+self.jacobian_B.shape[0], 
-                                self.system_B.shape[1]+self.jacobian_B.shape[1]))
-        dataJacB : np.ndarray = self.jacobian_B.data
-        rowJacB  : np.ndarray = self.jacobian_B.row
-        colJacB  : np.ndarray = self.jacobian_B.col
-        
-        for i in range(len(rowJacB)):
-            rowJacB[i] += self.system_B.shape[0]
-            colJacB[i] += self.system_B.shape[0]
-        
-        dataJacB = np.concatenate((self.system_B.data, dataJacB))
-        rowJacB  = np.concatenate((self.system_B.row,  rowJacB))
-        colJacB  = np.concatenate((self.system_B.col,  colJacB))
-        
-        self.jacobian_B = coo_matrix((dataJacB, (rowJacB, colJacB)), shape = (self.jacobian_B.shape[0], self.jacobian_B.shape[1]))
-        
-        
-        self.jacobian_K.resize((self.system_K.shape[0]+self.jacobian_K.shape[0], 
-                                self.system_K.shape[1]+self.jacobian_K.shape[1]))
-        dataJacK : np.ndarray = self.jacobian_K.data
-        rowJacK  : np.ndarray = self.jacobian_K.row
-        colJacK  : np.ndarray = self.jacobian_K.col
-        
-        for i in range(len(rowJacK)):
-            rowJacK[i] += self.system_K.shape[0]
-            colJacK[i] += self.system_K.shape[0]
-        
-        dataJacK = np.concatenate((self.system_K.data, dataJacK))
-        rowJacK  = np.concatenate((self.system_K.row,  rowJacK))
-        colJacK  = np.concatenate((self.system_K.col,  colJacK))
-        
-        self.jacobian_K = coo_matrix((dataJacK, (rowJacK, colJacK)), shape = (self.jacobian_K.shape[0], self.jacobian_K.shape[1]))
-        
-        temporaryGamma = cp.deepcopy(self.system_Gamma)
-        temporaryGamma.concatenateTensor(self.jacobian_Gamma)
-        self.jacobian_Gamma = temporaryGamma
-        
-        temporaryLambda = cp.deepcopy(self.system_Lambda)
-        temporaryLambda.concatenateTensor(self.jacobian_Lambda)
-        self.jacobian_Lambda = temporaryLambda
-        
-        # We don't extend the Psi vector since it only makes sense to have it in the adjoint system
-        # But if it's later needed, it can be extended by doing the following:
-        # > zeroTensor = coo_tensor(dimensions_ = [self.system_K.dimensions[0], self.system_K.dimensions[0], self.system_K.dimensions[0], self.system_K.dimensions[0]])
-        # > zeroTensor.concatenateTensor(self.jacobian_Psi)
-        # > self.jacobian_Psi = zeroTensor
-        
-        self.jacobian_forcePattern      = np.append(self.system_forcePattern, self.jacobian_forcePattern)
-        self.jacobian_initialConditions = np.append(self.system_initialConditions, self.jacobian_initialConditions)
-        
