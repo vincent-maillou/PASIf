@@ -607,4 +607,3 @@ class PASIf(__GpuDriver):
         self.jacobian_Lambda.multiplyByDiagMatrix(self.jacobian_M.data)
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
         #self.jacobian_forcePattern *= -1*self.jacobian_M.data
-    

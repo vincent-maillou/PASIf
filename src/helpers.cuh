@@ -146,7 +146,6 @@ enum problemType {forward, backward};
     std::vector<uint>   row;
     std::vector<uint>   col;
 
-
    // Device-side data
     reel *d_val;
     uint *d_slice;
@@ -185,7 +184,6 @@ enum problemType {forward, backward};
     std::vector<uint>   slice;
     std::vector<uint>   row;
     std::vector<uint>   col;
-    
 
    // Device-side data
     reel *d_val;
@@ -193,7 +191,6 @@ enum problemType {forward, backward};
     uint *d_slice;
     uint *d_row;
     uint *d_col;
-
   };
 
   std::ostream& operator<<(std::ostream& out, COOTensor4D const& tensor_);

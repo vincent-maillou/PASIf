@@ -121,8 +121,9 @@
   uint selectedExcitation(0);
 
   uint step = *d_step+offset;
+  uint log2interp = log2f(interpolationWindowSize);
   uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
-  uint excoff((((step << 1) + (halfStep?1:0))>>2));
+  uint excoff((((step << 1) + (halfStep?1:0))>>log2interp));
 
 
   uint k = blockIdx.x;
@@ -188,4 +189,3 @@
  void stepfwd(uint* d_step){
   *d_step += 1;
  }
-

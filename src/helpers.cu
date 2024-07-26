@@ -263,7 +263,7 @@
   * @param denseTensor 
   * @param scaleMatrix 
   */
-    COOTensor3D::COOTensor3D(std::array<uint, 3> n_,
+   COOTensor3D::COOTensor3D(std::array<uint, 3> n_,
                              std::vector<reel>   values_,
                              std::vector<uint>   indices_) : 
       n(n_){
@@ -389,13 +389,13 @@
                              std::vector<reel> values_,
                              std::vector<uint> indices_) : 
       n(n_){
-      // Set device pointer to nullprt
+    // Set device pointer to nullptr
       d_val        = nullptr;
       d_hyperslice = nullptr;
       d_slice      = nullptr;
       d_row        = nullptr;
       d_col        = nullptr;
-      
+
       nzz = values_.size();
       for(size_t i(0); i<nzz; ++i){
         val.push_back(values_[i]);
@@ -456,6 +456,7 @@
       CHECK_CUDA( cudaMemcpy(d_slice,      slice.data(),      nzz*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_row,        row.data(),        nzz*sizeof(uint), cudaMemcpyHostToDevice) );
       CHECK_CUDA( cudaMemcpy(d_col,        col.data(),        nzz*sizeof(uint), cudaMemcpyHostToDevice) );
+
     }
 
     size_t COOTensor4D::memFootprint(){
