@@ -272,6 +272,7 @@ class __GpuDriver{
   uint nBlocks;
   uint nThreadsPerBlock;
   uint maxThreads;
+  uint gridShapeY;
 
   cublasHandle_t   h_cublas;
   cusparseHandle_t h_cusparse;

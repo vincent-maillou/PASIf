@@ -131,6 +131,7 @@
         nBlocks(0),
         nThreadsPerBlock(0),
         maxThreads(512),
+        gridShapeY(1),
 
         fwd_graphs_created(false),
 
@@ -694,21 +695,21 @@
     derivatives(d_m1, d_Q, nullptr);
     
     modterpolator(d_m1, 0, false, false);//add the excitation force
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);//update state vector
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);//update state vector
 
     derivatives(d_m2, d_mi, nullptr);
     modterpolator(d_m2, 0, true, false);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
     
     derivatives(d_m3, d_mi, nullptr);
     modterpolator(d_m3, 0, true, false);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
     derivatives(d_m4, d_mi, nullptr);
     modterpolator(d_m4, 1, false, false);
 
     // Compute next state vector Q
-    integrate<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
   }
 
   void __GpuDriver::backwardRungeKutta(uint  tStart_, 
@@ -785,11 +786,10 @@
                                 CUSPARSE_SPMM_CSR_ALG1, 
                                 K->d_buffer));
 
-    uint nThreads = min(Lambda->nzz+Gamma->nzz+Psi->nzz, maxThreads);
     //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
     //Then each thread is made for one file and one (or more) non linear element
     
-    SpTdV<<<Gamma->ntimes, nThreads, 0, streams[0]>>>(Gamma->d_val,
+    SpTdV<<<dim3(Gamma->ntimes, gridShapeY), nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
                                   Gamma->d_slice,
                                   Gamma->d_row, 
                                   Gamma->d_col,
@@ -999,6 +999,11 @@
       d_m2 = d_fwd_m2;
       d_m3 = d_fwd_m3;
       d_m4 = d_fwd_m4;
+      
+      nBlocks = ceil( float(n_dofs_fwd) / nThreadsPerBlock );
+    
+      gridShapeY = ceil( float(Lambda->nzz+Gamma->nzz+Psi->nzz) / nThreadsPerBlock );
+      //gridShape for SpdtV product, grid dim in X is the number of file, and in y the stride for non linear elements
 
       // Set the initial conditions to the states vectors
       // resetStatesVectors();
@@ -1023,6 +1028,10 @@
       d_m3 = d_bwd_m3;
       d_m4 = d_bwd_m4;
 
+      nBlocks = ceil( float(n_dofs_fwd) / nThreadsPerBlock );
+
+      gridShapeY = ceil( float(Lambda->nzz+Gamma->nzz+Psi->nzz) / nThreadsPerBlock );
+      
       // Set the initial conditions to the states vectors
       resetStatesVectors();
     }

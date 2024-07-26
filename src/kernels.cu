@@ -44,27 +44,21 @@
             reel* X_setpoint,
             reel* Y){
   
-  uint stride = blockDim.x;
   uint sp_offset = blockIdx.x*n_setpoint;
   uint src_offset = blockIdx.x*n_source;
 
-  int k=threadIdx.x;
-  while(k<nzz_G){      
-    atomicAdd(&Y[d_slice_G[k]+src_offset],  d_val_G[k]*X_source[d_row_G[k]+src_offset]*X_setpoint[d_col_G[k]+sp_offset]);
-    k += stride;
-  }
+  int k=threadIdx.x + blockIdx.y*blockDim.x;
 
-  k = blockDim.x-threadIdx.x-1;
-  while(k<nzz_L && k>=0){
-    atomicAdd(&Y[d_hyperslice_L[k]+src_offset], d_val_L[k]*X_source[d_slice_L[k]+src_offset]*X_setpoint[d_row_L[k]+sp_offset]*X_setpoint[d_col_L[k]+sp_offset]);
-    k += stride;
-  }
+  if(k<nzz_G) atomicAdd(&Y[d_slice_G[k]+src_offset],  d_val_G[k]*X_source[d_row_G[k]+src_offset]*X_setpoint[d_col_G[k]+sp_offset]);
 
-  k=threadIdx.x-nzz_G;
-  while(k<nzz_P && k>=0){
-    atomicAdd(&Y[d_hyperhyperslice_P[k]+src_offset], d_val_P[k]*X_source[d_hyperslice_P[k]+src_offset]*X_setpoint[d_slice_P[k]+sp_offset]*X_setpoint[d_row_P[k]+sp_offset]*X_setpoint[d_col_P[k]+sp_offset]);
-    k += stride;
-  }
+
+  k = blockDim.x*gridDim.y-threadIdx.x-1;
+  if(k<nzz_L && k>=0) atomicAdd(&Y[d_hyperslice_L[k]+src_offset], d_val_L[k]*X_source[d_slice_L[k]+src_offset]*X_setpoint[d_row_L[k]+sp_offset]*X_setpoint[d_col_L[k]+sp_offset]);
+
+
+  k= blockIdx.y*blockDim.x + threadIdx.x-nzz_G;
+  
+  if(k<nzz_P && k>=0) atomicAdd(&Y[d_hyperhyperslice_P[k]+src_offset], d_val_P[k]*X_source[d_hyperslice_P[k]+src_offset]*X_setpoint[d_slice_P[k]+sp_offset]*X_setpoint[d_row_P[k]+sp_offset]*X_setpoint[d_col_P[k]+sp_offset]);
 
  }
 
@@ -154,11 +148,7 @@
                   uint  n){
 
   uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint k = index; k < n; k += stride){
-    rki[k] = q[k]+ dt*rk[k];
-  }
+  if (index<n) rki[index] = q[index]+ dt*rk[index];
  }
 
 
@@ -176,13 +166,8 @@
                 reel  h6, 
                 uint  n){
 
-  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
-  uint stride = blockDim.x * gridDim.x;  
-
-  for(uint k = index; k < n; k += stride){
-    atomicAdd(&q[k], h6*(rk1[k] +2*rk2[k]+2*rk3[k]+rk4[k]));
-    // __syncthreads();
-  }
+  uint k  = threadIdx.x + blockIdx.x * blockDim.x;
+  if(k<n)  q[k] += h6*(rk1[k] +2*rk2[k]+2*rk3[k]+rk4[k]);
  }
 
  __global__
