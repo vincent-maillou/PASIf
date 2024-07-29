@@ -37,6 +37,8 @@
         alpha(1.0), d_alpha(nullptr),
         beta0(0.0), d_beta0(nullptr),
         fwd_step(0), d_step(nullptr),
+        bwd_setpoint(0),
+        d_setpoint(nullptr), 
 
         dCompute(dCompute_),
         dSystem(dSystem_),
@@ -134,6 +136,7 @@
         gridShapeY(1),
 
         fwd_graphs_created(false),
+        bwd_graphs_created(false),
 
         h_cublas(nullptr),
         h_cusparse(nullptr)
@@ -151,7 +154,6 @@
       CHECK_CUDA( cudaMemcpy(d_step, &fwd_step,  sizeof(uint), cudaMemcpyHostToDevice) )
       _loadExcitationsSet(excitationSet_,
                           sampleRate_);
-
     }
 
   __GpuDriver::~__GpuDriver(){
@@ -651,7 +653,7 @@
     // Performe the rk4 steps
     for(uint t(tStart_); t<tEnd_ ; ++t){
 
-      // //create cuda graph for the fwd step
+      //create cuda graph for the fwd step
       if(!fwd_graphs_created){
         CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
         fwdStep();
@@ -662,7 +664,6 @@
         fwd_graphs_created=true;
       }
       CHECK_CUDA(cudaGraphLaunch(fwd_instance, streams[0]));
-      // cudaStreamSynchronize(streams[0]);
 
 
       if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps!=0)){
@@ -717,49 +718,54 @@
                                        uint  k,
                                        uint  startSetpoint){
 
-    uint   currentSetpoint(startSetpoint);
-    reel* h_bwd_state     = new reel[n_dofs_bwd];
-    reel* h_fwd_setpoints = new reel[n_dofs_fwd];
+    bwd_setpoint = startSetpoint;
+
+    CHECK_CUDA( cudaMemcpy(d_step, &tStart_,  sizeof(uint), cudaMemcpyHostToDevice) );
+    CHECK_CUDA( cudaMemcpy(d_setpoint, &bwd_setpoint,  sizeof(uint), cudaMemcpyHostToDevice) );
 
     // Performe the rk4 steps
     for(uint t(tStart_-1); t>=tEnd_ ; --t){
 
+      if(!bwd_graphs_created){
+        CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
+        bwdStep();
+        stepbwd<<<1, 1, 0, streams[0]>>>(d_step, d_setpoint);
+        bwd_setpoint--;
+        CHECK_CUDA(cudaStreamEndCapture(streams[0], &bwd_graph));
+        CHECK_CUDA(cudaGraphInstantiate(&bwd_instance, bwd_graph, NULL, NULL, 0));
+        CHECK_CUDA(cudaGraphDestroy(bwd_graph));
+        bwd_graphs_created=true;
+      }
+      CHECK_CUDA(cudaGraphLaunch(bwd_instance, streams[0]));
 
-        bwdStep(t, currentSetpoint);
         // Point to the previous state vector stored in the trajectory buffer
-        --currentSetpoint;
       if(t==0){break;}
     }  
-
-    delete[] h_fwd_setpoints;
-    delete[] h_bwd_state;
 
     // Save the computed adjoint state in what will be the initial condition for the next backward run
     CHECK_CUDA( cudaMemcpy(d_QinitCond, d_Q, n_dofs*sizeof(reel), cudaMemcpyDeviceToDevice) )
   }
 
-  void __GpuDriver::bwdStep(uint t,
-                            uint currentSetpoint){
+  void __GpuDriver::bwdStep(){
 
     // Compute the derivatives
-    derivatives(d_m1, d_Q, d_trajectories+currentSetpoint*n_dofs_fwd);
+    derivatives(d_m1, d_Q, d_trajectories+bwd_setpoint*n_dofs_fwd);
     modterpolator(d_m1, 0, false, true);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
 
 
-    derivatives(d_m2, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    derivatives(d_m2, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
     modterpolator(d_m2, 0, true, true);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
-    derivatives(d_m3, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    derivatives(d_m3, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
     modterpolator(d_m3, 0, true, true);
-    updateSlope<<<Gamma->ntimes, maxThreads, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
+    updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
-    derivatives(d_m4, d_mi, d_trajectories+currentSetpoint*n_dofs_fwd);
+    derivatives(d_m4, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
     modterpolator(d_m4, -1, false, true);
     // Compute next state vector Q
     integrate<<<nBlocks, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
-
   }
 
   inline void __GpuDriver::derivatives(reel* pm, 
@@ -789,6 +795,7 @@
     //Each excitation is one block. We allocate one thread per non-linear element, with a limit of 512
     //Then each thread is made for one file and one (or more) non linear element
     
+
     SpTdV<<<dim3(Gamma->ntimes, gridShapeY), nThreadsPerBlock, 0, streams[0]>>>(Gamma->d_val,
                                   Gamma->d_slice,
                                   Gamma->d_row, 
@@ -825,8 +832,9 @@
     // wich multiple simulation are needed to compute the system against all
     // of the excitation file
     uint systemStride      = n_dofs/parallelismThroughExcitations;
+    uint nBlocks_mod = ceil( float(ForcePattern->nzz) / nThreadsPerBlock );
     if(interpolationNumberOfPoints==0){
-          applyForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
+          applyForces<<<nBlocks_mod, nThreadsPerBlock, 0, streams[0]>>>
                                                 (ForcePattern->d_val, 
                                                 ForcePattern->d_indice, 
                                                 ForcePattern->nzz, 
@@ -837,7 +845,7 @@
                                                 d_step,
                                                 offset);
     }else{
-          interpolateForces<<<ForcePattern->nzz, 1, 0, streams[0]>>>
+          interpolateForces<<<nBlocks_mod, nThreadsPerBlock, 0, streams[0]>>>
                                                     (ForcePattern->d_val, 
                                                     ForcePattern->d_indice, 
                                                     ForcePattern->nzz, 
@@ -1000,7 +1008,7 @@
       d_m3 = d_fwd_m3;
       d_m4 = d_fwd_m4;
       
-      nBlocks = ceil( float(n_dofs_fwd) / nThreadsPerBlock );
+      nBlocks = ceil( float(n_dofs) / nThreadsPerBlock );
     
       gridShapeY = ceil( float(Lambda->nzz+Gamma->nzz+Psi->nzz) / nThreadsPerBlock );
       //gridShape for SpdtV product, grid dim in X is the number of file, and in y the stride for non linear elements
@@ -1028,7 +1036,7 @@
       d_m3 = d_bwd_m3;
       d_m4 = d_bwd_m4;
 
-      nBlocks = ceil( float(n_dofs_fwd) / nThreadsPerBlock );
+      nBlocks = ceil( float(n_dofs) / nThreadsPerBlock );
 
       gridShapeY = ceil( float(Lambda->nzz+Gamma->nzz+Psi->nzz) / nThreadsPerBlock );
       
@@ -1338,6 +1346,11 @@
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m2, n_dofs_bwd*sizeof(reel)) )
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m3, n_dofs_bwd*sizeof(reel)) )
     CHECK_CUDA( cudaMalloc((void**)&d_bwd_m4, n_dofs_bwd*sizeof(reel)) )
+
+    CHECK_CUDA( cudaMalloc((void**)&d_setpoint, sizeof(uint)) )
+    CHECK_CUDA( cudaMemcpy(d_setpoint, &bwd_setpoint,  sizeof(uint), cudaMemcpyHostToDevice) )
+
+
   }
 
   void __GpuDriver::extendAdjoint(){
@@ -1481,5 +1494,13 @@
 
       CHECK_CUDA( cudaFree(d_bwd_m4) )
       d_bwd_m4 = nullptr;
+    }
+
+    if(d_setpoint!=nullptr){
+      CHECK_CUDA( cudaFree(d_setpoint) )
+    }
+
+    if(bwd_graphs_created){
+      CHECK_CUDA(cudaGraphExecDestroy(bwd_instance));
     }
   }

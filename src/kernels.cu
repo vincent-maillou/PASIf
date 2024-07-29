@@ -80,14 +80,13 @@
                   int offset){
 
   uint selectedExcitation = 0;
-  uint k = blockIdx.x;
+  uint k = blockIdx.x*blockDim.x + threadIdx.x;
   uint step = *d_step+offset;
-  if(step<lengthOfeachExcitation){
+  if(step<lengthOfeachExcitation && step>0 && k<nzz){
     selectedExcitation += d_indice[k]/systemStride;
     atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], excitationsSet[selectedExcitation*lengthOfeachExcitation + step]));
   }
  }
-
 
 
 /** interpolateForces()
@@ -120,14 +119,13 @@
   uint excoff((((step << 1) + (halfStep?1:0))>>log2interp));
 
 
-  uint k = blockIdx.x;
-  // if((excoff<lengthOfeachExcitation && excoff>1 && backward)){
-  //   selectedExcitation += d_indice[k]/systemStride;
-  //   uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
-  //   // Interpolate the excitations
-  //   atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], __fadd_rn(__fmul_rn( interpolationMatrix[interpolationWindowSize-interpidx], excitationsSet[sweepStep+excoff]), __fmul_rn(interpolationMatrix[interpolationWindowSize*2-interpidx], excitationsSet[sweepStep+(excoff-1)]))));
-  // }else if (excoff<lengthOfeachExcitation && excoff>0 && !backward){
-  if (excoff<lengthOfeachExcitation){
+  uint k = threadIdx.x + blockIdx.x*blockDim.x;
+  if((excoff<lengthOfeachExcitation && excoff>1 && k<nzz && backward)){
+    selectedExcitation += d_indice[k]/systemStride;
+    // uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
+    // // Interpolate the excitations
+    // atomicAdd(&Y[d_indice[k]], d_val[k]*(interpolationMatrix[interpolationWindowSize-interpidx]*excitationsSet[sweepStep+excoff]+ interpolationMatrix[interpolationWindowSize*2-interpidx]*excitationsSet[sweepStep+(excoff-1)]));
+  }else if (excoff<lengthOfeachExcitation && excoff>0 && !backward && k<nzz){
       selectedExcitation += d_indice[k]/systemStride;
       uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
       // Interpolate the excitations
@@ -173,4 +171,10 @@
  __global__
  void stepfwd(uint* d_step){
   *d_step += 1;
+ }
+
+  __global__
+ void stepbwd(uint* d_step, uint* d_setpoint){
+  *d_step -= 1;
+  *d_setpoint -= 1;
  }

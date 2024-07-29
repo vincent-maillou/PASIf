@@ -102,8 +102,7 @@ class __GpuDriver{
                           uint  k,
                           uint  startSetpoint);
 
-  void bwdStep(uint t,
-               uint startSetpoint);                        
+  void bwdStep();                        
 
   void derivatives(reel* pm, 
                    reel* pq,
@@ -281,6 +280,13 @@ class __GpuDriver{
   cudaGraph_t fwd_graph;
   cudaGraphExec_t fwd_instance;
   bool fwd_graphs_created;
+
+  bool bwd_graphs_created;
+  uint bwd_setpoint; 
+  uint* d_setpoint;
+  cudaGraph_t bwd_graph;
+  cudaGraphExec_t bwd_instance;
+
 };
 
 

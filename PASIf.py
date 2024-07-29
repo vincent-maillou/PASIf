@@ -332,6 +332,9 @@ class PASIf(__GpuDriver):
                       jac_csr_K.data, 
                       jac_csr_K.indices, 
                       jac_csr_K.indptr)
+                      
+        # for i, v in enumerate(self.jacobian_Gamma.val):
+        #     print(f'Valu {v} at indices {self.jacobian_Gamma.indices[i*3:(i+1)*3]}')
 
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 

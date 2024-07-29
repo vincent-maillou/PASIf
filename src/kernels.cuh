@@ -116,3 +116,7 @@
 
  __global__
  void stepfwd(uint* d_step);
+
+
+ __global__
+ void stepbwd(uint* d_step, uint* d_setpoint);

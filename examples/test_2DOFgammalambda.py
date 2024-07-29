@@ -11,9 +11,9 @@ import time
 import cppyy
 
 USE_SOUND_FILE=True
-TRAJ=True
-GRAD= False
-CHAIN=True
+TRAJ=False
+GRAD= True
+CHAIN=False
 
 system = spr.MechanicalSystem()
 if USE_SOUND_FILE:
@@ -23,17 +23,18 @@ if USE_SOUND_FILE:
     m_cant = 10
     k_cant = (2*50*np.pi)**2*m_cant
     b_cant = .75*2*np.sqrt(k_cant*m_cant)
-
+    gamma  = 1e6
+    duffing  = 1e10 #lambda
 else:    
-    m = 200
-    b = 200
+    m = 2
+    b = 25
     k = 600
-    m_cant = 1000
-    b_cant = 1000
-    k_cant = 500
+    m_cant = 200
+    b_cant = 300
+    k_cant = 600
+    gamma  = 1000
+    duffing  = 0 #lambda
 
-gamma  = 1e6
-duffing  = 1e10 #lambda
 
 force = 1
 filelength = 5000
@@ -80,7 +81,7 @@ if CHAIN:
     k_scale = 10
     gamma  = .01
     duffing  = 1 #lambda
-    delay = .06
+    delay = .5
     delay_per_site = delay/n_sites
     mass = delay_per_site**2
     final_damping = k_scale * delay_per_site # equals sqrt(k_scale*m)
@@ -121,29 +122,28 @@ if CHAIN:
     #optomechanical coupling (gamma)
 
 if not USE_SOUND_FILE:
-    system.excitationSources['step'] = spr.DirectCInjectionSource(f'{force}*(1-t/(NUMSTEPS*TIMESTEP))')
-    system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1e7)
+    system.excitationSources['step'] = spr.DirectCInjectionSource(f'1')
+    system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1000)
     trainingSet = [0]
-
 else:
     trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2500']#, '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2812', '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2020']
 
     # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1010']
-    # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
+    trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
 
-    sr = 16000*16*2
+    sr = 16000*16
     excitationFileLength = 78001
-    numSteps= int(153600*2)
+    numSteps= int(153600)
 
     system.excitationSources['soundData2'] = spr.BinaryFileSource(fileList=trainingSet,
                                                     fileLength=excitationFileLength,
                                                     fileDataType='double',
-                                                    log2Upsampling=3)
+                                                    log2Upsampling=2)
     system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 1e3)
 
 system.probes[f'probe__squared'] = spr.SimpleA2Probe(f'cantilever')
 system.interactionPotentials['probe__squared_grad'] = system.probes['probe__squared'].makeAdjointSource()
-system.probes[f'probe__multi'] = spr.SimpleA2MultiProbe(f'cantilever', f'oscillator')
+# system.probes[f'probe__multi'] = spr.SimpleA2MultiProbe(f'cantilever', f'oscillator')
 
 # for i in range(1, 5):
 #     system.probes[f'probe__multi_{i}'] = spr.SimpleA2MultiProbe(f'dof_{i}', f'dof_{i+1}')
@@ -184,7 +184,7 @@ cudaEnvironment = spr.CUDAEnvironment(vecSystem,
 if not USE_SOUND_FILE:
     excitation = []
     for i in range(filelength):
-        excitation.append(force*(1-i/numSteps))
+        excitation.append(1)
     excitationSet = [excitation]
     cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
  
@@ -219,94 +219,6 @@ if GRAD:
             print(f'Potential {potential}, CPU: {cppGrad[0][i]}, GPU: {gpuGrad[0][i]}, relative error= {(cppGrad[0][i]-gpuGrad[0][i])/cppGrad[0][i]*100}')
             i+= 1
 
-# # SCIPY:
-# from scipy.integrate import solve_ivp
-# from scipy.interpolate import interp1d
-
-# K, Gamma, Lambda, F, X0 = cudaEnvironment.pasif.getMatrices()
-# data = np.fromfile(trainingSet[0])
-# times = np.linspace(0, len(data)/(16000*8), len(data))
-# interpolator = interp1d(times, data)
-
-
-# derivative_string = 'void derivatives (double* source, double* destination, double excitationForce[], int sweepIndex) {\n'
-# system.enumerateVariables()
-# derivative_string += system.generateDerivatives()
-# derivative_string += '}'
-# cppyy.cppdef(derivative_string)
-
-# n_probes = gpu_probe.shape[1]
-# n_dofs = n_sites*2+n_probes
-# destination = np.zeros(n_dofs)
-# source = np.random.rand(n_dofs)
-# excitation_strength = np.array([0]).astype('double')
-
-
-# map_cpp = np.arange(2*n_sites+2)
-# map_scipy = np.concatenate([
-#                 np.arange(n_sites),
-#                 np.arange(n_sites) + n_sites+2,
-#                 np.arange(2)+n_sites*2+2
-# ])
-
-
-
-# class A:
-#     values = []
-#     times = []
-#     def __init__(self):
-#         pass
-
-#     def interp(self, new_array):
-#         res = []
-#         self.values = np.array(self.values)
-#         for i in range(self.values.shape[1]):
-#             res.append(np.interp(new_array, self.times, self.values[:, i]))
-
-#         return np.array(res)
-
-# error_derivative = A()
-
-# def func(t, x, saver):
-#     # global error_derivative
-#     # res = K@np.copy(x)
-
-#     # for i, val in enumerate(Gamma.val):
-#     #     sl, row, col = Gamma.indices[i*3:(i+1)*3]
-#     #     res[sl] += val*x[row]*x[col]
-
-#     # for i, val in enumerate(Lambda.val):
-#     #     hsl, sl, col, row = Lambda.indices[i*4:(i+1)*4]
-#     #     res[hsl] += val*x[sl]*x[col]*x[row]
-
-#     # for i, val in enumerate(F):
-#     #     if not np.isclose(val, 0):
-#     #         res[i] += val*interpolator(t)
-
-#     res_2 = np.zeros(len(x))
-#     excitation_strength[0] = interpolator(t)
-#     source[map_cpp] = x[map_scipy]
-#     cppyy.gbl.derivatives(source, destination, excitation_strength, 0)
-#     res_2[map_scipy] = destination[map_cpp]
-
-#     res_2[n_sites:n_sites+n_probes] = x[n_sites*2+n_probes:-1]
-#     res_2[n_sites*2+n_probes] = x[6]**2
-#     res_2[n_sites*+2+n_probes+1] = x[6]*x[0]
-
-#     # saver.values.append((res-res_2)**2)
-#     # saver.times.append(t)
-#     return res_2
-
-# start = time.time()
-# sp_res = solve_ivp(func, (0, numSteps/sr), X0, t_eval=np.linspace(0, numSteps/sr, numSteps), method='RK45',
-#                     first_step=1/sr, max_step=1/sr, args=[error_derivative])
-
-# # error = error_derivative.interp(gpuTrajectory[0])
-# # print(error.shape)
-
-# print(f'Scipy time: {time.time()-start}')
-# scipy_probe = sp_res.y[-2:,-1]
-
 
 for i in range(gpu_probe.shape[1]):
     relative_error = 100*np.abs((cpp_probe[:,i]-gpu_probe[:,i])/cpp_probe[:,i])
@@ -327,16 +239,6 @@ if TRAJ:
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('amplitude')
 
-        # axs[2].set_title('Scipy Trajectory')
-        # axs[2].plot(gpuTrajectory[0], sp_res.y[i])
-        # axs[2].set_xlabel('time (s)')
-        # axs[2].set_ylabel('amplitude')
-
-        # fig, ax = plt.subplots(1)
-        # ax.plot(gpuTrajectory[0], error[i])
-        # ax.set_title(f'RMS error DOF {i}')
-        # ax.set_xlabel('time (s)')
-        # ax.set_ylabel('error')
 
     for i in range(gpu_probe.shape[1]):
         fig, axs = plt.subplots(2, constrained_layout=True)
@@ -351,56 +253,6 @@ if TRAJ:
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('amplitude')
 
-        # axs[2].set_title('Scipy Trajectory')
-        # axs[2].plot(gpuTrajectory[0], sp_res.y[i+2*n_sites+gpu_probe.shape[1]])
-        # axs[2].set_xlabel('time (s)')
-        # axs[2].set_ylabel('amplitude')
-
-        # fig, ax = plt.subplots(1)
-        # ax.plot(gpuTrajectory[0], error[i+2*n_sites+gpu_probe.shape[1]])
-        # ax.set_title(f'RMS error probe {i}')
-        # ax.set_xlabel('time (s)')
-        # ax.set_ylabel('error')
-
     plt.show()
 
-    raise a
 
-
-    fig, axs = plt.subplots(3, constrained_layout=True)
-    fig.suptitle('String trajectory', fontsize=16)
-    axs[0].set_title('CPP Trajectory')
-    axs[0].plot(gpuTrajectory[0], cppTrajectory[:,0])
-    axs[0].set_xlabel('time (s)')
-    axs[0].set_ylabel('amplitude')
-
-    axs[1].set_title('CUDA Trajectory')
-    axs[1].plot(gpuTrajectory[0], gpuTrajectory[1])
-    axs[1].set_xlabel('time (s)')
-    axs[1].set_ylabel('amplitude')
-
-    axs[2].set_title('Error')
-    axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[1]-cppTrajectory[:,0]))
-    axs[2].set_xlabel('time (s)')
-    axs[2].set_ylabel('amplitude')
-
-    fig, axs = plt.subplots(3, constrained_layout=True)
-    fig.suptitle('Cantilever trajectory', fontsize=16)
-    axs[0].set_title('CPP Trajectory')
-    axs[0].plot(gpuTrajectory[0], cppTrajectory[:,1])
-    axs[0].set_xlabel('time (s)')
-    axs[0].set_ylabel('amplitude')
-
-    axs[1].set_title('CUDA Trajectory')
-    axs[1].plot(gpuTrajectory[0], gpuTrajectory[2])
-    axs[1].set_xlabel('time (s)')
-    axs[1].set_ylabel('amplitude')
-
-    axs[2].set_title('Error')
-    axs[2].plot(gpuTrajectory[0], abs(gpuTrajectory[2]-cppTrajectory[:,1]))
-    axs[2].set_xlabel('time (s)')
-    axs[2].set_ylabel('amplitude')
-    plt.show()   
-
-
-    del cudaEnvironment
