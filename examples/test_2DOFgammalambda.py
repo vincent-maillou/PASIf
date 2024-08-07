@@ -8,7 +8,6 @@ import Springtronics.HelperFunctions as hf
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-import cppyy
 
 USE_SOUND_FILE=True
 TRAJ=False
@@ -24,20 +23,20 @@ if USE_SOUND_FILE:
     k_cant = (2*50*np.pi)**2*m_cant
     b_cant = .75*2*np.sqrt(k_cant*m_cant)
     gamma  = 1e6
-    duffing  = 1e10 #lambda
+    duffing  = 0 #lambda
 else:    
     m = 2
-    b = 25
-    k = 600
+    b = 5
+    k = 10
     m_cant = 200
-    b_cant = 300
-    k_cant = 600
-    gamma  = 1000
+    b_cant = 50
+    k_cant = 500
+    gamma  = 5
     duffing  = 0 #lambda
 
 
 force = 1
-filelength = 5000
+filelength = 50000*3
 numSteps=filelength
 sr = 16000
 x  = np.linspace(0, filelength/sr, filelength)
@@ -50,7 +49,6 @@ system.interactionPotentials[f'{dofName}_K'].strength.parameterized = True
 system.interactionPotentials[f'{dofName}_B'] =  spr.LocalDamping(dofName, b)
 system.interactionPotentials[f'{dofName}_B'].strength.parameterized = True
 
-
 dofName = 'cantilever'
 system.degreesOfFreedom[f'{dofName}'] = spr.ParametricVariable(m_cant)
 system.interactionPotentials[f'{dofName}_K'] =  spr.IntegerPotential(k_cant)
@@ -59,7 +57,7 @@ system.interactionPotentials[f'{dofName}_K'].strength.parameterized = True
 system.interactionPotentials[f'{dofName}_B'] =  spr.LocalDamping(dofName, b_cant)
 system.interactionPotentials[f'{dofName}_B'].strength.parameterized = True
 
-# # # # spring
+# # # # # spring
 system.interactionPotentials[f'{dofName}_L'] =  spr.IntegerPotential(duffing)
 system.interactionPotentials[f'{dofName}_L'].degreesOfFreedom[dofName] = 4
 system.interactionPotentials[f'{dofName}_L'].strength.parameterized = True
@@ -122,14 +120,14 @@ if CHAIN:
     #optomechanical coupling (gamma)
 
 if not USE_SOUND_FILE:
-    system.excitationSources['step'] = spr.DirectCInjectionSource(f'1')
-    system.interactionPotentials[f'excitation'] = spr.Excitation(opticalDOF, 'step', 1000)
+    system.excitationSources['step'] = spr.DirectCInjectionSource(f'.01+.1/(1+t)')
+    system.interactionPotentials[f'excitation'] = spr.Excitation('oscillator', 'step', 1000)
     trainingSet = [0]
 else:
     trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2500']#, '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2812', '/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_2020']
 
     # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1010']
-    trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
+    # trainingSet = ['/home/louvet/Documents/01_data/00_one_to_four/training/soundfile_1012']
 
     sr = 16000*16
     excitationFileLength = 78001
@@ -141,7 +139,7 @@ else:
                                                     log2Upsampling=2)
     system.interactionPotentials[f'excitation2'] = spr.Excitation(opticalDOF, 'soundData2', 1e3)
 
-system.probes[f'probe__squared'] = spr.SimpleA2Probe(f'cantilever')
+system.probes[f'probe__squared'] = spr.SimpleA2Probe(mechanicalDOF)
 system.interactionPotentials['probe__squared_grad'] = system.probes['probe__squared'].makeAdjointSource()
 # system.probes[f'probe__multi'] = spr.SimpleA2MultiProbe(f'cantilever', f'oscillator')
 
@@ -184,7 +182,7 @@ cudaEnvironment = spr.CUDAEnvironment(vecSystem,
 if not USE_SOUND_FILE:
     excitation = []
     for i in range(filelength):
-        excitation.append(1)
+        excitation.append(.01+.1/(1+i/sr))
     excitationSet = [excitation]
     cudaEnvironment.setExcitations(excitationSet, timeStep = 1.0/sr)
  

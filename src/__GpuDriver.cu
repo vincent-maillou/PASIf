@@ -667,7 +667,6 @@
 
 
       if(d_trajectories != nullptr && (t%saveSteps==0) && (saveSteps!=0)){
-        //only save non interpolated steps  
 
           if (std::is_same<float,reel>::value){
             CHECK_CUBLAS( cublasScopy(h_cublas,
@@ -719,7 +718,6 @@
                                        uint  startSetpoint){
 
     bwd_setpoint = startSetpoint;
-
     CHECK_CUDA( cudaMemcpy(d_step, &tStart_,  sizeof(uint), cudaMemcpyHostToDevice) );
     CHECK_CUDA( cudaMemcpy(d_setpoint, &bwd_setpoint,  sizeof(uint), cudaMemcpyHostToDevice) );
 
@@ -730,7 +728,6 @@
         CHECK_CUDA(cudaStreamBeginCapture(streams[0], cudaStreamCaptureModeGlobal)); 
         bwdStep();
         stepbwd<<<1, 1, 0, streams[0]>>>(d_step, d_setpoint);
-        bwd_setpoint--;
         CHECK_CUDA(cudaStreamEndCapture(streams[0], &bwd_graph));
         CHECK_CUDA(cudaGraphInstantiate(&bwd_instance, bwd_graph, NULL, NULL, 0));
         CHECK_CUDA(cudaGraphDestroy(bwd_graph));
@@ -748,24 +745,41 @@
 
   void __GpuDriver::bwdStep(){
 
+    request_setpoint<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>             (d_trajectories,
+    bwd_setpoint,
+    n_dofs_fwd,
+    d_setpoint);
+
+
     // Compute the derivatives
     derivatives(d_m1, d_Q, d_trajectories+bwd_setpoint*n_dofs_fwd);
-    modterpolator(d_m1, 0, false, true);
+    // modterpolator(d_m1, 0, false, true);
     updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m1, h2, n_dofs);
+
+    //update the setpoint for half step
+    half_setpoint<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>             (d_trajectories,
+    bwd_setpoint,
+    n_dofs_fwd,
+    d_setpoint);
 
 
     derivatives(d_m2, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
-    modterpolator(d_m2, 0, true, true);
+    // modterpolator(d_m2, 0, true, true);
     updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m2, h2, n_dofs);
 
     derivatives(d_m3, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
-    modterpolator(d_m3, 0, true, true);
+    // modterpolator(d_m3, 0, true, true);
     updateSlope<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_mi, d_Q, d_m3, h, n_dofs);
 
+    previous_setpoint<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>             (d_trajectories,
+    bwd_setpoint,
+    n_dofs_fwd,
+    d_setpoint);
+
     derivatives(d_m4, d_mi, d_trajectories+bwd_setpoint*n_dofs_fwd);
-    modterpolator(d_m4, -1, false, true);
+    // modterpolator(d_m4, -1, false, true);
     // Compute next state vector Q
-    integrate<<<nBlocks, maxThreads, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
+    integrate<<<nBlocks, nThreadsPerBlock, 0, streams[0]>>>(d_Q, d_m1, d_m2, d_m3, d_m4, h6, n_dofs);
   }
 
   inline void __GpuDriver::derivatives(reel* pm, 
@@ -844,21 +858,34 @@
                                                 Y, 
                                                 d_step,
                                                 offset);
+    }else if(backward){
+      interpolateForces_bwd<<<nBlocks_mod, nThreadsPerBlock, 0, streams[0]>>>
+                                                (ForcePattern->d_val, 
+                                                ForcePattern->d_indice, 
+                                                ForcePattern->nzz, 
+                                                d_ExcitationsSet,
+                                                lengthOfeachExcitation, 
+                                                systemStride,
+                                                Y, 
+                                                d_interpolationMatrix,
+                                                interpolationWindowSize,
+                                                d_step,
+                                                offset,
+                                                halfStep);
     }else{
-          interpolateForces<<<nBlocks_mod, nThreadsPerBlock, 0, streams[0]>>>
-                                                    (ForcePattern->d_val, 
-                                                    ForcePattern->d_indice, 
-                                                    ForcePattern->nzz, 
-                                                    d_ExcitationsSet,
-                                                    lengthOfeachExcitation, 
-                                                    systemStride,
-                                                    Y, 
-                                                    d_interpolationMatrix,
-                                                    interpolationWindowSize,
-                                                    d_step,
-                                                    offset,
-                                                    halfStep,
-                                                    backward);
+      interpolateForces_fwd<<<nBlocks_mod, nThreadsPerBlock, 0, streams[0]>>>
+                                                (ForcePattern->d_val, 
+                                                ForcePattern->d_indice, 
+                                                ForcePattern->nzz, 
+                                                d_ExcitationsSet,
+                                                lengthOfeachExcitation, 
+                                                systemStride,
+                                                Y, 
+                                                d_interpolationMatrix,
+                                                interpolationWindowSize,
+                                                d_step,
+                                                offset,
+                                                halfStep);
     }
   }
 

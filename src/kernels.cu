@@ -79,12 +79,11 @@
                   uint* d_step,
                   int offset){
 
-  uint selectedExcitation = 0;
   uint k = blockIdx.x*blockDim.x + threadIdx.x;
   uint step = *d_step+offset;
   if(step<lengthOfeachExcitation && step>0 && k<nzz){
-    selectedExcitation += d_indice[k]/systemStride;
-    atomicAdd(&Y[d_indice[k]], __fmul_rn(d_val[k], excitationsSet[selectedExcitation*lengthOfeachExcitation + step]));
+    uint selectedExcitation = d_indice[k]/systemStride;
+    atomicAdd(&Y[d_indice[k]], d_val[k]*excitationsSet[selectedExcitation*lengthOfeachExcitation + step]);
   }
  }
 
@@ -95,7 +94,7 @@
  * 
  */
  __global__
- void interpolateForces(reel* d_val, 
+ void interpolateForces_fwd(reel* d_val, 
                         uint* d_indice, 
                         uint  nzz, 
                         reel* excitationsSet,
@@ -106,8 +105,39 @@
                         uint  interpolationWindowSize,
                         uint* d_step,
                         int offset,
-                        bool halfStep,
-                        bool backward){
+                        bool halfStep){
+
+  // Prevent out of bound interpolation, 0 value (no force) will be used
+  // in case of out of bound
+  uint selectedExcitation(0);
+
+  uint step = *d_step+offset;
+  uint log2interp = log2f(interpolationWindowSize);
+  uint interpidx((((step << 1) + (halfStep?1:0)) & (interpolationWindowSize-1)));
+  uint excoff((((step << 1) + (halfStep?1:0))>>log2interp));
+
+  uint k = threadIdx.x + blockIdx.x*blockDim.x;
+  if (excoff<lengthOfeachExcitation && excoff>0 && k<nzz){
+      selectedExcitation += d_indice[k]/systemStride;
+      uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
+      // Interpolate the excitations
+      atomicAdd(&Y[d_indice[k]], d_val[k]*(interpolationMatrix[interpolationWindowSize+interpidx]*excitationsSet[sweepStep+excoff]+interpolationMatrix[interpidx]*excitationsSet[sweepStep+(excoff+1)]));
+  }
+ }
+
+ __global__
+ void interpolateForces_bwd(reel* d_val, 
+                        uint* d_indice, 
+                        uint  nzz, 
+                        reel* excitationsSet,
+                        uint  lengthOfeachExcitation, 
+                        uint  systemStride,
+                        reel* Y, 
+                        reel* interpolationMatrix,
+                        uint  interpolationWindowSize,
+                        uint* d_step,
+                        int offset,
+                        bool halfStep){
 
   // Prevent out of bound interpolation, 0 value (no force) will be used
   // in case of out of bound
@@ -120,19 +150,49 @@
 
 
   uint k = threadIdx.x + blockIdx.x*blockDim.x;
-  if((excoff<lengthOfeachExcitation && excoff>1 && k<nzz && backward)){
+  if((excoff<lengthOfeachExcitation && excoff>1 && k<nzz)){
     selectedExcitation += d_indice[k]/systemStride;
-    // uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
-    // // Interpolate the excitations
-    // atomicAdd(&Y[d_indice[k]], d_val[k]*(interpolationMatrix[interpolationWindowSize-interpidx]*excitationsSet[sweepStep+excoff]+ interpolationMatrix[interpolationWindowSize*2-interpidx]*excitationsSet[sweepStep+(excoff-1)]));
-  }else if (excoff<lengthOfeachExcitation && excoff>0 && !backward && k<nzz){
-      selectedExcitation += d_indice[k]/systemStride;
       uint sweepStep((selectedExcitation)*lengthOfeachExcitation);
       // Interpolate the excitations
-      atomicAdd(&Y[d_indice[k]], d_val[k]*(interpolationMatrix[interpolationWindowSize+interpidx]*excitationsSet[sweepStep+excoff]+interpolationMatrix[interpidx]*excitationsSet[sweepStep+(excoff+1)]));
+      atomicAdd(&Y[d_indice[k]], d_val[k]*(interpolationMatrix[interpolationWindowSize-interpidx]*excitationsSet[sweepStep+excoff]+ interpolationMatrix[interpolationWindowSize*2-interpidx]*excitationsSet[sweepStep+(excoff-1)]));
   }
  }
 
+
+ __global__
+ void request_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint){
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint offset_target = target_pos*n_dofs;
+  uint offset_rqst = *setpoint*n_dofs;
+  if (index<n_dofs) d_traj[offset_target+index] = d_traj[offset_rqst+index];              
+}
+
+ __global__
+ void half_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint){
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint offset_target = target_pos*n_dofs;
+  uint offset_0 = *setpoint*n_dofs;
+  uint offset_1 = (*setpoint-1)*n_dofs;
+
+  if (index<n_dofs) d_traj[offset_target+index] = .5*(d_traj[offset_0+index]+d_traj[offset_1+index]);              
+}
+
+ __global__
+ void previous_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint){
+  uint index  = threadIdx.x + blockIdx.x * blockDim.x;
+  uint offset_target = target_pos*n_dofs;
+  uint offset_rqst = (*setpoint-1)*n_dofs;
+  if (index<n_dofs) d_traj[offset_target+index] = d_traj[offset_rqst+index];              
+}
 
 /** updateSlope()
  * @brief Compute the next estimation vectors

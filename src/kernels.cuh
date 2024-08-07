@@ -71,7 +71,7 @@
  * 
  */
  __global__
- void interpolateForces(reel* d_val, 
+ void interpolateForces_fwd(reel* d_val, 
                         uint* d_indice, 
                         uint  nzz, 
                         reel* excitationsSet,
@@ -82,10 +82,39 @@
                         uint  interpolationWindowSize,
                         uint* d_step,
                         int offset,
-                        bool halfStep,
-                        bool backward);
+                        bool halfStep);
 
+ __global__
+ void interpolateForces_bwd(reel* d_val, 
+                        uint* d_indice, 
+                        uint  nzz, 
+                        reel* excitationsSet,
+                        uint  lengthOfeachExcitation, 
+                        uint  systemStride,
+                        reel* Y, 
+                        reel* interpolationMatrix,
+                        uint  interpolationWindowSize,
+                        uint* d_step,
+                        int offset,
+                        bool halfStep);
 
+ __global__
+ void request_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint);
+
+ __global__
+ void half_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint);
+
+ __global__
+ void previous_setpoint(reel* d_traj,
+                    uint target_pos,
+                    uint n_dofs,
+                    uint* setpoint);
 
 /** updateSlope()
  * @brief Compute the next estimation vectors

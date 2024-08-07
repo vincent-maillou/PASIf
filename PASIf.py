@@ -113,7 +113,7 @@ class coo_tensor:
         else:
             for i in range(len(self.val)):
                 self.val[i] = self.val[i] * diagMatrix_[self.indices[i*len(self.dimensions)]]
-        
+
     def getIndicesDim(self, dim_: int) -> list[int]:
         # Unfold the indices list of the tensor and return the indices  
         # of the dimension dim_ in a list format.
@@ -325,25 +325,38 @@ class PASIf(__GpuDriver):
 
         self.__jacobianPreprocessing() 
         self.jacobianSet = True     
-
         jac_csr_K = (self.jacobian_B+self.jacobian_K).tocsr()
         jac_csr_K.sort_indices()
+        
+        # print()
+        # print()
+        # print("K")
+        # print(jac_csr_K)
         self._setBwdK(self.jacobian_K.shape,
                       jac_csr_K.data, 
                       jac_csr_K.indices, 
                       jac_csr_K.indptr)
-                      
+
+        # print()
+        # print()
+        # print("Gamma")
         # for i, v in enumerate(self.jacobian_Gamma.val):
-        #     print(f'Valu {v} at indices {self.jacobian_Gamma.indices[i*3:(i+1)*3]}')
+        #     print(f'Val {v} at {self.jacobian_Gamma.indices[3*i:3*(i+1)]}')
 
         self._setBwdGamma(self.jacobian_Gamma.dimensions, 
                           self.jacobian_Gamma.val, 
                           self.jacobian_Gamma.indices)
 
+        # print()
+        # print()
+        # print("Lambda")
+        # for i, v in enumerate(self.jacobian_Lambda.val):
+        #     print(f'Val {v} at {self.jacobian_Lambda.indices[4*i:4*(i+1)]}')
+
         self._setBwdLambda(self.jacobian_Lambda.dimensions,
                            self.jacobian_Lambda.val,
                            self.jacobian_Lambda.indices)
-        
+
         self._setBwdForcePattern(self.jacobian_forcePattern)
         self._setBwdInitialConditions(self.jacobian_initialConditions)
 
@@ -411,7 +424,9 @@ class PASIf(__GpuDriver):
         if self.jacobianSet == False:
             raise ValueError("The jacobian must be set before computing the gradient.")
 
-        return self._getGradient(0)
+        res =  self._getGradient(0)
+        # print(res)
+        return res
 
     def getMatrices(self):
         if not self.systemSet: raise ValueError("System is not set yet")
@@ -603,9 +618,15 @@ class PASIf(__GpuDriver):
         self.system_forcePattern *= -1.*self.system_M.data
         
     def __jacobianPreprocessing(self):
+
+        # print()
+        # print()
+        # print("M")
+        # print(self.jacobian_M.data)
+
         self.jacobian_M = -1*inv(self.jacobian_M)
         self.jacobian_B = coo_matrix(self.jacobian_M.dot(self.jacobian_B))
-        self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K))        
+        self.jacobian_K = coo_matrix(self.jacobian_M.dot(self.jacobian_K)) 
         self.jacobian_Gamma.multiplyByDiagMatrix(self.jacobian_M.data)
         self.jacobian_Lambda.multiplyByDiagMatrix(self.jacobian_M.data)
         self.jacobian_Psi.multiplyByDiagMatrix(self.jacobian_M.data)
